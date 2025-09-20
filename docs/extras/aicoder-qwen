@@ -1,0 +1,49 @@
+#!/bin/bash
+
+OAUTH_JSON=~/.qwen/oauth_creds.json
+
+if [[ ! -f $OAUTH_JSON ]]; then
+    echo "no oauth file found $OAUTH_JSON"
+    exit
+fi
+
+expiry_date=$(gojq -r .expiry_date ${OAUTH_JSON})
+expiry_date=${expiry_date:0:10}
+
+seconds_to_expire=$((expiry_date - EPOCHSECONDS))
+
+if (( seconds_to_expire <= 0 )); then
+    echo "Token expired... run qwen coder to update..."
+    exit 1
+else
+    minutes_to_expire=$((seconds_to_expire / 60))
+    echo "Minutes to expire oauth: $minutes_to_expire"
+fi
+
+qwen_version="$TMPDIR/qwen-coder-version"
+if [ -e "$qwen_version" ]; then
+    fdate=$(date -r $qwen_version +%s)
+    if (( EPOCHSECONDS - fdate > 60 * 60 * 24 )); then
+        rm "$qwen_version"
+    fi
+fi
+if [ ! -e "$qwen_version" ]; then
+    echo "Updating qwen version info..."
+    repo_json=$(gorl https://api.github.com/repos/QwenLM/qwen-code/releases/latest)
+    latest_version=$(echo "$repo_json" | gojq -r ".tag_name" | cut -d'-' -f1)
+    echo "$latest_version" > $qwen_version
+else
+    latest_version=$(<$qwen_version)
+fi
+
+export HTTP_USER_AGENT="QwenCode/${latest_version} (linux; x64)"
+echo "Variable: USER_AGENT = $HTTP_USER_AGENT"
+
+export OPENAI_API_KEY=$(gojq -r .access_token ${OAUTH_JSON})
+export OPENAI_BASE_URL=https://portal.qwen.ai/v1
+export OPENAI_MODEL=qwen3-coder-plus
+#export OPENAI_MODEL=qwen3-coder-flash
+
+export AUTO_COMPACT_THRESHOLD=131072
+
+exec aicoder-start

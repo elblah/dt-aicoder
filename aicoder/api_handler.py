@@ -1,0 +1,206 @@
+"""
+API request handling for AI Coder.
+"""
+
+import json
+import time
+import tty
+import sys
+import urllib.request
+import urllib.error
+import threading
+from typing import List, Dict, Any
+
+from .config import (
+    DEBUG,
+    RED,
+    RESET,
+    ENABLE_STREAMING,
+)
+from .streaming_adapter import StreamingAdapter
+from .api_client import APIClient
+
+
+class APIHandlerMixin(APIClient):
+    """Mixin class for API request handling."""
+
+    def __init__(self):
+        super().__init__(getattr(self, "animator", None), getattr(self, "stats", None))
+
+    def _make_api_request(
+        self,
+        messages: List[Dict[str, Any]],
+        disable_streaming_mode: bool = False,
+        disable_tools: bool = False,
+    ):
+        """Sends a request to the OpenAI-compatible API.
+
+        Args:
+            messages: List of message dictionaries to send to the API
+            disable_streaming_mode: If True, disables streaming mode (used for internal prompts
+                                  that don't benefit from streaming, like summaries and autopilot decisions)
+            disable_tools: If True, excludes tools from the request (used for decisions and summaries)
+        """
+        # Use streaming adapter if enabled and not disabled for this request
+        if ENABLE_STREAMING and not disable_streaming_mode:
+            # Initialize streaming adapter if not already done
+            if not hasattr(self, "_streaming_adapter"):
+                self._streaming_adapter = StreamingAdapter(
+                    self, getattr(self, "animator", None)
+                )
+            return self._streaming_adapter.make_request(
+                messages, disable_streaming_mode, disable_tools
+            )
+
+        # Original implementation for non-streaming
+        # Update stats
+        self.stats.api_requests += 1
+
+        # Prepare API request data using shared functionality
+        api_data = self._prepare_api_request_data(
+            messages,
+            stream=False,
+            disable_tools=disable_tools,
+            tool_manager=getattr(self, "tool_manager", None),
+        )
+
+        self.animator.start_animation("Making API request...")
+
+        # Track API call time
+        api_start_time = time.time()
+
+        while True:
+            try:
+                # Check for user cancellation during animation
+                if self.animator.check_user_cancel():
+                    self.animator.stop_animation()
+                    print(f"\n{RED}Request cancelled by user.{RESET}")
+                    raise Exception("REQUEST_CANCELLED_BY_USER")
+
+                # Validate tool definitions using shared functionality
+                self._validate_tool_definitions(api_data)
+                request_body = json.dumps(api_data).encode("utf-8")
+            except TypeError as e:
+                self.animator.stop_animation()
+                print(f"\n{RED}Error serializing data for API request: {e}{RESET}")
+                return None
+            except Exception as e:
+                if str(e) == "REQUEST_CANCELLED_BY_USER":
+                    # Record time spent even on cancelled API calls
+                    self._update_stats_on_failure(api_start_time)
+                    return None
+                self.animator.stop_animation()
+                raise
+
+            if DEBUG:
+                if not disable_streaming_mode:
+                    print(f"DEBUG: data length = {len(request_body)}")
+                    try:
+                        debug_data = json.loads(request_body.decode("utf-8"))
+                        print(
+                            f"DEBUG: API request data: {json.dumps(debug_data, indent=2)}"
+                        )
+                    except Exception as e:
+                        print(f"DEBUG: Could not decode request body for debug: {e}")
+
+            # Threading approach for API request with ESC cancellation support
+            def api_request_worker(result_dict, stop_event):
+                """Worker function to make the API request in a separate thread."""
+                try:
+                    # Validate JSON before sending
+                    try:
+                        json.loads(request_body.decode("utf-8"))
+                    except json.JSONDecodeError as je:
+                        raise ValueError(f"Invalid JSON in request body: {je}")
+
+                    response_data = self._make_http_request(api_data, timeout=300)
+                    result_dict["response"] = response_data
+                    result_dict["success"] = True
+                except Exception as e:
+                    result_dict["error"] = e
+                    result_dict["success"] = False
+
+            # Dictionary to share results between threads
+            result_dict = {}
+
+            # Create and start the API request thread
+            api_thread = threading.Thread(
+                target=api_request_worker, args=(result_dict, None)
+            )
+            api_thread.daemon = True
+            api_thread.start()
+
+            # Monitor for ESC key press while waiting for API response
+            old_settings = self._setup_terminal_for_input()
+            try:
+                tty.setcbreak(sys.stdin.fileno())
+
+                # Wait for the thread to complete or for user cancellation
+                while api_thread.is_alive():
+                    time.sleep(0.1)  # Small delay to prevent busy-waiting
+
+                    # Check for ESC keypress (non-blocking)
+                    if self._handle_user_cancellation():
+                        self.animator.stop_animation()
+                        print(f"\n{RED}Request cancelled by user (ESC).{RESET}")
+                        # Note: We can't actually terminate the API request thread,
+                        # but we can ignore its result
+                        return None
+
+                # Thread has completed, get the result
+                self.animator.stop_animation()
+
+                # Wait for thread to finish and get result
+                api_thread.join()
+
+                if result_dict.get("success"):
+                    self._update_stats_on_success(
+                        api_start_time, result_dict["response"]
+                    )
+
+                    # Extract token usage information from the response
+                    response = result_dict["response"]
+                    if DEBUG:
+                        print(f"DEBUG: API response keys: {list(response.keys())}")
+                        if "usage" in response:
+                            print(f"DEBUG: Usage data: {response['usage']}")
+                        else:
+                            print("DEBUG: No 'usage' key in response")
+                            # Print the entire response structure to see what's there
+                            print(f"DEBUG: Full response keys: {list(response.keys())}")
+
+                    if "usage" in response:
+                        usage = response["usage"]
+                        # Extract prompt tokens (input) and completion tokens (output)
+                        if "prompt_tokens" in usage:
+                            self.stats.prompt_tokens += usage["prompt_tokens"]
+                        if "completion_tokens" in usage:
+                            self.stats.completion_tokens += usage["completion_tokens"]
+
+                    return response
+                else:
+                    # Record time spent even on failed API calls
+                    self._update_stats_on_failure(api_start_time)
+                    raise result_dict["error"]
+
+            except Exception as e:
+                self.animator.stop_animation()
+                if str(e) == "REQUEST_CANCELLED_BY_USER":
+                    # Record time spent even on cancelled API calls
+                    self._update_stats_on_failure(api_start_time)
+                    return None
+
+                # Handle HTTP errors specifically
+                if isinstance(e, urllib.error.HTTPError):
+                    if self._handle_http_error(e):
+                        continue
+                    return None
+                # Handle connection errors (Broken pipe, etc.)
+                elif isinstance(e, urllib.error.URLError):
+                    self._handle_connection_error(e)
+                    return None
+                else:
+                    raise
+            finally:
+                # Restore terminal settings
+                self._restore_terminal(old_settings)

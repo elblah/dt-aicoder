@@ -1,0 +1,55 @@
+#!/bin/bash
+# AI Coder Launcher Script
+# 
+# This script provides a convenient way to run AI Coder with optional sandboxing.
+# It creates a temporary copy of the aicoder.pyz file and runs it in a firejail sandbox
+# for enhanced security, with automatic cleanup on exit.
+
+# Set the path to your aicoder.pyz file
+# You can override this by setting the AICODER_PYZ_PATH environment variable
+AICODER_PYZ_PATH="${AICODER_PYZ_PATH:-~/poc/aicoder/v2/aicoder.pyz}"
+
+# Create a temporary file for execution
+TMP_AICODER_FILE=$(mktemp)
+
+# Cleanup function to remove temporary file on exit
+cleanup() {
+    rm -f "$TMP_AICODER_FILE"
+}
+trap cleanup EXIT
+
+# Copy the aicoder.pyz file to temporary location
+cp "$AICODER_PYZ_PATH" "$TMP_AICODER_FILE"
+
+# Additional firejail options (can be extended)
+OPTS=""
+
+# Check if sandboxing is explicitly disabled
+if [[ "$SANDBOX" = 0 ]]; then
+    # Run without sandboxing
+    python "$TMP_AICODER_FILE"
+else
+    # Check if firejail is available
+    if command -v firejail &> /dev/null; then
+        # Run with firejail sandboxing for enhanced security
+        firejail $OPTS --quiet --disable-mnt --private-dev \
+            --whitelist="$HOME/.config/aicoder" \
+            --whitelist="$HOME/.local/bin" \
+            --read-only="$HOME" \
+            --private-tmp \
+            --blacklist=/opt \
+            --blacklist=/boot \
+            --whitelist="$PWD" \
+            --read-write="$PWD" \
+                python "$TMP_AICODER_FILE"
+    else
+        # Firejail not available, run without sandboxing but warn user
+        echo "Warning: firejail not found, running without sandboxing"
+        echo "To enable sandboxing, please install firejail:"
+        echo "  Ubuntu/Debian: sudo apt install firejail"
+        echo "  Fedora: sudo dnf install firejail"
+        echo "  Arch: sudo pacman -S firejail"
+        echo ""
+        python "$TMP_AICODER_FILE"
+    fi
+fi

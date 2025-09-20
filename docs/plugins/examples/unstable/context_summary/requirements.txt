@@ -1,0 +1,5 @@
+# Context Summary Plugin Requirements
+# This plugin is designed to work with AICoder v2.0+
+
+# No additional dependencies required beyond standard Python libraries
+# The plugin uses only built-in Python modules and AICoder's internal APIs

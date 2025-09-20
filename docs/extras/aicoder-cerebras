@@ -1,0 +1,35 @@
+#!/bin/bash
+
+models=$(cat << EOF
+qwen-3-coder-480b
+qwen-3-235b-a22b-instruct-2507
+qwen-3-235b-a22b-thinking-2507
+gpt-oss-120b
+llama-4-maverick-17b-128e-instruct
+llama-4-scout-17b-16e-instruct
+EOF
+)
+
+MODEL=$(echo "$models" | fzf -e | cut -d';' -f1)
+[ -z "$MODEL" ] && MODEL=gemini-2.5-flash
+
+if [ -n "$MODEL" ]; then
+    echo "Model: $MODEL"
+fi    
+
+# Check if CEREBRAS_API_KEY environment variable is set
+if [[ -z "$CEREBRAS_API_KEY" ]]; then
+    echo "Error: CEREBRAS_API_KEY environment variable is not set"
+    echo "Please set it with your Cerebras API key:"
+    echo "  export CEREBRAS_API_KEY=your_api_key_here"
+    echo "Then run this script again"
+    exit 1
+fi
+
+export OPENAI_API_KEY=$CEREBRAS_API_KEY
+export OPENAI_BASE_URL=https://api.cerebras.ai/v1
+export OPENAI_MODEL=$MODEL
+
+export AUTO_COMPACT_THRESHOLD=131072
+
+exec aicoder-start

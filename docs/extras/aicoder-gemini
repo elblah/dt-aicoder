@@ -1,0 +1,24 @@
+#!/bin/bash
+
+models=$(cat << EOF
+gemini-2.5-pro
+gemini-2.5-flash
+EOF
+)
+
+MODEL=$(echo "$models" | fzf -e | cut -d';' -f1)
+[ -z "$MODEL" ] && MODEL=gemini-2.5-flash
+
+if [ -n "$MODEL" ]; then
+    echo "Model: $MODEL"
+fi    
+
+export OPENAI_API_KEY=$GEMINI_API_KEY
+export OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+export OPENAI_MODEL=$MODEL
+
+#export DISABLE_STREAMING=1
+
+export AUTO_COMPACT_THRESHOLD=131072
+
+exec aicoder-start
