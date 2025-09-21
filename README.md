@@ -1,6 +1,6 @@
-# AI Coder
+# AI Coder: Fast, Lightweight & Extensible AI-Assisted Development
 
-AI Coder is an AI-assisted coding tool with MCP (Model Context Protocol) support. It allows you to interact with AI models through a command-line interface and provides access to various tools for file system operations and command execution.
+AI Coder is a command-line interface (CLI) for AI-assisted coding, powered by MCP (Model Context Protocol). It provides seamless interaction with AI models and a comprehensive set of tools for file system operations and command execution.
 
 ## Demo
 
@@ -9,24 +9,42 @@ AI Coder is an AI-assisted coding tool with MCP (Model Context Protocol) support
 ## Features
 
 - Interactive chat with AI models
+- Can be extended with plugins (e.g., custom tools, integrations)
 - MCP tool support for file operations and command execution
 - User approval system for sensitive operations
 - Session management (save/load)
 - Memory compaction for long conversations
 - Colorized output for better readability
-- Streaming SSE support with optional logging (enabled by default, now with enhanced compatibility for Google's OpenAI-compatible endpoint)
+- Streaming SSE support with optional logging for real-time output
 - Low CPU and memory usage - significantly less than other AI coders
 - Works exceptionally well with TMUX terminal multiplexer
 - Zero external dependencies - no risk of dependency chain attacks
-- Developed and optimized on Raspberry Pi 3B - uses less than 5% CPU most of the time
+- Developed and optimized on Raspberry Pi 3B - uses less than 5% CPU most of the time on the RPI3B
+
+## Why AI Coder?
+
+Many existing AI coding assistants often come with significant overhead:
+
+- **Resource Heavy:** They consume excessive CPU and memory, impacting system performance and battery life.
+- **Complex Dependencies:** A multitude of external dependencies complicates installation, upgrades, and introduces potential security risks.
+- **Obscured Operations:** Background processes can make it unclear what the AI is doing, leading to a lack of transparency.
+
+AI Coder was built to address these challenges, offering a fundamentally different approach:
+
+- **Ultra-Lightweight & Efficient:** Engineered for minimal CPU and memory consumption, it's ideal for resource-constrained environments like the Raspberry Pi 3B (often using less than 5% CPU) and extends battery life on laptops and mobile devices (e.g., Termux on Android).
+- **Zero External Dependencies:** A truly standalone application, eliminating dependency bloat, simplifying maintenance, and enhancing security.
+- **Transparent Execution:** All operations are visible and in the foreground, providing complete insight into the AI's actions. No flickering screens, just clear, direct interaction.
+- **Seamless TMUX Integration:** Designed to work flawlessly within TMUX, enhancing your command-line workflow.
+
+AI Coder isn't just another tool; it's a commitment to efficiency, transparency, and a streamlined AI-assisted development experience.
 
 ## Installation
 
 ### Automated Installation (Recommended)
 
 ```bash
-git clone <repository-url>
-cd aicoder
+git clone https://github.com/elblah/dt-aicoder
+cd dt-aicoder
 ./install.sh
 ```
 
@@ -41,16 +59,24 @@ This will:
 If you have `uv` installed, you can also install AI Coder as a tool:
 
 ```bash
-# Install from github repo
+# Install from github repo (the easiest method)
 uv tool install git+https://github.com/elblah/dt-aicoder
 
 # Or install from local directory
+git clone https://github.com/elblah/dt-aicoder
+cd dt-aicoder
 uv tool install . --editable
 
 # Or after installation, run with:
 uvx aicoder
 
 ```
+
+For examples on configuring additional tools (commandline, JSON-RPC, or MCP-STDIO), refer to `docs/extras/mcp_tools.json`.
+
+Also in the docs/extras you can find startup scripts that you can customize.
+
+Lots of plugins are available in docs/plugins/examples
 
 Once installed as a uv tool, you can run AI Coder from anywhere with:
 ```bash
@@ -64,14 +90,16 @@ For the full experience with sandboxing, use the automated installation script a
 ### From Source (Traditional)
 
 ```bash
-git clone <repository-url>
-cd aicoder
+git clone https://github.com/elblah/dt-aicoder
+cd dt-aicoder
 pip install -e .
 ```
 
 ### As a Zipapp
 
 ```bash
+git clone https://github.com/elblah/dt-aicoder
+cd dt-aicoder
 python build_zippapp.py
 python aicoder.pyz
 ```
@@ -94,6 +122,8 @@ aicoder
 ```
 
 ## Running Tests
+
+Ensuring the stability and correctness of AI Coder is paramount. This section outlines how to run tests effectively, with critical considerations for tool execution.
 
 ### ⚠️ CRITICAL: ALWAYS Run Tests with YOLO_MODE=1
 
@@ -219,6 +249,7 @@ AI Coder can be configured through environment variables:
 
 AI Coder supports dynamic color themes that can be applied at runtime:
 
+- `original` - Standard ANSI terminal colors
 - `default` - Standard color scheme
 - `luna` - Purple-themed color scheme
 - `sunset` - Orange/red-themed color scheme
@@ -243,7 +274,7 @@ AI Coder includes several built-in tools to help the AI interact with the file s
 - `grep` - Search for text in files
 - `glob` - Find files matching a pattern (supports ** for recursive matching)
 - `pwd` - Get the current working directory
-- `update_plan` - Track and display task progress to the user
+- `update_plan` - Displays a task plan with progress tracking to the user. *Note: This tool is enabled by the 'Plan Plugin'.*
 
 ### update_plan Tool
 
