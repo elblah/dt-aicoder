@@ -174,8 +174,8 @@ class APIClient:
                 "Authorization": f"Bearer {API_KEY}",
                 "User-Agent": os.environ.get("HTTP_USER_AGENT", "Mozilla/5.0"),
                 "Referrer": "localhost",
-                "HTTP-Referer": "https://localhost",
-                "X-Title": "Local",
+                "HTTP-Referer": "https://github.com/elblah/dt-aicoder",
+                "X-Title": "dt-aicoder",
             },
             method="POST",
         )
