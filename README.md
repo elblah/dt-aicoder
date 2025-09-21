@@ -40,6 +40,10 @@ AI Coder isn't just another tool; it's a commitment to efficiency, transparency,
 
 ## Installation
 
+## Installation Demo
+
+![Installation Demo](install.gif)
+
 ### Automated Installation (Recommended)
 
 ```bash
