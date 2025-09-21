@@ -2,6 +2,10 @@
 
 AI Coder is an AI-assisted coding tool with MCP (Model Context Protocol) support. It allows you to interact with AI models through a command-line interface and provides access to various tools for file system operations and command execution.
 
+## Demo
+
+![Demo](demo.gif)
+
 ## Features
 
 - Interactive chat with AI models
