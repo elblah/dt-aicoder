@@ -75,24 +75,7 @@ def execute_write_file(path: str, content: str, stats) -> str:
             if old_content == content:
                 return f"File '{abs_path}' unchanged."
             else:
-                # Simple line-based diff
-                old_lines = old_content.splitlines(keepends=True)
-                new_lines = content.splitlines(keepends=True)
-                diff = list(
-                    difflib.unified_diff(
-                        old_lines,
-                        new_lines,
-                        fromfile=f"{abs_path} (old)",
-                        tofile=f"{abs_path} (new)",
-                    )
-                )
-
-                if diff:
-                    # Colorize the diff output using our new function
-                    diff_text = colorize_diff_lines("".join(diff))
-                    return f"Successfully updated '{abs_path}' ({len(content)} characters).\n\nChanges:\n{diff_text}"
-                else:
-                    return f"Successfully updated '{abs_path}' ({len(content)} characters)."
+                return f"Successfully updated '{abs_path}' ({len(content)} characters)."
 
     except Exception as e:
         stats.tool_errors += 1

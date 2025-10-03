@@ -48,12 +48,12 @@ WARNING: If you do not follow these requirements:
    - You may change the wrong instance if you don't include enough context
 
 Special cases:
-- To create a new file: provide file_path and new_string, leave old_string empty
-- To delete content: provide file_path and old_string, leave new_string empty""",
+- To create a new file: provide path and new_string, leave old_string empty
+- To delete content: provide path and old_string, leave new_string empty""",
     "parameters": {
         "type": "object",
         "properties": {
-            "file_path": {
+            "path": {
                 "type": "string",
                 "description": "The absolute path to the file to modify",
             },
@@ -66,19 +66,19 @@ Special cases:
                 "description": "The edited text to replace the old_string",
             },
         },
-        "required": ["file_path", "old_string", "new_string"],
+        "required": ["path", "old_string", "new_string"],
     },
     "validate_function": "validate_edit_file",
 }
 
 
-def generate_diff(old_content: str, new_content: str, file_path: str) -> str:
+def generate_diff(old_content: str, new_content: str, path: str) -> str:
     """Generate a unified diff between old and new content."""
     old_lines = old_content.splitlines(keepends=True)
     new_lines = new_content.splitlines(keepends=True)
 
     diff = difflib.unified_diff(
-        old_lines, new_lines, fromfile=f"{file_path} (old)", tofile=f"{file_path} (new)"
+        old_lines, new_lines, fromfile=f"{path} (old)", tofile=f"{path} (new)"
     )
 
     # Convert generator to list and join properly
@@ -87,7 +87,7 @@ def generate_diff(old_content: str, new_content: str, file_path: str) -> str:
 
 
 def execute_edit_file(
-    file_path: str,
+    path: str,
     old_string: str,
     new_string: str,
     stats=None,
@@ -96,7 +96,7 @@ def execute_edit_file(
     Edit a file with safety checks similar to production-ready implementations.
 
     Args:
-        file_path: Path to the file to edit
+        path: Path to the file to edit
         old_string: Text to be replaced (must be unique)
         new_string: Replacement text
         stats: Stats object to track tool usage
@@ -106,75 +106,72 @@ def execute_edit_file(
     """
     try:
         # Convert to absolute path
-        file_path = os.path.abspath(file_path)
+        path = os.path.abspath(path)
 
         # Handle file creation (when old_string is empty)
         if old_string == "":
-            return _create_new_file(file_path, new_string, stats)
+            return _create_new_file(path, new_string, stats)
 
         # Handle content deletion (when new_string is empty)
         if new_string == "":
-            return _delete_content(file_path, old_string, stats)
+            return _delete_content(path, old_string, stats)
 
         # Handle content replacement
-        return _replace_content(file_path, old_string, new_string, stats)
+        return _replace_content(path, old_string, new_string, stats)
 
     except Exception as e:
         if stats:
             stats.tool_errors += 1
-        return f"Error editing file '{file_path}': {e}"
+        return f"Error editing file '{path}': {e}"
 
 
-def _create_new_file(file_path: str, content: str, stats) -> str:
+def _create_new_file(path: str, content: str, stats) -> str:
     """Create a new file."""
     try:
         # Check if file already exists
-        if os.path.exists(file_path):
-            if os.path.isdir(file_path):
-                return f"Error: Path is a directory, not a file: {file_path}"
-            return f"Error: File already exists: {file_path}"
+        if os.path.exists(path):
+            if os.path.isdir(path):
+                return f"Error: Path is a directory, not a file: {path}"
+            return f"Error: File already exists: {path}"
 
         # Create parent directories if they don't exist
-        directory = os.path.dirname(file_path)
+        directory = os.path.dirname(path)
         if directory:
             os.makedirs(directory, exist_ok=True)
 
         # Write the file
-        with open(file_path, "w", encoding="utf-8") as f:
+        with open(path, "w", encoding="utf-8") as f:
             f.write(content)
 
         # Record file operations
-        record_file_read(file_path)
+        record_file_read(path)
 
-        # Show a diff-like output for consistency with write_file
-        # For new files, show the content being created (similar to write_file behavior)
-        content_preview = content[:500] + "..." if len(content) > 500 else content
-        return f"Successfully created '{file_path}' ({len(content)} characters).\n\nContent:\n{content_preview}"
+        return f"Successfully created '{path}' ({len(content)} characters)."
 
     except Exception as e:
         if stats:
             stats.tool_errors += 1
-        return f"Error creating file '{file_path}': {e}"
+        return f"Error creating file '{path}': {e}"
 
 
-def _delete_content(file_path: str, old_string: str, stats) -> str:
+def _delete_content(path: str, old_string: str, stats) -> str:
     """Delete content from a file."""
     try:
         # Check if file exists
-        if not os.path.exists(file_path):
-            return f"Error: File not found: {file_path}"
+        if not os.path.exists(path):
+            return f"Error: File not found: {path}"
 
         # Check if it's a directory
-        if os.path.isdir(file_path):
-            return f"Error: Path is a directory, not a file: {file_path}"
+        if os.path.isdir(path):
+            return f"Error: Path is a directory, not a file: {path}"
 
         # Check if file was modified since last read
-        mod_check_error = check_file_modification_strict(file_path)
+        mod_check_error = check_file_modification_strict(path)
         if mod_check_error:
             return mod_check_error
 
         # Read current content
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8") as f:
             old_content = f.read()
 
         # Check if old_string exists
@@ -192,44 +189,39 @@ def _delete_content(file_path: str, old_string: str, stats) -> str:
             old_content[:first_index] + old_content[first_index + len(old_string) :]
         )
 
-        # Generate diff
-        diff = generate_diff(old_content, new_content, file_path)
-        # Colorize the diff
-        colored_diff = colorize_diff_lines(diff)
-
         # Write the file
-        with open(file_path, "w", encoding="utf-8") as f:
+        with open(path, "w", encoding="utf-8") as f:
             f.write(new_content)
 
         # Record file operations
-        record_file_read(file_path)
+        record_file_read(path)
 
-        return f"Successfully updated '{file_path}' ({len(new_content)} characters).\n\nChanges:\n{colored_diff}"
+        return f"Successfully updated '{path}' ({len(new_content)} characters)."
 
     except Exception as e:
         if stats:
             stats.tool_errors += 1
-        return f"Error deleting content from file '{file_path}': {e}"
+        return f"Error deleting content from file '{path}': {e}"
 
 
-def _replace_content(file_path: str, old_string: str, new_string: str, stats) -> str:
+def _replace_content(path: str, old_string: str, new_string: str, stats) -> str:
     """Replace content in a file."""
     try:
         # Check if file exists
-        if not os.path.exists(file_path):
-            return f"Error: File not found: {file_path}"
+        if not os.path.exists(path):
+            return f"Error: File not found: {path}"
 
         # Check if it's a directory
-        if os.path.isdir(file_path):
-            return f"Error: Path is a directory, not a file: {file_path}"
+        if os.path.isdir(path):
+            return f"Error: Path is a directory, not a file: {path}"
 
         # Check if file was modified since last read
-        mod_check_error = check_file_modification_strict(file_path)
+        mod_check_error = check_file_modification_strict(path)
         if mod_check_error:
             return mod_check_error
 
         # Read current content
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8") as f:
             old_content = f.read()
 
         # Check if old_string exists
@@ -253,24 +245,19 @@ def _replace_content(file_path: str, old_string: str, new_string: str, stats) ->
             + old_content[first_index + len(old_string) :]
         )
 
-        # Generate diff
-        diff = generate_diff(old_content, new_content, file_path)
-        # Colorize the diff
-        colored_diff = colorize_diff_lines(diff)
-
         # Write the file
-        with open(file_path, "w", encoding="utf-8") as f:
+        with open(path, "w", encoding="utf-8") as f:
             f.write(new_content)
 
         # Record file operations
-        record_file_read(file_path)
+        record_file_read(path)
 
-        return f"Successfully updated '{file_path}' ({len(new_content)} characters).\n\nChanges:\n{colored_diff}"
+        return f"Successfully updated '{path}' ({len(new_content)} characters)."
 
     except Exception as e:
         if stats:
             stats.tool_errors += 1
-        return f"Error replacing content in file '{file_path}': {e}"
+        return f"Error replacing content in file '{path}': {e}"
 
 
 def validate_edit_file(arguments: Dict[str, Any]) -> str | bool:
@@ -283,32 +270,32 @@ def validate_edit_file(arguments: Dict[str, Any]) -> str | bool:
     try:
         import os
 
-        file_path = arguments.get("file_path", "")
+        path = arguments.get("path", "")
         old_string = arguments.get("old_string", "")
         new_string = arguments.get("new_string", "")
 
         # Handle file creation (when old_string is empty)
         if old_string == "":
             # For file creation, just check if file already exists
-            if os.path.exists(file_path) and os.path.isdir(file_path):
-                return f"Error: Path is a directory, not a file: {file_path}"
+            if os.path.exists(path) and os.path.isdir(path):
+                return f"Error: Path is a directory, not a file: {path}"
             return True
 
         # Handle content deletion or replacement
         # Check if file exists
-        if not os.path.exists(file_path):
-            return f"Error: File not found: {file_path}"
+        if not os.path.exists(path):
+            return f"Error: File not found: {path}"
 
         # Check if it's a directory
-        if os.path.isdir(file_path):
-            return f"Error: Path is a directory, not a file: {file_path}"
+        if os.path.isdir(path):
+            return f"Error: Path is a directory, not a file: {path}"
 
         # Read current content
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(path, "r", encoding="utf-8") as f:
                 old_content = f.read()
         except Exception as e:
-            return f"Error reading file '{file_path}': {e}"
+            return f"Error reading file '{path}': {e}"
 
         # Check if old_string exists (for deletion or replacement)
         if old_string != "" and old_string not in old_content:

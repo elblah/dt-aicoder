@@ -8,19 +8,11 @@ import time
 import urllib.request
 import subprocess
 from typing import Dict, Any, List, Tuple
+
+from ..utils import parse_json_arguments
 from datetime import datetime
 from .. import config
-from ..config import (
-    DEBUG,
-    YELLOW,
-    RED,
-    BLUE,
-    RESET,
-    BOLD,
-    DEFAULT_TRUNCATION_LIMIT,
-    GREEN,
-)
-from ..utils import colorize_diff_lines
+from ..utils import colorize_diff_lines, make_readline_safe
 from .internal_tools import INTERNAL_TOOL_FUNCTIONS
 from .validator import (
     validate_tool_parameters,
@@ -28,6 +20,13 @@ from .validator import (
     validate_function_signature,
 )
 from .approval_system import ApprovalSystem
+
+# Import readline to enable readline functionality
+try:
+    import readline
+except ImportError:
+    # readline is not available on this platform
+    pass
 
 DENIED_MESSAGE = "EXECUTION DENIED BY THE USER"
 
@@ -43,6 +42,10 @@ class ToolExecutor:
 
     def _log_malformed_tool_call(self, tool_name: str, arguments_raw: str):
         """Log malformed tool calls to a file for debugging purposes."""
+        # Only log if debug mode is enabled
+        if not config.DEBUG:
+            return
+            
         try:
             # Create a timestamp for the log file
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -60,9 +63,9 @@ class ToolExecutor:
             with open(log_filename, "w") as f:
                 json.dump(log_entry, f, indent=2)
 
-            print(f"{YELLOW} * Malformed tool call logged to {log_filename}{RESET}")
+            print(f"{config.YELLOW} * Malformed tool call logged to {log_filename}{config.RESET}")
         except Exception as e:
-            print(f"{RED} * Failed to log malformed tool call: {e}{RESET}")
+            print(f"{config.RED} * Failed to log malformed tool call: {e}{config.RESET}")
 
     def _improved_json_parse(self, json_string):
         """
@@ -82,6 +85,43 @@ class ToolExecutor:
                 json_string,
                 e.pos,
             )
+
+    def _normalize_arguments(self, arguments):
+        """
+        Normalize arguments to ensure they are in dictionary format.
+        
+        Note: Arguments should already be parsed by the time this is called,
+        but we handle the case where they might still be a string for backward compatibility.
+        """
+        # Handle any remaining string arguments (shouldn't happen if we parse earlier)
+        if isinstance(arguments, str):
+            try:
+                arguments = parse_json_arguments(arguments)
+            except (json.JSONDecodeError, ValueError):
+                # If parsing fails, return the original value
+                pass
+
+        # Ensure arguments is a dictionary before using **
+        if not isinstance(arguments, dict):
+            # If arguments is still not a dict, try to convert common types
+            if isinstance(arguments, list) and len(arguments) > 0:
+                # If it's a list, use the first element if it's a dict
+                if isinstance(arguments[0], dict):
+                    arguments = arguments[0]
+                else:
+                    # Wrap the list in a dict
+                    arguments = {"value": arguments}
+            elif isinstance(arguments, (int, float, bool, type(None))):
+                # If it's a primitive, wrap it in a dict
+                arguments = {"value": arguments}
+            elif isinstance(arguments, str):
+                # If it's still a string, wrap it in a dict as content
+                arguments = {"content": arguments}
+            else:
+                # Default to empty dict as fallback
+                arguments = {}
+
+        return arguments
 
     def execute_tool_calls(
         self, message: Dict[str, Any]
@@ -104,62 +144,46 @@ class ToolExecutor:
             function_info = tool_call["function"]
             func_name = function_info["name"]
 
-            print(f"\n{YELLOW}└─ AI wants to call tool: {func_name}{RESET}")
+            print(f"\n{config.YELLOW}└─ AI wants to call tool: {func_name}{config.RESET}")
 
-            # Handle arguments - must be valid JSON, no guessing or second chances
+            # Handle arguments - parse once at the beginning, use parsed version throughout
             arguments_raw = function_info["arguments"]
             arguments = None
 
-            # Arguments must be a string that parses to valid JSON, or already parsed dict/list
-            if isinstance(arguments_raw, str):
-                try:
-                    # Parse JSON exactly once - no double parsing, no fallbacks
-                    arguments = json.loads(arguments_raw)
-                    # Handle double-encoded JSON strings (common AI error)
-                    if isinstance(arguments, str):
-                        try:
-                            arguments = json.loads(arguments)
-                        except json.JSONDecodeError:
-                            # If double parsing fails, keep the first parsed result
-                            pass
-                except json.JSONDecodeError as e:
-                    # Reject immediately if JSON is invalid
-                    error_msg = f"Error: Malformed JSON in tool call arguments for '{func_name}'. The AI generated invalid JSON that cannot be parsed. Please ensure your JSON is properly formatted with double quotes and correct syntax. Error details: {str(e)}"
-                    print(f"{RED} * {error_msg}{RESET}")
-                    print(f"{RED} * Raw arguments: {arguments_raw}{RESET}")
-                    print(
-                        f"{YELLOW} * This tool call has been rejected and will not be added to the message history to prevent session corruption.{RESET}"
-                    )
+            # Parse JSON once with our utility function
+            try:
+                arguments = parse_json_arguments(arguments_raw)
+            except (json.JSONDecodeError, ValueError) as e:
+                # Reject immediately if JSON is invalid
+                error_msg = f"Error: Malformed JSON in tool call arguments for '{func_name}'. The AI generated invalid JSON that cannot be parsed. Please ensure your JSON is properly formatted with double quotes and correct syntax. Error details: {str(e)}"
+                print(f"{config.RED} * {error_msg}{config.RESET}")
+                print(f"{config.RED} * Raw arguments: {arguments_raw}{config.RESET}")
+                print(
+                    f"{config.YELLOW} * This tool call has been rejected and will not be added to the message history to prevent session corruption.{config.RESET}"
+                )
 
-                    # Log the malformed tool call to a file for debugging
-                    self._log_malformed_tool_call(func_name, arguments_raw)
+                # Log the malformed tool call to a file for debugging
+                self._log_malformed_tool_call(func_name, arguments_raw)
 
-                    # Create an educational message for the AI (not a tool result)
-                    educational_message = {
-                        "role": "system",
-                        "content": f"SYSTEM ERROR: Your tool call for '{func_name}' was rejected due to invalid JSON format.\n\n"
-                        f"Please ensure your JSON arguments are properly formatted:\n"
-                        f'• Use double quotes (") for all strings and keys\n'
-                        f"• Properly escape special characters\n"
-                        f"• Check for missing commas and brackets\n"
-                        f"• Validate JSON structure before sending\n\n"
-                        f"Please correct your tool call and try again.",
-                    }
-                    tool_results.append(educational_message)
+                # Create an educational message for the AI (not a tool result)
+                educational_message = {
+                    "role": "user",
+                    "content": f"SYSTEM ERROR: Your tool call for '{func_name}' was rejected due to invalid JSON format.\n\n"
+                    f"Please ensure your JSON arguments are properly formatted:\n"
+                    f' - Use double quotes (") for all strings and keys\n'
+                    f" - Properly escape special characters\n"
+                    f" - Check for missing commas and brackets\n"
+                    f" - Validate JSON structure before sending\n\n"
+                    f"Please correct your tool call and try again.",
+                }
+                tool_results.append(educational_message)
 
-                    # Skip processing this tool call entirely (no tool result will be generated)
-                    continue
-            elif isinstance(arguments_raw, (dict, list)):
-                # Already parsed arguments
-                arguments = arguments_raw
-            else:
-                # Invalid arguments type
-                error_msg = f"Error: Invalid arguments type for tool '{func_name}'. Expected string or dict/list, got {type(arguments_raw)}"
-                print(f"{RED} * {error_msg}{RESET}")
+                # Skip processing this tool call entirely (no tool result will be generated)
+                continue
 
                 # Create an educational message for the AI
                 educational_message = {
-                    "role": "system",
+                    "role": "user",
                     "content": f"SYSTEM ERROR: Your tool call for '{func_name}' was rejected because it contained invalid arguments. Expected JSON string or parsed object.\n"
                     f"Please correct your tool call and try again.",
                 }
@@ -192,10 +216,10 @@ class ToolExecutor:
                     if (
                         key not in hidden_parameters
                         and isinstance(value, str)
-                        and len(value) > DEFAULT_TRUNCATION_LIMIT
+                        and len(value) > config.DEFAULT_TRUNCATION_LIMIT
                     ):
                         display_args[key] = (
-                            value[:DEFAULT_TRUNCATION_LIMIT] + "... [truncated]"
+                            value[:config.DEFAULT_TRUNCATION_LIMIT] + "... [truncated]"
                         )
 
             # Check if arguments should be hidden completely
@@ -205,7 +229,7 @@ class ToolExecutor:
 
             # If cancel all is active, skip execution and mark as cancelled
             if cancel_all_active:
-                print(f"{RED} * Skipping tool call (cancel all active)...{RESET}")
+                print(f"{config.RED} * Skipping tool call (cancel all active)...{config.RESET}")
                 result = "CANCELLED_BY_USER"
                 tool_config_for_display = None
                 guidance_content = None
@@ -218,7 +242,7 @@ class ToolExecutor:
                 if result == "CANCEL_ALL_TOOL_CALLS":
                     cancel_all_active = True
                     print(
-                        f"{RED} * Cancel all activated for remaining tool calls{RESET}"
+                        f"{config.RED} * Cancel all activated for remaining tool calls{config.RESET}"
                     )
 
             # Check if we added an educational message for this tool call (indicating rejection)
@@ -247,9 +271,9 @@ class ToolExecutor:
                 else:
                     # Truncate result display for cleaner output (increased limit for diffs)
                     result_display = str(result)
-                    if len(result_display) > DEFAULT_TRUNCATION_LIMIT:
+                    if len(result_display) > config.DEFAULT_TRUNCATION_LIMIT:
                         result_display = (
-                            result_display[:DEFAULT_TRUNCATION_LIMIT]
+                            result_display[:config.DEFAULT_TRUNCATION_LIMIT]
                             + "... [truncated]"
                         )
                     print(f"   - Result: {result_display}")
@@ -264,7 +288,7 @@ class ToolExecutor:
 
             # Verify that the tool_call_id is not None or empty
             if not tool_call["id"]:
-                print(f"{RED} * Warning: Empty tool_call_id for {func_name}{RESET}")
+                print(f"{config.RED} * Warning: Empty tool_call_id for {func_name}{config.RESET}")
 
             tool_results.append(tool_result_entry)
 
@@ -302,7 +326,9 @@ class ToolExecutor:
         if with_guidance:
             try:
                 self.animator.stop_cursor_blinking()
-                guidance_content = input(f"{BOLD}{GREEN}Guidance: {RESET}").strip()
+                guidance_prompt = f"{config.BOLD}{config.GREEN}Guidance: {config.RESET}"
+                safe_guidance_prompt = make_readline_safe(guidance_prompt)
+                guidance_content = input(safe_guidance_prompt).strip()
             except (EOFError, KeyboardInterrupt):
                 # If user cancels guidance input, proceed without guidance
                 guidance_content = None
@@ -368,7 +394,7 @@ class ToolExecutor:
                 if not tool_config:
                     return f"Error: Tool '{tool_name}' not found.", {}, None
 
-            if DEBUG:
+            if config.DEBUG:
                 print(f"DEBUG: Executing tool {tool_name} with config: {tool_config}")
 
             tool_type = tool_config.get("type")
@@ -409,7 +435,10 @@ class ToolExecutor:
                 try:
                     # Handle approval for internal tools
                     auto_approved = tool_config.get("auto_approved", False)
-                    if not auto_approved and not config.YOLO_MODE:
+                    needs_approval = not auto_approved and not config.YOLO_MODE
+                    yolo_approval = not auto_approved and config.YOLO_MODE
+                    
+                    if needs_approval or yolo_approval:
                         prompt_message = self.approval_system.format_tool_prompt(
                             tool_name, arguments, tool_config
                         )
@@ -418,22 +447,40 @@ class ToolExecutor:
                             # Return validation error directly
                             return prompt_message, tool_config, None
 
-                        approved, with_guidance = (
-                            self.approval_system.request_user_approval(
-                                prompt_message, tool_name, arguments, tool_config
+                        if needs_approval:  # Non-YOLO mode - ask user
+                            approved, with_guidance = (
+                                self.approval_system.request_user_approval(
+                                    prompt_message, tool_name, arguments, tool_config
+                                )
                             )
-                        )
-                        if not approved:
-                            # Handle guidance prompt even for denied tools
-                            guidance_content = self._handle_guidance_prompt(
-                                with_guidance
-                            )
-                            return DENIED_MESSAGE, tool_config, guidance_content
+                            if not approved:
+                                # Handle guidance prompt even for denied tools
+                                guidance_content = self._handle_guidance_prompt(
+                                    with_guidance
+                                )
+                                return DENIED_MESSAGE, tool_config, guidance_content
 
-                        # Store guidance flag for later use
-                        if with_guidance:
-                            # We'll handle guidance after execution
-                            pass
+                            # Store guidance flag for later use
+                            if with_guidance:
+                                # We'll handle guidance after execution
+                                pass
+                        else:  # YOLO mode - auto approve but show the prompt
+                            print(f"\n{config.YELLOW}{prompt_message}{config.RESET}")
+                            print(f"{config.GREEN}Auto approving... running YOLO MODE!{config.RESET}")
+
+                    # Normalize arguments to ensure they are in dictionary format
+                    arguments = self._normalize_arguments(arguments)
+
+                    # Final validation: ensure arguments is a dictionary for tool execution
+                    if not isinstance(arguments, dict):
+                        error_msg = (
+                            f"ERROR: Invalid JSON format in arguments for tool '{tool_name}'. "
+                            f"The JSON string could not be parsed into a dictionary. "
+                            f"Please ensure your JSON arguments are properly formatted with correct syntax, "
+                            f"double quotes for strings, and proper escaping."
+                        )
+                        print(f"{config.RED} * {error_msg}{config.RESET}")
+                        return error_msg, tool_config, None
 
                     # Special handling for run_shell_command to pass tool_index and total_tools
                     if tool_name == "run_shell_command":
@@ -468,7 +515,7 @@ class ToolExecutor:
                     "tool_description_command"
                 ):
                     try:
-                        if DEBUG:
+                        if config.DEBUG:
                             print(
                                 f"DEBUG: Running tool_description_command for {tool_name}"
                             )
@@ -489,7 +536,7 @@ class ToolExecutor:
                                     tool_config = dict(tool_config)
                                     old_desc = tool_config.get("description", "")
                                     tool_config["description"] = dynamic_desc
-                                    if DEBUG:
+                                    if config.DEBUG:
                                         print(
                                             f"DEBUG: Updated description for {tool_name}"
                                         )
@@ -501,7 +548,7 @@ class ToolExecutor:
                             print(
                                 f"WARNING: tool_description_command failed for {tool_name} with return code {desc_proc.returncode}"
                             )
-                            if DEBUG:
+                            if config.DEBUG:
                                 print(f"DEBUG: stderr: {desc_proc.stderr}")
                                 print(f"DEBUG: stdout: {desc_proc.stdout}")
                     except subprocess.TimeoutExpired:
@@ -512,7 +559,7 @@ class ToolExecutor:
                         print(
                             f"ERROR: Exception in tool_description_command for {tool_name}: {e}"
                         )
-                        if DEBUG:
+                        if config.DEBUG:
                             import traceback
 
                             traceback.print_exc()
@@ -522,7 +569,7 @@ class ToolExecutor:
                     "append_to_system_prompt_command"
                 ):
                     try:
-                        if DEBUG:
+                        if config.DEBUG:
                             print(
                                 f"DEBUG: Running append_to_system_prompt_command for {tool_name}"
                             )
@@ -553,7 +600,7 @@ class ToolExecutor:
                             print(
                                 f"WARNING: append_to_system_prompt_command failed for {tool_name} with return code {append_proc.returncode}"
                             )
-                            if DEBUG:
+                            if config.DEBUG:
                                 print(f"DEBUG: stderr: {append_proc.stderr}")
                                 print(f"DEBUG: stdout: {append_proc.stdout}")
                     except subprocess.TimeoutExpired:
@@ -564,7 +611,7 @@ class ToolExecutor:
                         print(
                             f"ERROR: Exception in append_to_system_prompt_command for {tool_name}: {e}"
                         )
-                        if DEBUG:
+                        if config.DEBUG:
                             import traceback
 
                             traceback.print_exc()
@@ -596,20 +643,20 @@ class ToolExecutor:
                                     timeout=60,
                                 )
                                 if preview_result.stdout.strip():
-                                    print(f"{BLUE}--- PREVIEW OUTPUT ---{RESET}")
+                                    print(f"{config.BLUE}--- PREVIEW OUTPUT ---{config.RESET}")
                                     # Check if we should colorize the preview output
                                     output = preview_result.stdout.rstrip()
                                     if should_colorize_diff:
                                         output = colorize_diff_lines(output)
                                     print(output)
                                 if preview_result.stderr.strip():
-                                    print(f"{RED}--- PREVIEW STDERR ---{RESET}")
+                                    print(f"{config.RED}--- PREVIEW STDERR ---{config.RESET}")
                                     output = preview_result.stderr.rstrip()
                                     if should_colorize_diff:
                                         output = colorize_diff_lines(output)
                                     print(output)
                             except Exception as e:
-                                print(f"{RED}Error running preview command: {e}{RESET}")
+                                print(f"{config.RED}Error running preview command: {e}{config.RESET}")
 
                         prompt_message = self.approval_system.format_tool_prompt(
                             tool_name, arguments, tool_config
@@ -630,6 +677,9 @@ class ToolExecutor:
                                 with_guidance
                             )
                             return DENIED_MESSAGE, tool_config, guidance_content
+
+                    # Normalize arguments to ensure they are in dictionary format
+                    arguments = self._normalize_arguments(arguments)
 
                     command = tool_config["command"].format(**arguments)
                     # Print the executing command with potential colorization
@@ -656,13 +706,13 @@ class ToolExecutor:
                     # Format command output nicely
                     result_lines = []
                     if result.stdout.strip():
-                        result_lines.append(f"{BLUE}--- STDOUT ---{RESET}")
+                        result_lines.append(f"{config.BLUE}--- STDOUT ---{config.RESET}")
                         output = result.stdout.rstrip()
                         if should_colorize_diff:
                             output = colorize_diff_lines(output)
                         result_lines.append(output)
                     if result.stderr.strip():
-                        result_lines.append(f"{RED}--- STDERR ---{RESET}")
+                        result_lines.append(f"{config.RED}--- STDERR ---{config.RESET}")
                         output = result.stderr.rstrip()
                         if should_colorize_diff:
                             output = colorize_diff_lines(output)
@@ -709,6 +759,9 @@ class ToolExecutor:
                                 with_guidance
                             )
                             return DENIED_MESSAGE, tool_config, guidance_content
+
+                    # Normalize arguments to ensure they are in dictionary format
+                    arguments = self._normalize_arguments(arguments)
 
                     url = tool_config["url"]
                     method = tool_config["method"]

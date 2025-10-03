@@ -105,8 +105,14 @@ class TestInternalTools(unittest.TestCase):
             command="echo 'Hello World'", stats=self.mock_stats
         )
 
-        # Verify the command output is in the result
+        # Verify the command output is in the result (without Command: prefix)
         self.assertIn("Hello World", result)
+        # Verify that the old format (with Command:) is not present
+        self.assertNotIn("Command: echo 'Hello World'", result)
+        # Verify return code is present
+        self.assertIn("Return code:", result)
+        # Verify stdout label is present
+        self.assertIn("Stdout:", result)
 
     def test_run_shell_command_with_reason(self):
         """Test the run_shell_command tool with a reason."""
@@ -118,6 +124,12 @@ class TestInternalTools(unittest.TestCase):
 
         # Verify the command executed successfully
         self.assertIn("Test", result)
+        # Verify that the reason is not included in the output anymore
+        self.assertNotIn("Reason: Testing shell command execution", result)
+        # Verify return code is present
+        self.assertIn("Return code:", result)
+        # Verify stdout label is present
+        self.assertIn("Stdout:", result)
 
 
 if __name__ == "__main__":

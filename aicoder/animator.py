@@ -8,7 +8,7 @@ import select
 import threading
 from datetime import timedelta
 
-from .config import BOLD, RESET
+from . import config
 
 # termios is imported conditionally for Unix systems
 try:
@@ -56,7 +56,7 @@ class Animator:
                     cursor_code = "\033[?25l"  # Hide cursor
 
                 sys.stdout.write(
-                    f"\r{RESET}{BOLD}{message} {char} {elapsed_str} (Press ESC to cancel){RESET}{cursor_code}"
+                    f"\r{config.RESET}{config.BOLD}{message} {char} {elapsed_str} (Press ESC to cancel){config.RESET}{cursor_code}"
                 )
                 sys.stdout.flush()
 

@@ -9,8 +9,8 @@ import unittest
 # Add the parent directory to the path to import aicoder modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-# Import color definitions from config
-from aicoder.config import RED, GREEN, RESET
+# Import config module (not individual constants)
+import aicoder.config as config
 
 from aicoder.utils import safe_strip, colorize_diff_lines, parse_markdown
 
@@ -60,7 +60,7 @@ class TestUtils(unittest.TestCase):
         text = "# Main Header"
         result = parse_markdown(text)
         # Streaming style uses red color for headers
-        self.assertIn(f"{RED}# Main Header", result)
+        self.assertIn(f"{config.RED}# Main Header", result)
 
         # Test H2
         text = "## Sub Header"
@@ -79,21 +79,21 @@ class TestUtils(unittest.TestCase):
         text = "This is **bold text** here"
         result = parse_markdown(text)
         # Streaming style uses green color for bold
-        self.assertIn(f"{GREEN}**bold text**{RESET}", result)
+        self.assertIn(f"{config.GREEN}**bold text**{config.RESET}", result)
 
     def test_parse_markdown_italic(self):
         """Test parsing italic markdown."""
         text = "This is *italic text* here"
         result = parse_markdown(text)
         # Streaming style uses green color for italic
-        self.assertIn(f"{GREEN}*italic text*{RESET}", result)
+        self.assertIn(f"{config.GREEN}*italic text*{config.RESET}", result)
 
     def test_parse_markdown_inline_code(self):
         """Test parsing inline code markdown."""
         text = "This is `inline code` here"
         result = parse_markdown(text)
         # Streaming style uses green color for inline code
-        self.assertIn(f"{GREEN}`inline code`{RESET}", result)
+        self.assertIn(f"{config.GREEN}`inline code`{config.RESET}", result)
 
     def test_parse_markdown_empty(self):
         """Test parsing empty markdown."""

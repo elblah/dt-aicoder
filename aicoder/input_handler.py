@@ -3,19 +3,38 @@ Input handling for AI Coder.
 """
 
 import os
-from .config import GREEN, YELLOW, RED, RESET, BOLD
+import readline
+from . import config
+from .utils import make_readline_safe
 
 
 class InputHandlerMixin:
     """Mixin class for input handling."""
 
+    def _display_token_info(self):
+        """Display token information before user prompt and AI response."""
+        if not hasattr(self, 'stats'):
+            return
+        
+        from .utils import display_token_info
+        display_token_info(self.stats, config.AUTO_COMPACT_THRESHOLD)
+
     def _get_multiline_input(self) -> str:
         """Handles multi-line input with backslash continuation."""
+        # Display token information before user prompt if enabled
+        if config.ENABLE_TOKEN_INFO_DISPLAY:
+            self._display_token_info()
+
         lines = []
         while True:
-            prompt = f"{BOLD}{GREEN}\n>{RESET} " if not lines else f"{GREEN}...{RESET} "
+            if not lines:
+                prompt = f"{config.BOLD}{config.GREEN}\n>{config.RESET} "
+            else:
+                prompt = f"{config.GREEN}...{config.RESET} "
+            # Make the prompt readline-safe to handle colors properly
+            safe_prompt = make_readline_safe(prompt)
             try:
-                line = input(prompt).rstrip()
+                line = input(safe_prompt).rstrip()
 
                 # Check if this is a continuation line (ends with backslash)
                 if line.endswith("\\") and not line.endswith("\\\\"):
@@ -54,12 +73,12 @@ class InputHandlerMixin:
                 # If file has content, append it to user input
                 if prompt_append_content:
                     # Print a blank line and the prompt append content in yellow
-                    print(f"\n{YELLOW}Prompt append: {prompt_append_content}{RESET}")
+                    print(f"\n{config.YELLOW}Prompt append: {prompt_append_content}{config.RESET}")
 
                     # Append the content with a blank line separator
                     return f"{user_input}\n\n{prompt_append_content}"
             except Exception as e:
-                print(f"{RED}Error reading {prompt_append_file}: {e}{RESET}")
+                print(f"{config.RED}Error reading {prompt_append_file}: {e}{config.RESET}")
 
         # Return original input if no file or empty content
         return user_input

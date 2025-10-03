@@ -8,7 +8,7 @@ import subprocess
 import importlib
 from typing import Any, Dict, List
 
-from ..config import APP_NAME, DEBUG, GREEN, HOME_DIR, RED, YELLOW, RESET
+from .. import config
 
 
 class ToolRegistry:
@@ -40,19 +40,19 @@ class ToolRegistry:
                     # Check if it has a TOOL_DEFINITION
                     if hasattr(tool_module, "TOOL_DEFINITION"):
                         self.mcp_tools[attr_name] = tool_module.TOOL_DEFINITION
-                        if DEBUG:
+                        if config.DEBUG:
                             print(
-                                f"{GREEN}*** Loaded internal tool: {attr_name}{RESET}"
+                                f"{config.GREEN}*** Loaded internal tool: {attr_name}{config.RESET}"
                             )
                 except Exception as e:
-                    if DEBUG:
+                    if config.DEBUG:
                         print(
-                            f"{YELLOW}*** Skipping {attr_name} during internal tool loading: {e}{RESET}"
+                            f"{config.YELLOW}*** Skipping {attr_name} during internal tool loading: {e}{config.RESET}"
                         )
                     continue
 
         except Exception as e:
-            print(f"{RED}*** Error loading internal tools: {e}{RESET}")
+            print(f"{config.RED}*** Error loading internal tools: {e}{config.RESET}")
 
     def _load_external_tools(self):
         """Load external tools from configuration files."""
@@ -61,7 +61,7 @@ class ToolRegistry:
         if mcp_tools_path:
             filename = mcp_tools_path
         else:
-            filename = f"{HOME_DIR}/.config/{APP_NAME}/mcp_tools.json"
+            filename = f"{config.HOME_DIR}/.config/{config.APP_NAME}/mcp_tools.json"
             if not os.path.exists(filename):
                 filename = "mcp_tools.json"
 
@@ -74,24 +74,24 @@ class ToolRegistry:
                 external_tools = json.load(f)
 
                 # Process each tool/server definition
-                for name, config in external_tools.items():
+                for name, tool_config in external_tools.items():
                     # Check if the tool/server is disabled
-                    if config.get("disabled", False):
-                        if DEBUG:
+                    if tool_config.get("disabled", False):
+                        if config.DEBUG:
                             print(
-                                f"{YELLOW}*** Skipping disabled tool/server: {name}{RESET}"
+                                f"{config.YELLOW}*** Skipping disabled tool/server: {name}{config.RESET}"
                             )
                         continue
 
                     # Merge external tools, overriding defaults if there are conflicts
-                    self.mcp_tools[name] = config
+                    self.mcp_tools[name] = tool_config
 
                     # 1) Dynamic description: allow tools to supply a runtime description
-                    if isinstance(config, dict) and config.get(
+                    if isinstance(tool_config, dict) and tool_config.get(
                         "tool_description_command"
                     ):
                         try:
-                            if DEBUG:
+                            if config.DEBUG:
                                 print(
                                     f"DEBUG: Running tool_description_command for {name} during load"
                                 )
@@ -99,7 +99,7 @@ class ToolRegistry:
                                     f"DEBUG: Current working directory: {os.getcwd()}"
                                 )
                             desc_proc = subprocess.run(
-                                config["tool_description_command"],
+                                tool_config["tool_description_command"],
                                 shell=True,
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE,
@@ -116,7 +116,7 @@ class ToolRegistry:
                                         self.mcp_tools[name]["description"] = (
                                             dynamic_desc
                                         )
-                                        if DEBUG:
+                                        if config.DEBUG:
                                             print(
                                                 f"DEBUG: Updated description for {name}"
                                             )
@@ -127,7 +127,7 @@ class ToolRegistry:
                                 print(
                                     f"WARNING: tool_description_command failed for {name} with return code {desc_proc.returncode}"
                                 )
-                                if DEBUG:
+                                if config.DEBUG:
                                     print(f"DEBUG: stderr: {desc_proc.stderr}")
                                     print(f"DEBUG: stdout: {desc_proc.stdout}")
                         except subprocess.TimeoutExpired:
@@ -138,17 +138,17 @@ class ToolRegistry:
                             print(
                                 f"ERROR: Exception in tool_description_command for {name}: {e}"
                             )
-                            if DEBUG:
+                            if config.DEBUG:
                                 import traceback
 
                                 traceback.print_exc()
 
                     # 2) Append to system prompt if command specifies it
-                    if isinstance(config, dict) and config.get(
+                    if isinstance(tool_config, dict) and tool_config.get(
                         "append_to_system_prompt_command"
                     ):
                         try:
-                            if DEBUG:
+                            if config.DEBUG:
                                 print(
                                     f"DEBUG: Running append_to_system_prompt_command for {name} during load"
                                 )
@@ -159,7 +159,7 @@ class ToolRegistry:
                                     f"DEBUG: Has message_history: {hasattr(self, 'message_history')}"
                                 )
                             append_proc = subprocess.run(
-                                config["append_to_system_prompt_command"],
+                                tool_config["append_to_system_prompt_command"],
                                 shell=True,
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE,
@@ -181,7 +181,7 @@ class ToolRegistry:
                                         self.message_history.messages[0]["content"] += (
                                             f"\n\n{append_content}"
                                         )
-                                        if DEBUG:
+                                        if config.DEBUG:
                                             print(
                                                 f"DEBUG: Appended content to system prompt for {name}"
                                             )
@@ -195,7 +195,7 @@ class ToolRegistry:
                                 print(
                                     f"WARNING: append_to_system_prompt_command failed for {name} with return code {append_proc.returncode}"
                                 )
-                                if DEBUG:
+                                if config.DEBUG:
                                     print(f"DEBUG: stderr: {append_proc.stderr}")
                                     print(f"DEBUG: stdout: {append_proc.stdout}")
                         except subprocess.TimeoutExpired:
@@ -206,42 +206,42 @@ class ToolRegistry:
                             print(
                                 f"ERROR: Exception in append_to_system_prompt_command for {name}: {e}"
                             )
-                            if DEBUG:
+                            if config.DEBUG:
                                 import traceback
 
                                 traceback.print_exc()
 
                     # Count tools vs servers
-                    if config.get("type") == "mcp-stdio":
+                    if tool_config.get("type") == "mcp-stdio":
                         mcp_servers_count += 1
                     else:
                         external_tools_count += 1
 
                 print(
-                    f"{GREEN}*** Loaded {len(self.mcp_tools)} tools ({len([t for t in self.mcp_tools.values() if t.get('type') == 'internal'])} internal, {external_tools_count} external) and {mcp_servers_count} external MCP servers.{RESET}"
+                    f"{config.GREEN}*** Loaded {len(self.mcp_tools)} tools ({len([t for t in self.mcp_tools.values() if t.get('type') == 'internal'])} internal, {external_tools_count} external) and {mcp_servers_count} external MCP servers.{config.RESET}"
                 )
-                if DEBUG:
-                    print(f"{YELLOW}*** Tool configurations: {self.mcp_tools}{RESET}")
+                if config.DEBUG:
+                    print(f"{config.YELLOW}*** Tool configurations: {self.mcp_tools}{config.RESET}")
         except FileNotFoundError:
             # This is not an error, it's expected if the user wants a simple setup
             print(
-                f"{GREEN}*** Loaded {len(self.mcp_tools)} internal tools. No '{filename}' found.{RESET}"
+                f"{config.GREEN}*** Loaded {len(self.mcp_tools)} internal tools. No '{filename}' found.{config.RESET}"
             )
         except json.JSONDecodeError:
             print(
-                f"{RED}*** Error decoding MCP tool file: {filename}. Using internal tools only.{RESET}"
+                f"{config.RED}*** Error decoding MCP tool file: {filename}. Using internal tools only.{config.RESET}"
             )
         except Exception as e:
             print(
-                f"{RED}*** Could not load external MCP tools: {e}. Using internal tools only.{RESET}"
+                f"{config.RED}*** Could not load external MCP tools: {e}. Using internal tools only.{config.RESET}"
             )
 
     def get_tool_definitions(self) -> List[Dict[str, Any]]:
         """Generate tool definitions for the API."""
         definitions = []
-        for name, config in self.mcp_tools.items():
+        for name, tool_config in self.mcp_tools.items():
             # Skip stdio servers in tool definitions (they're not directly callable tools)
-            if config.get("type") == "mcp-stdio":
+            if tool_config.get("type") == "mcp-stdio":
                 # Discover tools from the server
                 server_tools = self._discover_mcp_server_tools(name)
                 for tool_name, tool_def in server_tools.items():
@@ -263,8 +263,8 @@ class ToolRegistry:
                     "type": "function",
                     "function": {
                         "name": name,
-                        "description": config.get("description", ""),
-                        "parameters": config.get(
+                        "description": tool_config.get("description", ""),
+                        "parameters": tool_config.get(
                             "parameters", {"type": "object", "properties": {}}
                         ),
                     },
@@ -317,7 +317,7 @@ class ToolRegistry:
                 "params": {
                     "protocolVersion": "2025-06-18",
                     "capabilities": {"elicitation": {}},
-                    "clientInfo": {"name": f"{APP_NAME}-client", "version": "1.0.0"},
+                    "clientInfo": {"name": f"{config.APP_NAME}-client", "version": "1.0.0"},
                 },
             }
 
@@ -344,7 +344,7 @@ class ToolRegistry:
 
             # Print discovered tools count
             print(
-                f"{GREEN}    - Discovered {len(tools)} tools from {server_name}{RESET}"
+                f"{config.GREEN}    - Discovered {len(tools)} tools from {server_name}{config.RESET}"
             )
 
             return tools

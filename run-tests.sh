@@ -1,17 +1,16 @@
 #!/bin/bash
 
-export AICODER_THEME="original" 
+export AICODER_THEME="original"
 export YOLO_MODE=1 
 
-python -m unittest -v
+python -m unittest discover --failfast -v
 ret_unittest=$?
-
-echo ""
+printf "\n\n"
 
 ./test_runner.py --full
 ret_test_runner=$?
 
-echo -e "\nResults:"
+echo -e "\nFinal Results:"
 
 if [[ "$ret_unittest" == 0 && "$ret_test_runner" == 0 ]]; then
     echo "All tests ok"

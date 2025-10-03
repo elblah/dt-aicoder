@@ -66,15 +66,12 @@ def execute_run_shell_command(
             timeout=timeout,  # Use the provided timeout
         )
 
-        # Format the output
-        output = f"Command: {command}\n"
-        if reason:
-            output += f"Reason: {reason}\n"
-        output += f"Return code: {result.returncode}\n"
+        # Format the output - only include return code, stdout, and stderr
+        output = f"Return code: {result.returncode}\n"
         if result.stdout:
-            output += f"Stdout:\n{result.stdout}\n"
+            output += f"Stdout: {result.stdout}\n"
         if result.stderr:
-            output += f"Stderr:\n{result.stderr}\n"
+            output += f"Stderr: {result.stderr}\n"
 
         return output
     except subprocess.TimeoutExpired:

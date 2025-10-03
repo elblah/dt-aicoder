@@ -6,8 +6,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import timedelta
 
-# Import color constants from config
-from .config import GREEN, RESET
+from . import config
 
 
 @dataclass
@@ -40,7 +39,7 @@ class Stats:
         if self.api_time_spent > 0:
             tps = self.completion_tokens / self.api_time_spent
 
-        print(f"\n{GREEN}=== Session Statistics ==={RESET}")
+        print(f"\n{config.GREEN}=== Session Statistics ==={config.RESET}")
         print(f"Session duration: {timedelta(seconds=int(elapsed_time))}")
 
         # Show message history count and size if available
@@ -90,22 +89,22 @@ class Stats:
     def _print_context_usage(self):
         """Print context usage percentage if auto-compaction is enabled."""
         try:
-            from .config import AUTO_COMPACT_THRESHOLD
-
-            if AUTO_COMPACT_THRESHOLD > 0:
+            if config.AUTO_COMPACT_ENABLED:
                 if self.current_prompt_size > 0:
                     usage_percentage = (
-                        self.current_prompt_size / AUTO_COMPACT_THRESHOLD
+                        self.current_prompt_size / config.CONTEXT_SIZE
                     ) * 100
                     print(
-                        f"Auto-compaction threshold: {usage_percentage:.1f}% "
-                        f"({self.current_prompt_size:,}/{AUTO_COMPACT_THRESHOLD:,} tokens)"
+                        f"Context usage: {usage_percentage:.1f}% "
+                        f"({self.current_prompt_size:,}/{config.CONTEXT_SIZE:,} tokens, "
+                        f"triggers at {config.CONTEXT_COMPACT_PERCENTAGE}%)"
                     )
                 else:
                     print(
-                        f"Auto-compaction threshold: 0.0% "
-                        f"({self.current_prompt_size:,}/{AUTO_COMPACT_THRESHOLD:,} tokens)"
+                        f"Context usage: 0.0% "
+                        f"({self.current_prompt_size:,}/{config.CONTEXT_SIZE:,} tokens, "
+                        f"triggers at {config.CONTEXT_COMPACT_PERCENTAGE}%)"
                     )
-        except ImportError:
+        except (ImportError, AttributeError):
             # Config not available, skip context usage display
             pass

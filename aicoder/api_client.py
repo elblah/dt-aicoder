@@ -13,82 +13,8 @@ import urllib.request
 import urllib.error
 import os
 from typing import List, Dict, Any
-
-# Handle both relative and absolute imports
-try:
-    from .config import (
-        DEBUG,
-        RED,
-        YELLOW,
-        RESET,
-        API_MODEL,
-        API_ENDPOINT,
-        API_KEY,
-        TEMPERATURE,
-        TOP_P,
-        MAX_TOKENS,
-    )
-    from .retry_utils import APIRetryHandler
-except ImportError:
-    # Fallback for testing or when running as main module
-    try:
-        from config import (
-            DEBUG,
-            RED,
-            YELLOW,
-            RESET,
-            API_MODEL,
-            API_ENDPOINT,
-            API_KEY,
-            TEMPERATURE,
-            TOP_P,
-            MAX_TOKENS,
-        )
-        import retry_utils
-
-        APIRetryHandler = retry_utils.APIRetryHandler
-    except ImportError:
-        # Mock for testing
-        import sys
-        import types
-
-        # Create mock config
-        mock_config = types.ModuleType("config")
-        mock_config.DEBUG = False
-        mock_config.RED = RED
-        mock_config.YELLOW = YELLOW
-        mock_config.RESET = RESET
-        mock_config.API_MODEL = "test-model"
-        mock_config.API_ENDPOINT = "https://api.test.com/v1/chat/completions"
-        mock_config.API_KEY = "test-key"
-        mock_config.TEMPERATURE = 0.7
-        mock_config.TOP_P = 1.0
-        mock_config.MAX_TOKENS = None
-        sys.modules["config"] = mock_config
-
-        # Create mock retry_utils
-        mock_retry_utils = types.ModuleType("retry_utils")
-
-        class MockAPIRetryHandler:
-            def __init__(self, animator, stats=None):
-                pass
-
-        mock_retry_utils.APIRetryHandler = MockAPIRetryHandler
-        sys.modules["retry_utils"] = mock_retry_utils
-
-        # Assign to globals
-        DEBUG = mock_config.DEBUG
-        RED = mock_config.RED
-        YELLOW = mock_config.YELLOW
-        RESET = mock_config.RESET
-        API_MODEL = mock_config.API_MODEL
-        API_ENDPOINT = mock_config.API_ENDPOINT
-        API_KEY = mock_config.API_KEY
-        TEMPERATURE = mock_config.TEMPERATURE
-        TOP_P = mock_config.TOP_P
-        MAX_TOKENS = mock_config.MAX_TOKENS
-        APIRetryHandler = MockAPIRetryHandler
-
+from . import config
+from . import retry_utils
 
 class APIClient:
     """Base API client with shared functionality for both streaming and non-streaming requests."""
@@ -96,7 +22,7 @@ class APIClient:
     def __init__(self, animator=None, stats=None):
         self.animator = animator
         self.stats = stats
-        self.retry_handler = APIRetryHandler(animator, stats)
+        self.retry_handler = retry_utils.APIRetryHandler(animator, stats)
 
     def _prepare_api_request_data(
         self,
@@ -107,7 +33,7 @@ class APIClient:
     ) -> Dict[str, Any]:
         """Prepare the API request data with common parameters."""
         api_data = {
-            "model": API_MODEL,
+            "model": config.API_MODEL,
             "messages": messages,
         }
 
@@ -118,27 +44,20 @@ class APIClient:
 
         # Temperature settings
         if "TEMPERATURE" in os.environ:
-            api_data["temperature"] = TEMPERATURE
+            api_data["temperature"] = config.TEMPERATURE
 
         # Top-p settings
-        if "TOP_P" in os.environ and TOP_P != 1.0:
-            api_data["top_p"] = TOP_P
+        if "TOP_P" in os.environ and config.TOP_P != 1.0:
+            api_data["top_p"] = config.TOP_P
 
         # Max tokens
-        if MAX_TOKENS is not None:
-            api_data["max_tokens"] = MAX_TOKENS
+        if config.MAX_TOKENS is not None:
+            api_data["max_tokens"] = config.MAX_TOKENS
 
         # Tool settings
         if not disable_tools and tool_manager:
-            # Check if this is a summary request (don't include tools for summaries)
-            is_summary_request = any(
-                m.get("role") == "system" and "summary" in m.get("content", "").lower()
-                for m in messages
-            )
-
-            if not is_summary_request:
-                api_data["tools"] = tool_manager.get_tool_definitions()
-                api_data["tool_choice"] = "auto"
+            api_data["tools"] = tool_manager.get_tool_definitions()
+            api_data["tool_choice"] = "auto"
 
         return api_data
 
@@ -152,7 +71,7 @@ class APIClient:
                         json.dumps(tool_def["function"]["parameters"])
                     except Exception as e:
                         print(
-                            f"{RED} * Error: Malformed tool definition parameters: {e}{RESET}"
+                            f"{config.RED} * Error: Malformed tool definition parameters: {e}{config.RESET}"
                         )
                         # Fix the parameters by providing a default valid structure
                         tool_def["function"]["parameters"] = {
@@ -166,18 +85,22 @@ class APIClient:
         """Make the actual HTTP request to the API."""
         request_body = json.dumps(api_data).encode("utf-8")
 
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {config.API_KEY}",
+            "User-Agent": os.environ.get("HTTP_USER_AGENT", "Mozilla/5.0"),
+            "Referrer": "localhost",
+        }
+   
+        if "openrouter.ai" in config.API_ENDPOINT:
+            headers["HTTP-Referer"] = "https://github.com/elblah/dt-aicoder"
+            headers["X-Title"] = "dt-aicoder"
+
         req = urllib.request.Request(
-            API_ENDPOINT,
+            config.API_ENDPOINT,
             data=request_body,
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {API_KEY}",
-                "User-Agent": os.environ.get("HTTP_USER_AGENT", "Mozilla/5.0"),
-                "Referrer": "localhost",
-                "HTTP-Referer": "https://github.com/elblah/dt-aicoder",
-                "X-Title": "dt-aicoder",
-            },
             method="POST",
+            headers=headers,
         )
 
         with urllib.request.urlopen(req, timeout=timeout) as response:
@@ -227,9 +150,45 @@ class APIClient:
                 if "completion_tokens" in usage:
                     # Accumulate completion tokens for session statistics
                     self.stats.completion_tokens += usage["completion_tokens"]
+            else:
+                # Fallback: estimate tokens if usage information is not available
+                # This can happen with some API providers that don't include token usage
+                estimated_input_tokens = 0
+                estimated_output_tokens = 0
+                
+                # For input tokens, we need to access the message history
+                # We'll check if it's available as an instance attribute
+                if hasattr(self, 'message_history') and self.message_history:
+                    estimated_input_tokens = self._estimate_messages_tokens(self.message_history.messages)
+                # If we don't have access to message_history, we can't estimate input tokens
+                
+                # Estimate output tokens from the response content
+                if "choices" in response and len(response["choices"]) > 0:
+                    choice = response["choices"][0]
+                    if "message" in choice and "content" in choice["message"]:
+                        content = choice["message"]["content"]
+                        if content:
+                            estimated_output_tokens = self._estimate_tokens(content)
+                
+                # Update stats with estimated values
+                self.stats.prompt_tokens += estimated_input_tokens
+                self.stats.completion_tokens += estimated_output_tokens
+                # Update current prompt size for auto-compaction (use estimated input tokens if available)
+                if estimated_input_tokens > 0:
+                    self.stats.current_prompt_size = estimated_input_tokens
 
         # Reset retry counter on successful API call
         self.retry_handler.reset_retry_counter()
+
+    def _estimate_tokens(self, text: str) -> int:
+        """Estimate the number of tokens in a text string using utility function."""
+        from .utils import estimate_tokens
+        return estimate_tokens(text)
+        
+    def _estimate_messages_tokens(self, messages: List[Dict]) -> int:
+        """Estimate total tokens for a list of messages using utility function."""
+        from .utils import estimate_messages_tokens
+        return estimate_messages_tokens(messages)
 
     def _update_stats_on_failure(self, api_start_time: float):
         """Update statistics on failed API call."""

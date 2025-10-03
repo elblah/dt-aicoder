@@ -17,7 +17,7 @@ TOOL_DEFINITION = {
     "auto_approved": True,
     "approval_excludes_arguments": False,
     "approval_key_exclude_arguments": [],
-    "description": f"Lists the contents of a specified directory recursively (limited to {DEFAULT_FILE_LIMIT} files).",
+    "description": f"Lists the contents of a specified directory recursively. Uses fd-find when available, ripgrep as second choice, find as fallback. Limited to {DEFAULT_FILE_LIMIT} files.",
     "parameters": {
         "type": "object",
         "properties": {
@@ -35,8 +35,8 @@ TOOL_DEFINITION = {
 def _list_files_with_rg(path: str, file_limit: int = DEFAULT_FILE_LIMIT) -> str:
     """List files recursively using ripgrep."""
     try:
-        # Use rg --files piped to head -n file_limit to limit output and prevent hanging on large directories
-        cmd = ["bash", "-c", f"rg --files '{path}' | head -n {file_limit}"]
+        # Use rg --files piped to head -n file_limit to limit output and prevent hanging on large directories (safe against injection)
+        cmd = ["bash", "-c", f'{{ "$1" --files "$2"; }} | head -n {file_limit}', "_", "rg", path]
 
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         if result.returncode == 0:
@@ -54,14 +54,39 @@ def _list_files_with_rg(path: str, file_limit: int = DEFAULT_FILE_LIMIT) -> str:
         return f"Error executing rg: {e}"
 
 
+def _list_files_with_fd(path: str, file_limit: int = DEFAULT_FILE_LIMIT, command_name: str = "fd") -> str:
+    """List files recursively using fd-find."""
+    try:
+        # Use fd/fdfind to list files, piped to head -n file_limit to limit output (safe against injection)
+        cmd = ["bash", "-c", f'{{ "$1" . "$2" --type f; }} | head -n {file_limit}', "_", command_name, path]
+
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        if result.returncode == 0 or result.returncode == 1:  # 0 = files found, 1 = no files
+            files = [f for f in result.stdout.strip().split("\n") if f]
+            output = "\n".join(files) if files and files[0] else "No files found"
+            # Check if we hit the limit
+            if len(files) >= file_limit:
+                output += f"\n... (showing first {file_limit} files)"
+            return output
+        else:
+            return f"Error running {command_name}: {result.stderr}"
+    except subprocess.TimeoutExpired:
+        return "Error: Command timed out after 30 seconds"
+    except Exception as e:
+        return f"Error executing {command_name}: {e}"
+
+
 def _list_files_with_find(path: str, file_limit: int = DEFAULT_FILE_LIMIT) -> str:
     """List files recursively using find."""
     try:
-        # Use find piped to head -n file_limit to limit output and prevent hanging on large directories
+        # Use find piped to head -n file_limit to limit output and prevent hanging on large directories (safe against injection)
         cmd = [
             "bash",
             "-c",
-            f"find '{path}' -type f -printf '%P\\n' | head -n {file_limit}",
+            f'{{ "$1" "$2" -type f -printf "%P\\\\n"; }} | head -n {file_limit}',
+            "_",
+            "find",
+            path,
         ]
 
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
@@ -94,8 +119,12 @@ def execute_list_directory(path: str, stats) -> str:
             stats.tool_errors += 1
             return f"Error: Path '{path}' is not a directory."
 
-        # Try ripgrep first if available
-        if check_tool_availability("rg"):
+        # Try tools in order of preference: fd/fdfind (fastest), ripgrep, find (fallback)
+        if check_tool_availability("fd"):
+            return _list_files_with_fd(path, DEFAULT_FILE_LIMIT, "fd")
+        elif check_tool_availability("fdfind"):
+            return _list_files_with_fd(path, DEFAULT_FILE_LIMIT, "fdfind")
+        elif check_tool_availability("rg"):
             return _list_files_with_rg(path, DEFAULT_FILE_LIMIT)
         else:
             # Fallback to find

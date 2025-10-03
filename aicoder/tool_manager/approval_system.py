@@ -5,8 +5,14 @@ Approval system for tool execution.
 import json
 from typing import Dict, Any, List
 from .. import config
-from ..config import YELLOW, GREEN, RED, RESET
-from ..utils import format_tool_prompt
+from ..utils import format_tool_prompt, make_readline_safe
+
+# Import readline to enable readline functionality
+try:
+    import readline
+except ImportError:
+    # readline is not available on this platform
+    pass
 
 
 class ApprovalSystem:
@@ -38,8 +44,8 @@ class ApprovalSystem:
 
         # YOLO Mode - bypass all approval systems
         if config.YOLO_MODE:
-            print(f"\n{YELLOW}{prompt_message}{RESET}")
-            print(f"{GREEN}Auto approving... running YOLO MODE!{RESET}")
+            print(f"\n{config.YELLOW}{prompt_message}{config.RESET}")
+            print(f"{config.GREEN}Auto approving... running YOLO MODE!{config.RESET}")
             return (True, False)
 
         try:
@@ -70,19 +76,19 @@ class ApprovalSystem:
 
             # Show prompt with error handling
             try:
-                print(f"\n{YELLOW}{prompt_message}{RESET}")
+                print(f"\n{config.YELLOW}{prompt_message}{config.RESET}")
             except Exception as e:
-                print(f"{RED}Error displaying prompt: {e}{RESET}")
+                print(f"{config.RED}Error displaying prompt: {e}{config.RESET}")
                 # Still proceed with approval to maintain security
 
             # Get user input with validation
             max_attempts = 3
             for attempt in range(max_attempts):
                 try:
+                    approval_prompt = f"{config.RED}a) Allow once  s) Allow for session  d) Deny  c) Cancel all  YOLO) YOLO  help) Show help\nChoose (a/s/d/c/YOLO/help): {config.RESET}"
+                    safe_approval_prompt = make_readline_safe(approval_prompt)
                     answer = (
-                        input(
-                            f"{RED}a) Allow once  s) Allow for session  d) Deny  c) Cancel all  YOLO) YOLO  help) Show help\nChoose (a/s/d/c/YOLO/help): {RESET}"
-                        )
+                        input(safe_approval_prompt)
                         .lower()
                         .strip()
                     )
@@ -118,23 +124,23 @@ class ApprovalSystem:
                         continue
                     else:
                         print(
-                            f"{YELLOW}Invalid choice. Please enter a, s, d, c, YOLO, or help.{RESET}"
+                            f"{config.YELLOW}Invalid choice. Please enter a, s, d, c, YOLO, or help.{config.RESET}"
                         )
                         if attempt == max_attempts - 1:
                             print(
-                                f"{RED}Max attempts reached. Denying tool call.{RESET}"
+                                f"{config.RED}Max attempts reached. Denying tool call.{config.RESET}"
                             )
                             return (False, False)
                 except (EOFError, KeyboardInterrupt):
-                    print(f"\n{RED}Input interrupted. Denying tool call.{RESET}")
+                    print(f"\n{config.RED}Input interrupted. Denying tool call.{config.RESET}")
                     return (False, False)
                 except Exception as e:
                     # Check if this is a cancellation request
                     if str(e) == "CANCEL_ALL_TOOL_CALLS":
                         raise  # Re-raise cancellation
-                    print(f"{RED}Error reading input: {e}{RESET}")
+                    print(f"{config.RED}Error reading input: {e}{config.RESET}")
                     if attempt == max_attempts - 1:
-                        print(f"{RED}Max attempts reached. Denying tool call.{RESET}")
+                        print(f"{config.RED}Max attempts reached. Denying tool call.{config.RESET}")
                         return (False, False)
 
             # Fallback deny if we somehow get here
@@ -144,7 +150,7 @@ class ApprovalSystem:
             # Check if this is a cancellation request
             if str(e) == "CANCEL_ALL_TOOL_CALLS":
                 raise  # Re-raise cancellation
-            print(f"{RED}Error in approval system: {e}{RESET}")
+            print(f"{config.RED}Error in approval system: {e}{config.RESET}")
             # For security, deny by default on errors
             return (False, False)
 
@@ -180,12 +186,12 @@ class ApprovalSystem:
         except Exception as e:
             # Fallback to tool name only if key generation fails
             print(
-                f"{RED}Warning: Failed to generate cache key for {tool_name}: {e}{RESET}"
+                f"{config.RED}Warning: Failed to generate cache key for {tool_name}: {e}{config.RESET}"
             )
             return tool_name
 
     def format_tool_prompt(
-        self, tool_name: str, arguments: Dict[str, Any], tool_config: Dict[str, Any]
+        self, tool_name: str, arguments: Dict[str, Any], tool_config: Dict[str, Any], raw_arguments: str = None
     ) -> str:
         """Format a user-friendly prompt for tool approval."""
         # Pre-validation for tools that have a validation function
@@ -198,29 +204,29 @@ class ApprovalSystem:
         path = ""
         if tool_name == "write_file" and "path" in arguments:
             path = arguments["path"]
-        elif tool_name == "edit_file" and "file_path" in arguments:
-            path = arguments["file_path"]
+        elif tool_name == "edit_file" and "path" in arguments:
+            path = arguments["path"]
 
-        return format_tool_prompt(tool_name, arguments, tool_config, path)
+        return format_tool_prompt(tool_name, arguments, tool_config, path, raw_arguments)
 
     def _show_approval_help(self):
         """Display help information for approval options."""
-        print(f"\n{GREEN}Approval Options:{RESET}")
+        print(f"\n{config.GREEN}Approval Options:{config.RESET}")
         print(
-            f"{YELLOW}a) Allow once{RESET} - Execute this tool call just this one time"
+            f"{config.YELLOW}a) Allow once{config.RESET} - Execute this tool call just this one time"
         )
         print(
-            f"{YELLOW}s) Allow for session{RESET} - Allow this type of tool call for the rest of this session"
+            f"{config.YELLOW}s) Allow for session{config.RESET} - Allow this type of tool call for the rest of this session"
         )
-        print(f"{YELLOW}d) Deny{RESET} - Reject this tool call")
+        print(f"{config.YELLOW}d) Deny{config.RESET} - Reject this tool call")
         print(
-            f"{YELLOW}c) Cancel all{RESET} - Cancel all pending tool calls and return to user input"
+            f"{config.YELLOW}c) Cancel all{config.RESET} - Cancel all pending tool calls and return to user input"
         )
         print(
-            f"{YELLOW}YOLO) YOLO mode{RESET} - Automatically approve all tool calls for the rest of the session"
+            f"{config.YELLOW}YOLO) YOLO mode{config.RESET} - Automatically approve all tool calls for the rest of the session"
         )
-        print(f"{YELLOW}help) Show help{RESET} - Display this help message")
-        print(f"\n{GREEN}Guidance Feature:{RESET}")
+        print(f"{config.YELLOW}help) Show help{config.RESET} - Display this help message")
+        print(f"\n{config.GREEN}Guidance Feature:{config.RESET}")
         print(
             "You can add a '+' after any option (except help) to provide guidance to the AI."
         )
@@ -279,4 +285,4 @@ class ApprovalSystem:
     def revoke_approvals(self):
         """Clear the session approval cache."""
         self.tool_approvals_session.clear()
-        print(f"\n{GREEN} *** All session approvals have been revoked.{RESET}")
+        print(f"\n{config.GREEN} *** All session approvals have been revoked.{config.RESET}")

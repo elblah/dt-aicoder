@@ -11,12 +11,7 @@ import urllib.error
 import threading
 from typing import List, Dict, Any
 
-from .config import (
-    DEBUG,
-    RED,
-    RESET,
-    ENABLE_STREAMING,
-)
+from . import config
 from .streaming_adapter import StreamingAdapter
 from .api_client import APIClient
 
@@ -42,7 +37,7 @@ class APIHandlerMixin(APIClient):
             disable_tools: If True, excludes tools from the request (used for decisions and summaries)
         """
         # Use streaming adapter if enabled and not disabled for this request
-        if ENABLE_STREAMING and not disable_streaming_mode:
+        if config.ENABLE_STREAMING and not disable_streaming_mode:
             # Initialize streaming adapter if not already done
             if not hasattr(self, "_streaming_adapter"):
                 self._streaming_adapter = StreamingAdapter(
@@ -74,7 +69,7 @@ class APIHandlerMixin(APIClient):
                 # Check for user cancellation during animation
                 if self.animator.check_user_cancel():
                     self.animator.stop_animation()
-                    print(f"\n{RED}Request cancelled by user.{RESET}")
+                    print(f"\n{config.RED}Request cancelled by user.{config.RESET}")
                     raise Exception("REQUEST_CANCELLED_BY_USER")
 
                 # Validate tool definitions using shared functionality
@@ -82,7 +77,7 @@ class APIHandlerMixin(APIClient):
                 request_body = json.dumps(api_data).encode("utf-8")
             except TypeError as e:
                 self.animator.stop_animation()
-                print(f"\n{RED}Error serializing data for API request: {e}{RESET}")
+                print(f"\n{config.RED}Error serializing data for API request: {e}{config.RESET}")
                 return None
             except Exception as e:
                 if str(e) == "REQUEST_CANCELLED_BY_USER":
@@ -92,7 +87,7 @@ class APIHandlerMixin(APIClient):
                 self.animator.stop_animation()
                 raise
 
-            if DEBUG:
+            if config.DEBUG:
                 if not disable_streaming_mode:
                     print(f"DEBUG: data length = {len(request_body)}")
                     try:
@@ -142,7 +137,7 @@ class APIHandlerMixin(APIClient):
                     # Check for ESC keypress (non-blocking)
                     if self._handle_user_cancellation():
                         self.animator.stop_animation()
-                        print(f"\n{RED}Request cancelled by user (ESC).{RESET}")
+                        print(f"\n{config.RED}Request cancelled by user (ESC).{config.RESET}")
                         # Note: We can't actually terminate the API request thread,
                         # but we can ignore its result
                         return None
@@ -160,7 +155,7 @@ class APIHandlerMixin(APIClient):
 
                     # Extract token usage information from the response
                     response = result_dict["response"]
-                    if DEBUG:
+                    if config.DEBUG:
                         print(f"DEBUG: API response keys: {list(response.keys())}")
                         if "usage" in response:
                             print(f"DEBUG: Usage data: {response['usage']}")
@@ -173,9 +168,36 @@ class APIHandlerMixin(APIClient):
                         usage = response["usage"]
                         # Extract prompt tokens (input) and completion tokens (output)
                         if "prompt_tokens" in usage:
+                            self.stats.current_prompt_size = usage["prompt_tokens"]
                             self.stats.prompt_tokens += usage["prompt_tokens"]
                         if "completion_tokens" in usage:
                             self.stats.completion_tokens += usage["completion_tokens"]
+                    else:
+                        # Fallback: estimate tokens if usage information is not available
+                        # This can happen with some API providers that don't include token usage
+                        estimated_input_tokens = 0
+                        estimated_output_tokens = 0
+                        
+                        # For input tokens, we need to access the message history
+                        if hasattr(self, 'message_history') and self.message_history:
+                            from .utils import estimate_messages_tokens
+                            estimated_input_tokens = estimate_messages_tokens(self.message_history.messages)
+                        
+                        # Estimate output tokens from the response content
+                        if "choices" in response and len(response["choices"]) > 0:
+                            choice = response["choices"][0]
+                            if "message" in choice and "content" in choice["message"]:
+                                content = choice["message"]["content"]
+                                if content:
+                                    from .utils import estimate_tokens
+                                    estimated_output_tokens = estimate_tokens(content)
+                        
+                        # Update stats with estimated values
+                        self.stats.prompt_tokens += estimated_input_tokens
+                        self.stats.completion_tokens += estimated_output_tokens
+                        # Update current prompt size for auto-compaction (use estimated input tokens if available)
+                        if estimated_input_tokens > 0:
+                            self.stats.current_prompt_size = estimated_input_tokens
 
                     return response
                 else:

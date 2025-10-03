@@ -22,6 +22,9 @@ wheels/
 MANIFEST
 *.pyz
 .ruff_cache/
+.goose
+tiered_cost_data.txt
+.tiered_cost_data.txt
 
 # Virtual environments
 venv/
@@ -211,7 +214,3 @@ temp/
 *.njsproj
 *.sln
 *.sw?
-
-# AICoder
-tiered_cost_data.txt
-session.json

@@ -46,7 +46,7 @@ def check_file_modification(file_path: str) -> str:
             read_time_str = time.strftime(
                 "%Y-%m-%d %H:%M:%S", time.localtime(last_read_time)
             )
-            return f"Error: File {file_path} has been modified since it was last read (mod time: {mod_time_str}, last read: {read_time_str}). You must read the file again before editing it."
+            return f"Error: File {file_path} has been modified since it was last read (mod time: {mod_time_str}, last read: {read_time_str}). You must read the ENTIRE file again using the read_file tool before editing it."
 
         return ""  # No error
     except Exception as e:
@@ -70,7 +70,7 @@ def check_file_modification_strict(file_path: str) -> str:
 
         # If file was never read, that's an error for strict checking
         if last_read_time == 0:
-            return "Error: You must read the file before editing it."
+            return "Error: You must read the ENTIRE file using the read_file tool before editing it."
 
         # Check if file was modified since last read
         if mod_time > last_read_time:
@@ -79,7 +79,7 @@ def check_file_modification_strict(file_path: str) -> str:
             read_time_str = time.strftime(
                 "%Y-%m-%d %H:%M:%S", time.localtime(last_read_time)
             )
-            return f"Error: File {file_path} has been modified since it was last read (mod time: {mod_time_str}, last read: {read_time_str}). You must read the file again before editing it."
+            return f"Error: File {file_path} has been modified since it was last read (mod time: {mod_time_str}, last read: {read_time_str}). You must read the ENTIRE file again using the read_file tool before editing it."
 
         return ""  # No error
     except Exception as e:

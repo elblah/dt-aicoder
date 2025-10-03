@@ -96,8 +96,8 @@ class TestAPIClient(unittest.TestCase):
         self.assertEqual(api_data["tool_choice"], "auto")
         mock_tool_manager.get_tool_definitions.assert_called_once()
 
-    def test_prepare_api_request_data_with_summary_request(self):
-        """Test that tools are not included for summary requests."""
+    def test_prepare_api_request_data_with_disable_tools(self):
+        """Test that tools are not included when disable_tools is True."""
         client = APIClient()
 
         # Mock tool manager
@@ -113,19 +113,12 @@ class TestAPIClient(unittest.TestCase):
             }
         ]
 
-        # Messages that would be identified as a summary request
-        messages = [
-            {
-                "role": "system",
-                "content": "Please provide a summary of the conversation",
-            },
-            {"role": "user", "content": "Hello"},
-        ]
+        messages = [{"role": "user", "content": "Hello"}]
         api_data = client._prepare_api_request_data(
-            messages, stream=False, disable_tools=False, tool_manager=mock_tool_manager
+            messages, stream=False, disable_tools=True, tool_manager=mock_tool_manager
         )
 
-        # Check that tools are NOT included for summary requests
+        # Check that tools are NOT included when disable_tools=True
         self.assertNotIn("tools", api_data)
         self.assertNotIn("tool_choice", api_data)
         mock_tool_manager.get_tool_definitions.assert_not_called()

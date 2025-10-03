@@ -9,15 +9,7 @@ import time
 import traceback
 import signal
 
-from .config import (
-    DEBUG,
-    GREEN,
-    RED,
-    RESET,
-    BOLD,
-    YELLOW,
-    ENABLE_STREAMING,
-)
+from . import config
 from .stats import Stats
 from .message_history import MessageHistory
 from .tool_manager import MCPToolManager
@@ -39,26 +31,26 @@ def global_exception_handler(exc_type, exc_value, exc_traceback):
         return
 
     # Print the error
-    print(f"\n{RED}*** UNHANDLED EXCEPTION ***{RESET}", file=sys.stderr)
-    print(f"{RED}Type: {exc_type.__name__}{RESET}", file=sys.stderr)
-    print(f"{RED}Value: {exc_value}{RESET}", file=sys.stderr)
+    print(f"\n{config.RED}*** UNHANDLED EXCEPTION ***{config.RESET}", file=sys.stderr)
+    print(f"{config.RED}Type: {exc_type.__name__}{config.RESET}", file=sys.stderr)
+    print(f"{config.RED}Value: {exc_value}{config.RESET}", file=sys.stderr)
 
     # Save session if possible
     try:
         # Try to save the current session
         save_crash_session()
-        print(f"{YELLOW}Session saved to session_crash.json{RESET}", file=sys.stderr)
+        print(f"{config.YELLOW}Session saved to session_crash.json{config.RESET}", file=sys.stderr)
     except Exception as save_error:
         print(
-            f"{RED}Failed to save crash session: {save_error}{RESET}", file=sys.stderr
+            f"{config.RED}Failed to save crash session: {save_error}{config.RESET}", file=sys.stderr
         )
 
     # Print traceback
-    print(f"\n{RED}Full traceback:{RESET}", file=sys.stderr)
+    print(f"\n{config.RED}Full traceback:{config.RESET}", file=sys.stderr)
     traceback.print_exception(exc_type, exc_value, exc_traceback, file=sys.stderr)
 
     print(
-        f"\n{YELLOW}The application has crashed unexpectedly. Session data has been saved to session_crash.json{RESET}",
+        f"\n{config.YELLOW}The application has crashed unexpectedly. Session data has been saved to session_crash.json{config.RESET}",
         file=sys.stderr,
     )
 
@@ -127,6 +119,8 @@ class AICoder(
             "/stats": self._handle_stats,
             "/retry": self._handle_retry,
             "/r": self._handle_retry,
+            "/debug": self._handle_debug,
+            "/d": self._handle_debug,
             "/revoke_approvals": self._handle_revoke_approvals,
             "/ra": self._handle_revoke_approvals,
             "/yolo": self._handle_yolo,
@@ -136,20 +130,20 @@ class AICoder(
         notify_plugins_of_aicoder_init(loaded_plugins, self)
 
         # Print streaming status at startup only if disabled (since it's enabled by default)
-        if not ENABLE_STREAMING:
-            print(f"{GREEN}*** Streaming mode disabled{RESET}")
+        if not config.ENABLE_STREAMING:
+            print(f"{config.GREEN}*** Streaming mode disabled{config.RESET}")
 
         # Print auto-compaction status at startup if enabled
-        from .config import AUTO_COMPACT_THRESHOLD
-
-        if AUTO_COMPACT_THRESHOLD > 0:
+        if config.AUTO_COMPACT_ENABLED:
             print(
-                f"{GREEN}*** Auto-compaction enabled (threshold: {AUTO_COMPACT_THRESHOLD} tokens){RESET}"
+                f"{config.GREEN}*** Auto-compaction enabled (context: {config.CONTEXT_SIZE} tokens, triggers at {config.CONTEXT_COMPACT_PERCENTAGE}%){config.RESET}"
             )
+
+
 
     def _signal_handler(self, sig, frame):
         """Handle SIGINT (Ctrl+C) signal gracefully."""
-        print(f"\n{RED}Received interrupt signal. Exiting...{RESET}")
+        print(f"\n{config.RED}Received interrupt signal. Exiting...{config.RESET}")
         self._print_exit_stats()
 
         # Save cost data if the tiered cost plugin is loaded
@@ -167,37 +161,64 @@ class AICoder(
 
         sys.exit(0)
 
-    def _check_auto_compaction(self):
-        """Check if auto-compaction should be triggered based on current prompt size."""
-        from .config import AUTO_COMPACT_THRESHOLD
+    def _check_and_handle_large_tool_results(self, tool_results):
+        """Check if any tool result is too large and needs truncation or replacement."""
+        # Check if any tool result is too large and needs handling
+        for result in tool_results:
+            if "content" in result and result["content"]:
+                content_size = len(str(result["content"]))
+                if content_size > config.MAX_TOOL_RESULT_SIZE:
+                    original_size = content_size
+                    tool_name = result.get("name", "unknown")
+                    
+                    # Provide clear, informative error messages without being prescriptive
+                    if tool_name == "read_file":
+                        result["content"] = f"ERROR: File content too large ({original_size} bytes). Maximum {config.MAX_TOOL_RESULT_SIZE} bytes allowed. Use alternative approach to read specific portions of the file."
+                    elif tool_name == "run_shell_command":
+                        result["content"] = f"ERROR: Command output too large ({original_size} bytes). Maximum {config.MAX_TOOL_RESULT_SIZE} bytes allowed. Use command options to limit output size."
+                    elif tool_name == "list_directory":
+                        result["content"] = f"ERROR: Directory listing too large ({original_size} bytes). Maximum {config.MAX_TOOL_RESULT_SIZE} bytes allowed. Navigate to a more specific subdirectory or filter results."
+                    else:
+                        result["content"] = f"ERROR: Tool result too large ({original_size} bytes). Maximum {config.MAX_TOOL_RESULT_SIZE} bytes allowed."
+                    
+                    if config.DEBUG:
+                        print(f"{config.YELLOW} *** Tool result from '{tool_name}' replaced due to size ({original_size} chars > {config.MAX_TOOL_RESULT_SIZE} limit){config.RESET}")
 
-        # If threshold is 0 or negative, auto-compaction is disabled
-        if AUTO_COMPACT_THRESHOLD <= 0:
+    def _check_auto_compaction(self):
+        """Check if auto-compaction should be triggered based on context percentage."""
+        # If auto-compaction is disabled, return early
+        if not config.AUTO_COMPACT_ENABLED:
             return
 
         # Check if current prompt size exceeds the threshold
-        if self.stats.current_prompt_size >= AUTO_COMPACT_THRESHOLD:
-            print(
-                f"\n{GREEN} *** Auto-compaction threshold reached (current: {self.stats.current_prompt_size} >= threshold: {AUTO_COMPACT_THRESHOLD} tokens){RESET}"
-            )
-            self.message_history.compact_memory()
+        if self.stats.current_prompt_size >= config.AUTO_COMPACT_THRESHOLD:
+            # Check if the message history has the compaction flag (for backward compatibility with tests)
+            # If the flag doesn't exist, assume compaction is allowed (original behavior)
+            # If the flag exists and is False, compaction is allowed
+            # If the flag exists and is True, compaction is blocked until a new message is added
+            if not getattr(self.message_history, '_compaction_performed', False):
+                percentage = (self.stats.current_prompt_size / config.CONTEXT_SIZE) * 100
+                print(
+                    f"\n{config.GREEN} *** Auto-compaction triggered (context: {self.stats.current_prompt_size:,}/{config.CONTEXT_SIZE:,} tokens, {percentage:.1f}%) {config.RESET}"
+                )
+                self.message_history.compact_memory()
 
     def _initialize_mcp_servers(self):
         """Initialize all MCP stdio servers at startup."""
         init_printed = False
-        for name, config in self.tool_manager.mcp_tools.items():
-            if config.get("type") == "mcp-stdio":
+        for name, tool_config in self.tool_manager.mcp_tools.items():
+            if tool_config.get("type") == "mcp-stdio":
                 try:
                     if not init_printed:
-                        print(f"{GREEN}*** Initializing MCP servers...{RESET}")
+                        print(f"{config.GREEN}*** Initializing MCP servers...{config.RESET}")
                         init_printed = True
                     tools = self.tool_manager.registry._discover_mcp_server_tools(name)
                     print(
-                        f"{GREEN}*** Initialized MCP server '{name}' with {len(tools)} tools{RESET}"
+                        f"{config.GREEN}*** Initialized MCP server '{name}' with {len(tools)} tools{config.RESET}"
                     )
                 except Exception as e:
                     print(
-                        f"{RED}*** Failed to initialize MCP server '{name}': {e}{RESET}"
+                        f"{config.RED}*** Failed to initialize MCP server '{name}': {e}{config.RESET}"
                     )
 
     def _save_crash_session(self):
@@ -243,6 +264,8 @@ class AICoder(
                 try:
                     run_api_call = False
 
+                    self._check_auto_compaction()
+
                     # Use the new multi-line input function
                     user_input = self._get_multiline_input()
                     user_input = user_input.strip()
@@ -272,7 +295,7 @@ class AICoder(
                         if response is None:
                             # User cancelled the request
                             print(
-                                f"\n{RED}Request cancelled. Returning to user input.{RESET}"
+                                f"\n{config.RED}Request cancelled. Returning to user input.{config.RESET}"
                             )
                             break
                         if (
@@ -286,24 +309,29 @@ class AICoder(
                         message = response["choices"][0]["message"]
                         self.message_history.add_assistant_message(message)
 
+                        self._check_auto_compaction()
+
                         if message.get("tool_calls"):
-                            if DEBUG:
+                            if config.DEBUG:
                                 print(
                                     f"DEBUG: Message has tool calls: {message['tool_calls']}"
                                 )
+                            
                             tool_results, cancel_all_active = self._execute_tool_calls(
                                 message
                             )
                             # Ensure we're adding all tool results to messages
                             if tool_results:
+                                # Check and handle large tool results for size limiting
+                                self._check_and_handle_large_tool_results(tool_results)
                                 self.message_history.add_tool_results(tool_results)
                             else:
-                                print(f"{RED} * Warning: No tool results to add{RESET}")
+                                print(f"{config.RED} * Warning: No tool results to add{config.RESET}")
 
                             # If cancel all was activated, break out of the tool loop and return to user input
                             if cancel_all_active:
                                 print(
-                                    f"\n{RED} *** Cancel all activated - returning to user input{RESET}"
+                                    f"\n{config.RED} *** Cancel all activated - returning to user input{config.RESET}"
                                 )
                                 break
                             continue
@@ -311,6 +339,12 @@ class AICoder(
                             # Check if this is a streaming response - if so, don't print the content again
                             # as it was already printed during streaming
                             if not message.get("_streaming_response"):
+                                # Display token information before AI response if enabled
+                                if config.ENABLE_TOKEN_INFO_DISPLAY:
+                                    from .utils import display_token_info
+                                    display_token_info(self.stats, config.AUTO_COMPACT_THRESHOLD)
+                                    print()  # Add newline after token info so AI response appears on next line
+
                                 # Check if content is empty - this indicates an error condition
                                 if not message["content"].strip():
                                     # Empty content is an error - check finish reason for details
@@ -319,26 +353,26 @@ class AICoder(
                                     )
                                     if finish_reason:
                                         print(
-                                            f"\n{RED}AI Error: Empty response (finish_reason: {finish_reason}){RESET}"
+                                            f"\n{config.RED}AI Error: Empty response (finish_reason: {finish_reason}){config.RESET}"
                                         )
                                         if finish_reason == "content_filter":
                                             print(
-                                                f"{YELLOW}The response was filtered by content safety systems.{RESET}"
+                                                f"{config.YELLOW}The response was filtered by content safety systems.{config.RESET}"
                                             )
                                         elif finish_reason == "length":
                                             print(
-                                                f"{YELLOW}The response was truncated due to token limits before any content was generated.{RESET}"
+                                                f"{config.YELLOW}The response was truncated due to token limits before any content was generated.{config.RESET}"
                                             )
                                         else:
                                             print(
-                                                f"{YELLOW}The API returned an empty response. This may indicate an issue with the request.{RESET}"
+                                                f"{config.YELLOW}The API returned an empty response. This may indicate an issue with the request.{config.RESET}"
                                             )
                                     else:
                                         print(
-                                            f"\n{RED}AI Error: Empty response with no finish reason{RESET}"
+                                            f"\n{config.RED}AI Error: Empty response with no finish reason{config.RESET}"
                                         )
                                         print(
-                                            f"{YELLOW}This may indicate a network issue or API problem.{RESET}"
+                                            f"{config.YELLOW}This may indicate a network issue or API problem.{config.RESET}"
                                         )
 
                                     # Don't continue with empty content - break the loop
@@ -346,16 +380,16 @@ class AICoder(
                                 else:
                                     # Normal content - print it
                                     print(
-                                        f"\n{BOLD}{GREEN}AI:{RESET} {parse_markdown(message['content'])}"
+                                        f"{config.BOLD}{config.GREEN}AI:{config.RESET} {parse_markdown(message['content'])}"
                                     )
-
-                            # Check for auto-compaction after each response
-                            self._check_auto_compaction()
 
                             break
 
+                    # Check for auto-compaction after each complete interaction cycle (before showing prompt to user)
+                    self._check_auto_compaction()
+
                 except (KeyboardInterrupt, EOFError):
-                    print(f"\n{RED}Received interrupt. Exiting...{RESET}")
+                    print(f"\n{config.RED}Received interrupt. Exiting...{config.RESET}")
                     self._print_exit_stats()
                     break
         except Exception:
@@ -367,10 +401,10 @@ def main():
     """Main entry point."""
     # Check for crash session
     if os.path.exists("session_crash.json"):
-        print(f"{YELLOW}Found a crash session from a previous run.{RESET}")
-        print(f"{YELLOW}File: session_crash.json{RESET}")
+        print(f"{config.YELLOW}Found a crash session from a previous run.{config.RESET}")
+        print(f"{config.YELLOW}File: session_crash.json{config.RESET}")
         response = (
-            input(f"{GREEN}Do you want to load this session? (y/N/d): {RESET}")
+            input(f"{config.GREEN}Do you want to load this session? (y/N/d): {config.RESET}")
             .strip()
             .lower()
         )
@@ -378,9 +412,9 @@ def main():
             # Delete the crash session file
             try:
                 os.remove("session_crash.json")
-                print(f"{GREEN}Crash session file deleted.{RESET}")
+                print(f"{config.GREEN}Crash session file deleted.{config.RESET}")
             except Exception as e:
-                print(f"{RED}Failed to delete crash session file: {e}{RESET}")
+                print(f"{config.RED}Failed to delete crash session file: {e}{config.RESET}")
             # Continue with fresh session
             app = AICoder()
             app.run()
@@ -410,17 +444,17 @@ def main():
                 app.stats.api_time_spent = stats_data.get("api_time_spent", 0)
                 app.stats.tool_calls = stats_data.get("tool_calls", 0)
 
-                print(f"{GREEN}Crash session loaded successfully.{RESET}")
+                print(f"{config.GREEN}Crash session loaded successfully.{config.RESET}")
                 # Optionally rename the crash file to indicate it's been loaded
                 os.rename("session_crash.json", "session_crash_loaded.json")
-                print(f"{YELLOW}Crash file renamed to session_crash_loaded.json{RESET}")
+                print(f"{config.YELLOW}Crash file renamed to session_crash_loaded.json{config.RESET}")
 
                 # Run the app with loaded data
                 app.run()
                 return
             except Exception as e:
-                print(f"{RED}Failed to load crash session: {e}{RESET}")
-                print(f"{RED}Starting fresh session instead.{RESET}")
+                print(f"{config.RED}Failed to load crash session: {e}{config.RESET}")
+                print(f"{config.RED}Starting fresh session instead.{config.RESET}")
 
     app = AICoder()
     app.run()

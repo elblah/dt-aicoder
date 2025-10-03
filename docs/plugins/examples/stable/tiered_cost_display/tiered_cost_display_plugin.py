@@ -37,7 +37,7 @@ PLUGIN_ENABLED = os.environ.get("TIERED_COST_PLUGIN_ENABLED", "true").lower() in
     "1",
     "yes",
 )
-COST_DATA_FILE = os.environ.get("TIERED_COST_DATA_FILE", "./tiered_cost_data.txt")
+COST_DATA_FILE = os.environ.get("TIERED_COST_DATA_FILE", "./.tiered_cost_data.txt")
 
 # Environment variable override configuration (fixed pricing, no multitier support)
 INPUT_TOKEN_COST_ENV = os.environ.get("INPUT_TOKEN_COST")

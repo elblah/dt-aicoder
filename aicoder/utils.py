@@ -5,9 +5,36 @@ Utility functions for AI Coder.
 import os
 import difflib
 import shutil
-from typing import Dict, Any
+import json
+from typing import Dict, Any, List, Union
 
-from .config import GREEN, RED, RESET, DEFAULT_TRUNCATION_LIMIT, YELLOW, BOLD
+from . import config
+
+
+def make_readline_safe(text: str) -> str:
+    """Make color codes safe for readline by wrapping them with RL_PROMPT_START_IGNORE and RL_PROMPT_END_IGNORE.
+    
+    These are \001 and \002 characters that tell readline to ignore cursor positioning
+    for the enclosed characters.
+    
+    Args:
+        text: Text containing color codes
+        
+    Returns:
+        Text with color codes wrapped for readline safety
+    """
+    if not text:
+        return text
+    
+    result = text
+    # Replace all available color codes with readline-safe versions
+    for color_code in [
+        config.RESET, config.BOLD, config.RED, config.GREEN, config.YELLOW, 
+        config.BLUE
+    ]:
+        result = result.replace(color_code, f"\001{color_code}\002")
+    
+    return result
 
 
 def safe_strip(val, default="no content"):
@@ -32,17 +59,17 @@ def colorize_diff_lines(text):
         if line.startswith("+") and not line.startswith("+++") and stripped_line:
             # Added lines (green) - preserve original line ending
             colored_lines.append(
-                GREEN + stripped_line + RESET + line[len(stripped_line) :]
+                config.GREEN + stripped_line + config.RESET + line[len(stripped_line) :]
             )
         elif line.startswith("-") and not line.startswith("---") and stripped_line:
             # Removed lines (red) - preserve original line ending
             colored_lines.append(
-                RED + stripped_line + RESET + line[len(stripped_line) :]
+                config.RED + stripped_line + config.RESET + line[len(stripped_line) :]
             )
         elif line.startswith("@@") and stripped_line:
             # Diff header lines (yellow) - preserve original line ending
             colored_lines.append(
-                YELLOW + stripped_line + RESET + line[len(stripped_line) :]
+                config.YELLOW + stripped_line + config.RESET + line[len(stripped_line) :]
             )
         else:
             # Unchanged lines (default color) - preserve original line exactly
@@ -56,19 +83,30 @@ def format_tool_prompt(
     arguments: Dict[str, Any],
     tool_config: Dict[str, Any],
     path: str = "",
+    raw_arguments: str = None,
 ) -> str:
     """Format a user-friendly prompt for tool approval."""
-    from .config import DEBUG
 
     try:
-        if DEBUG:
+        if config.DEBUG:
             print(f"DEBUG: Formatting tool prompt for {tool_name}")
             print(f"DEBUG: Tool config: {tool_config}")
 
         prompt_lines = [f"└─ AI wants to call: {tool_name}"]
 
+        # Show raw JSON in debug mode or if provided
+        if config.DEBUG and raw_arguments:
+            prompt_lines.append(f"   Raw JSON: {raw_arguments}")
+        elif raw_arguments and not config.DEBUG:
+            # In non-debug mode, still show raw JSON if it's clearly malformed
+            try:
+                import json
+                json.loads(raw_arguments)
+            except json.JSONDecodeError:
+                prompt_lines.append(f"   Raw JSON (malformed): {raw_arguments}")
+
         # Print the tool description if available
-        if DEBUG and "description" in tool_config:
+        if config.DEBUG and "description" in tool_config:
             print(f"DEBUG: Tool description: {tool_config['description']}")
 
         # Special handling for specific tools
@@ -109,7 +147,7 @@ def format_tool_prompt(
 
         elif tool_name == "edit_file":
             # For edit_file, show a diff of what will change
-            file_path = arguments.get("file_path", "")
+            file_path = arguments.get("path", "")
             old_string = arguments.get("old_string", "")
             new_string = arguments.get("new_string", "")
 
@@ -167,6 +205,37 @@ def format_tool_prompt(
                         prompt_lines.append("Warning: old_string not found in file")
                 except Exception as e:
                     prompt_lines.append(f"Error reading file {file_path}: {e}")
+            elif file_path and not os.path.exists(file_path) and old_string == "":
+                # For new file creation (old_string is empty), show a diff with all lines as additions
+                old_content = ""
+                new_content = new_string
+                
+                # Generate diff for new file (empty old content vs new content)
+                old_lines = old_content.splitlines(keepends=True)
+                new_lines = new_content.splitlines(keepends=True)
+                diff = list(
+                    difflib.unified_diff(
+                        old_lines,
+                        new_lines,
+                        fromfile=f"{file_path} (old)",
+                        tofile=f"{file_path} (new)",
+                    )
+                )
+
+                if diff:
+                    # Colorize the diff output
+                    diff_text = colorize_diff_lines("".join(diff))
+                    prompt_lines.append(f"File: {file_path} (new file)")
+                    prompt_lines.append("Changes:")
+                    prompt_lines.append(diff_text)
+                else:
+                    prompt_lines.append(f"File: {file_path} (new file)")
+                    prompt_lines.append("Content:")
+                    prompt_lines.append(
+                        new_string[:500] + "..."
+                        if len(new_string) > 500
+                        else new_string
+                    )
             else:
                 # For new files, show what will be created
                 prompt_lines.append(f"File: {file_path} (new file)")
@@ -191,11 +260,11 @@ def format_tool_prompt(
             hide_reason = "reason" in hidden_parameters
             hide_timeout = "timeout" in hidden_parameters
 
-            prompt_lines = [f"   AI wants to run a command:{RESET}"]
+            prompt_lines = [f"   AI wants to run a command:{config.RESET}"]
             if hide_command:
-                prompt_lines.append(f"{BOLD}    Command: [HIDDEN]{RESET}")
+                prompt_lines.append(f"{config.BOLD}    Command: [HIDDEN]{config.RESET}")
             else:
-                prompt_lines.append(f"{BOLD}    Command: {command}{RESET}")
+                prompt_lines.append(f"{config.BOLD}    Command: {command}{config.RESET}")
             if reason and not hide_reason:
                 prompt_lines.append(f"    Reason: {reason}")
             elif hide_reason and reason:
@@ -232,9 +301,9 @@ def format_tool_prompt(
                 elif (
                     truncated_chars == 0
                     and isinstance(value, str)
-                    and len(value) > DEFAULT_TRUNCATION_LIMIT
+                    and len(value) > config.DEFAULT_TRUNCATION_LIMIT
                 ):
-                    value = value[:DEFAULT_TRUNCATION_LIMIT] + "... [truncated]"
+                    value = value[:config.DEFAULT_TRUNCATION_LIMIT] + "... [truncated]"
 
                 prompt_lines.append(f"    {key}: {value}")
 
@@ -270,11 +339,11 @@ def parse_markdown_streaming_style(text: str) -> str:
             at_line_start = True
             # Reset header mode
             if in_header:
-                result.append(RESET)
+                result.append(config.RESET)
                 in_header = False
             # Reset star mode on newline
             if in_star:
-                result.append(RESET)
+                result.append(config.RESET)
                 in_star = False
                 star_count = 0
             result.append(char)
@@ -287,7 +356,7 @@ def parse_markdown_streaming_style(text: str) -> str:
             if char == "`":
                 code_tick_count -= 1
                 if code_tick_count == 0:
-                    result.append(RESET)
+                    result.append(config.RESET)
                     in_code = False
             i += 1
             continue
@@ -298,7 +367,7 @@ def parse_markdown_streaming_style(text: str) -> str:
             if char == "*":
                 star_count -= 1
                 if star_count == 0:
-                    result.append(RESET)
+                    result.append(config.RESET)
                     in_star = False
             i += 1
             continue
@@ -313,7 +382,7 @@ def parse_markdown_streaming_style(text: str) -> str:
                 j += 1
 
             # Start code block
-            result.append(GREEN)
+            result.append(config.GREEN)
             for k in range(tick_count):
                 result.append("`")
             in_code = True
@@ -332,7 +401,7 @@ def parse_markdown_streaming_style(text: str) -> str:
                 j += 1
 
             # Start star block
-            result.append(GREEN)
+            result.append(config.GREEN)
             for k in range(star_count):
                 result.append("*")
             in_star = True
@@ -343,7 +412,7 @@ def parse_markdown_streaming_style(text: str) -> str:
 
         # Precedence 5: Check for header # at line start (lowest precedence)
         if at_line_start and char == "#":
-            result.append(RED)
+            result.append(config.RED)
             in_header = True
             result.append(char)
             at_line_start = False
@@ -410,6 +479,102 @@ def show_cursor():
 
     sys.stdout.write("\033[?25h")
     sys.stdout.flush()
+
+
+def estimate_tokens(text: str) -> int:
+    """
+    Estimate the number of tokens in a text string.
+    Uses the standard approach: 4 characters per token.
+    This is fast and good enough for pruning decisions.
+    """
+    if not text:
+        return 0
+    return max(0, round(len(text) / 4))
+
+
+def estimate_messages_tokens(messages: List[Dict]) -> int:
+    """
+    Estimate total tokens for a list of messages.
+    """
+    total = 0
+    for msg in messages:
+        # Estimate content
+        content = msg.get('content', '')
+        total += estimate_tokens(content)
+        
+        # Estimate tool calls if present
+        if 'tool_calls' in msg and msg['tool_calls']:
+            for tool_call in msg['tool_calls']:
+                if isinstance(tool_call, dict) and 'function' in tool_call:
+                    func_name = tool_call['function'].get('name', '')
+                    func_args = tool_call['function'].get('arguments', '')
+                    total += estimate_tokens(func_name)
+                    total += estimate_tokens(func_args)
+        
+        # Estimate tool results
+        if msg.get('role') == 'tool':
+            tool_call_id = msg.get('tool_call_id', '')
+            total += estimate_tokens(tool_call_id)
+    
+    return total
+
+
+def display_token_info(stats, auto_compact_threshold=None):
+    """Display token information in the requested format.
+    
+    Args:
+        stats: Stats object containing token information
+        auto_compact_threshold: Threshold value for calculating percentage (defaults to config.AUTO_COMPACT_THRESHOLD if not provided)
+    """
+    if not stats:
+        return
+    
+    # Import config at the beginning
+    import aicoder.config as config
+    
+    # Use provided threshold or fall back to config
+    if auto_compact_threshold is None:
+        threshold = config.AUTO_COMPACT_THRESHOLD
+    else:
+        threshold = auto_compact_threshold
+    
+    # Calculate usage percentage based on context size or threshold
+    usage_percentage = 0
+    display_threshold = threshold  # Default to the threshold for display
+    
+    if config.AUTO_COMPACT_ENABLED:
+        # If auto-compaction is enabled, show percentage of context size and trigger point
+        usage_percentage = min(100, (stats.current_prompt_size / config.CONTEXT_SIZE) * 100)
+        display_threshold = config.CONTEXT_SIZE
+    elif threshold > 0:
+        # If using old-style threshold, calculate against that
+        usage_percentage = min(100, (stats.current_prompt_size / threshold) * 100)
+    else:
+        # If no threshold, calculate against context size
+        usage_percentage = min(100, (stats.current_prompt_size / config.CONTEXT_SIZE) * 100)
+        display_threshold = config.CONTEXT_SIZE
+    
+    # Create visual representation (10 segments wide) with half-based rounding
+    # Fill n-th segment if usage >= 5 + 10*(n-1) %, i.e., (usage + 5) // 10
+    filled_bars = int((usage_percentage + 5) // 10)
+    filled_bars = min(10, filled_bars)  # Cap at 10 for 100%
+    empty_bars = 10 - filled_bars
+    
+    # Choose color based on usage percentage
+    if usage_percentage <= 50:
+        bar_color = config.GREEN
+    elif usage_percentage <= 80:
+        bar_color = config.YELLOW
+    else:
+        bar_color = config.RED
+    
+    # Add color to filled balls based on usage level
+    #bars = f"{bar_color}{'●' * filled_bars}{'○' * empty_bars}{config.RESET}"
+    bars = f"{bar_color}{'█' * filled_bars}{'░' * empty_bars}{config.RESET}"
+    
+    # Display token info in the requested format
+    # Show current prompt size vs the context size
+    print(f"\nContext: {bars} {usage_percentage:.0f}% ({stats.current_prompt_size:,}/{display_threshold:,} tokens)", end="", flush=True)
 
 
 def cancellable_sleep(seconds: float, animator=None) -> bool:
@@ -481,3 +646,54 @@ def cancellable_sleep(seconds: float, animator=None) -> bool:
                 termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
             except Exception:
                 pass
+
+
+def parse_json_arguments(arguments: Union[str, dict, list]) -> Union[dict, list]:
+    """
+    Parse JSON arguments that may be double/triple encoded.
+    
+    Handles the case where AI models send JSON as a string, which may itself
+    be encoded multiple times (e.g., '{"arg": "value"}' vs '"{\\"arg\\": \\"value\\"}"')
+    
+    Args:
+        arguments: Either a dict/list (already parsed) or a JSON string that needs parsing
+        
+    Returns:
+        Parsed dict or list
+        
+    Raises:
+        json.JSONDecodeError: If JSON is malformed
+        ValueError: If after max attempts we still have a string
+    """
+    # If already a dict or list, return as-is
+    if not isinstance(arguments, str):
+        return arguments
+    
+    current_value = arguments
+    max_attempts = 5
+    
+    for attempt in range(max_attempts):
+        try:
+            parsed = json.loads(current_value)
+            
+            # If we got a dict or list, this is what we want
+            if isinstance(parsed, (dict, list)):
+                return parsed
+            # If we got a string, try parsing again (handles double/triple encoding)
+            elif isinstance(parsed, str):
+                current_value = parsed
+                continue
+            else:
+                # Unexpected type (int, float, bool, None) - return as-is
+                return parsed
+                
+        except json.JSONDecodeError:
+            # If we can't parse and this is the first attempt, the original was malformed
+            if attempt == 0:
+                raise
+            else:
+                # We parsed some levels but then hit malformed JSON
+                raise ValueError(f"Arguments still a string after {attempt} parse attempts: {current_value}")
+    
+    # If we get here, we maxed out attempts and still have a string
+    raise ValueError(f"Arguments still a string after {max_attempts} parse attempts: {current_value}")

@@ -8,7 +8,7 @@ import tempfile
 import subprocess
 import pprint
 from typing import Tuple, List
-from .config import DEBUG, GREEN, YELLOW, RED, RESET
+from . import config
 
 
 class CommandHandlerMixin:
@@ -25,7 +25,7 @@ class CommandHandlerMixin:
         if handler:
             return handler(args)
         else:
-            print(f"\n{RED} *** Command not found: {command}{RESET}")
+            print(f"\n{config.RED} *** Command not found: {command}{config.RESET}")
             return False, False
 
     def _handle_help(self, args: List[str]) -> Tuple[bool, bool]:
@@ -68,15 +68,25 @@ class CommandHandlerMixin:
             os.unlink(temp_filename)
 
             if content.strip():
-                print(f"\n{GREEN}>>> Memory updated...{RESET}")
+                print(f"\n{config.GREEN}>>> Memory updated...{config.RESET}")
                 self.message_history.messages = json.loads(content)
+                
+                # Re-estimate tokens since memory content changed
+                try:
+                    from ..utils import estimate_messages_tokens
+                    estimated_tokens = estimate_messages_tokens(self.message_history.messages)
+                    print(f"{config.BLUE}>>> Context re-estimated: ~{estimated_tokens} tokens{config.RESET}")
+                except Exception as e:
+                    if config.DEBUG:
+                        print(f"{config.RED} *** Error re-estimating tokens: {e}{config.RESET}")
+                
                 return False, False
             else:
-                print(f"\n{YELLOW}*** Edit cancelled, no content.{RESET}")
+                print(f"\n{config.YELLOW}*** Edit cancelled, no content.{config.RESET}")
                 return False, False
 
         except Exception as e:
-            print(f"\n{RED}*** Error during edit: {e}{RESET}")
+            print(f"\n{config.RED}*** Error during edit: {e}{config.RESET}")
             return False, False
 
     def _handle_edit(self, args: List[str]) -> Tuple[bool, bool]:
@@ -96,16 +106,16 @@ class CommandHandlerMixin:
             os.unlink(temp_filename)
 
             if content.strip():
-                print(f"\n{GREEN}>>> Using edited prompt...{RESET}")
+                print(f"\n{config.GREEN}>>> Using edited prompt...{config.RESET}")
                 print(content)
                 self.message_history.add_user_message(content)
                 return False, True
             else:
-                print(f"\n{YELLOW}*** Edit cancelled, no content.{RESET}")
+                print(f"\n{config.YELLOW}*** Edit cancelled, no content.{config.RESET}")
                 return False, False
 
         except Exception as e:
-            print(f"\n{RED}*** Error during edit: {e}{RESET}")
+            print(f"\n{config.RED}*** Error during edit: {e}{config.RESET}")
             return False, False
 
     def _handle_print_messages(self, args: List[str]) -> Tuple[bool, bool]:
@@ -114,11 +124,11 @@ class CommandHandlerMixin:
         pp.pprint(self.message_history.messages)
 
         # Also print the system prompt content if in debug mode
-        if DEBUG and self.message_history.messages:
+        if config.DEBUG and self.message_history.messages:
             system_prompt = self.message_history.messages[0].get("content", "")
-            print(f"\n{YELLOW}=== SYSTEM PROMPT CONTENT ==={RESET}")
+            print(f"\n{config.YELLOW}=== SYSTEM PROMPT CONTENT ==={config.RESET}")
             print(system_prompt)
-            print(f"{YELLOW}=== END SYSTEM PROMPT ==={RESET}")
+            print(f"{config.YELLOW}=== END SYSTEM PROMPT ==={config.RESET}")
 
         return False, False
 
@@ -134,14 +144,13 @@ class CommandHandlerMixin:
             import aicoder.config
 
             aicoder.config.API_MODEL = args[0]
-        from .config import API_MODEL
-
-        print(f"\n{GREEN} *** Model: {API_MODEL}{RESET}")
+        
+        print(f"\n{config.GREEN} *** Model: {config.API_MODEL}{config.RESET}")
         return False, False
 
     def _handle_new_session(self, args: List[str]) -> Tuple[bool, bool]:
         """Starts a new chat session."""
-        print(f"\n{GREEN} *** New session created...{RESET}")
+        print(f"\n{config.GREEN} *** New session created...{config.RESET}")
         self.message_history.reset_session()
         return False, False
 
@@ -175,7 +184,7 @@ class CommandHandlerMixin:
         if not args:
             # Show current status
             status = "enabled" if aicoder.config.YOLO_MODE else "disabled"
-            print(f"\n{GREEN}*** YOLO mode is {status}{RESET}")
+            print(f"\n{config.GREEN}*** YOLO mode is {status}{config.RESET}")
             return False, False
 
         arg = args[0].lower()
@@ -185,16 +194,16 @@ class CommandHandlerMixin:
 
             os.environ["YOLO_MODE"] = "1"
             aicoder.config.YOLO_MODE = True
-            print(f"\n{GREEN}*** YOLO mode enabled{RESET}")
+            print(f"\n{config.GREEN}*** YOLO mode enabled{config.RESET}")
         elif arg in ["off", "disable", "0", "false"]:
             # Disable YOLO mode
             import os
 
             os.environ["YOLO_MODE"] = "0"
             aicoder.config.YOLO_MODE = False
-            print(f"\n{GREEN}*** YOLO mode disabled{RESET}")
+            print(f"\n{config.GREEN}*** YOLO mode disabled{config.RESET}")
         else:
-            print(f"\n{RED}*** Invalid argument. Use: /yolo [on|off]{RESET}")
+            print(f"\n{config.RED}*** Invalid argument. Use: /yolo [on|off]{config.RESET}")
 
         return False, False
 
@@ -206,13 +215,91 @@ class CommandHandlerMixin:
     def _handle_retry(self, args: List[str]) -> Tuple[bool, bool]:
         """Retries the last API call without modifying the conversation history."""
         if len(self.message_history.messages) < 2:
-            print(f"\n{YELLOW}*** Not enough messages to retry.{RESET}")
+            print(f"\n{config.YELLOW}*** Not enough messages to retry.{config.RESET}")
             return False, False
 
-        print(f"\n{GREEN}*** Retrying last request...{RESET}")
+        print(f"\n{config.GREEN}*** Retrying last request...{config.RESET}")
 
+        # Check if debug mode is enabled and notify user
+        import os
+        if os.environ.get("DEBUG") == "1" and os.environ.get("STREAM_LOG_FILE"):
+            print(f"{config.YELLOW}*** Debug mode is active - will log to: {os.environ.get('STREAM_LOG_FILE')}{config.RESET}")
+        
         # Simply resend the current context without modifying history
         return False, True
+
+    def _handle_debug(self, args: List[str]) -> Tuple[bool, bool]:
+        """Manage debug mode: /debug [on|off] - Show or toggle debug logging for streaming issues."""
+        import os
+
+        # Check current debug state
+        current_debug = os.environ.get("DEBUG", "") == "1"
+        current_stream_log = os.environ.get("STREAM_LOG_FILE", "")
+
+        if not args:
+            # Show current status
+            status = "enabled" if current_debug and current_stream_log else "disabled"
+            print(f"\n{config.GREEN}*** Debug logging is {status}{config.RESET}")
+            if current_debug and current_stream_log:
+                print("    - DEBUG mode: ON")
+                print(f"    - Stream logging: {current_stream_log}")
+            return False, False
+
+        arg = args[0].lower()
+        if arg in ["on", "enable", "1", "true"]:
+            if current_debug and current_stream_log:
+                print(f"\n{config.GREEN}*** Debug logging is already enabled{config.RESET}")
+                print("    - DEBUG mode: ON")
+                print(f"    - Stream logging: {current_stream_log}")
+                return False, False
+
+            # Enable debug logging
+            os.environ["DEBUG"] = "1"
+            os.environ["STREAM_LOG_FILE"] = "stream_debug.log"
+
+            # Also set longer timeouts to avoid false timeouts during debugging
+            os.environ["STREAMING_TIMEOUT"] = "600"
+            os.environ["STREAMING_READ_TIMEOUT"] = "120"
+            os.environ["HTTP_TIMEOUT"] = "600"
+
+            # Force re-initialization of streaming adapter to pick up new debug settings
+            if hasattr(self, "_streaming_adapter"):
+                delattr(self, "_streaming_adapter")
+                print("    - Streaming adapter reset to pick up debug settings")
+
+            print(f"\n{config.GREEN}*** Debug logging enabled{config.RESET}")
+            print("    - DEBUG mode: ON")
+            print("    - Stream logging: stream_debug.log")
+            print("    - Streaming timeout: 600s")
+            print("    - Read timeout: 120s")
+            print("    - HTTP timeout: 600s")
+            print(f"{config.YELLOW}*** Run /retry or make a request to capture debug data.{config.RESET}")
+
+        elif arg in ["off", "disable", "0", "false"]:
+            if not current_debug:
+                print(f"\n{config.GREEN}*** Debug logging is already disabled{config.RESET}")
+                return False, False
+
+            # Disable debug logging
+            os.environ.pop("DEBUG", None)
+            os.environ.pop("STREAM_LOG_FILE", None)
+            os.environ.pop("STREAMING_TIMEOUT", None)
+            os.environ.pop("STREAMING_READ_TIMEOUT", None)
+            os.environ.pop("HTTP_TIMEOUT", None)
+
+            # Force re-initialization of streaming adapter to pick up new debug settings
+            if hasattr(self, "_streaming_adapter"):
+                delattr(self, "_streaming_adapter")
+                print("    - Streaming adapter reset to disable debug settings")
+
+            print(f"\n{config.GREEN}*** Debug logging disabled{config.RESET}")
+            print("    - DEBUG mode: OFF")
+            print("    - Stream logging: OFF")
+
+        else:
+            print(f"\n{config.RED}*** Invalid argument. Use: /debug [on|off]{config.RESET}")
+
+        return False, False
 
     def _handle_quit(self, args: List[str]) -> Tuple[bool, bool]:
         """Exits the application."""

@@ -7,6 +7,7 @@ import os
 import sys
 import unittest
 from unittest.mock import patch
+import importlib
 
 # Add the aicoder directory to the path so we can import from it
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -18,57 +19,95 @@ class TestAutoCompact(unittest.TestCase):
     def setUp(self):
         """Set up test environment."""
         # Clear any existing environment variables that might affect tests
+        self.original_context_size = os.environ.get("CONTEXT_SIZE")
+        self.original_context_compact_percentage = os.environ.get("CONTEXT_COMPACT_PERCENTAGE")
+        self.original_auto_compact_threshold = os.environ.get("AUTO_COMPACT_THRESHOLD")
+        
+        # Remove old environment variables
         if "AUTO_COMPACT_THRESHOLD" in os.environ:
             del os.environ["AUTO_COMPACT_THRESHOLD"]
-        # Force reload of the config module to ensure clean state
-        if "aicoder.config" in sys.modules:
-            del sys.modules["aicoder.config"]
+        if "CONTEXT_SIZE" in os.environ:
+            del os.environ["CONTEXT_SIZE"]
+        if "CONTEXT_COMPACT_PERCENTAGE" in os.environ:
+            del os.environ["CONTEXT_COMPACT_PERCENTAGE"]
+        
+        # Import and reload config module
+        import aicoder.config
+        importlib.reload(aicoder.config)
+
+    def tearDown(self):
+        """Restore environment variables."""
+        # Remove current environment variables
+        if "AUTO_COMPACT_THRESHOLD" in os.environ:
+            del os.environ["AUTO_COMPACT_THRESHOLD"]
+        if "CONTEXT_SIZE" in os.environ:
+            del os.environ["CONTEXT_SIZE"]
+        if "CONTEXT_COMPACT_PERCENTAGE" in os.environ:
+            del os.environ["CONTEXT_COMPACT_PERCENTAGE"]
+            
+        # Restore original values if they existed
+        if self.original_context_size is not None:
+            os.environ["CONTEXT_SIZE"] = self.original_context_size
+        if self.original_context_compact_percentage is not None:
+            os.environ["CONTEXT_COMPACT_PERCENTAGE"] = self.original_context_compact_percentage
+        if self.original_auto_compact_threshold is not None:
+            os.environ["AUTO_COMPACT_THRESHOLD"] = self.original_auto_compact_threshold
+            
+        # Import and reload config module to restore original state
+        import aicoder.config
+        importlib.reload(aicoder.config)
 
     def test_auto_compact_threshold_default(self):
         """Test that AUTO_COMPACT_THRESHOLD defaults to 0 (disabled)."""
         # Import after environment setup
         from aicoder.config import AUTO_COMPACT_THRESHOLD
 
+        # With default settings (CONTEXT_COMPACT_PERCENTAGE = 0), AUTO_COMPACT_THRESHOLD should be 0
         self.assertEqual(AUTO_COMPACT_THRESHOLD, 0)
 
     def test_auto_compact_threshold_custom_value(self):
-        """Test that AUTO_COMPACT_THRESHOLD can be set to a custom value."""
-        os.environ["AUTO_COMPACT_THRESHOLD"] = "2000"
-        # Force reload of the config module to pick up the new environment variable
-        if "aicoder.config" in sys.modules:
-            del sys.modules["aicoder.config"]
+        """Test that AUTO_COMPACT_THRESHOLD can be set via new configuration."""
+        os.environ["CONTEXT_SIZE"] = "10000"
+        os.environ["CONTEXT_COMPACT_PERCENTAGE"] = "20"  # 20% of 10000 = 2000
+        # Import and reload config module
+        import aicoder.config
+        importlib.reload(aicoder.config)
         from aicoder.config import AUTO_COMPACT_THRESHOLD
 
         self.assertEqual(AUTO_COMPACT_THRESHOLD, 2000)
 
     def test_auto_compact_threshold_zero_disables(self):
         """Test that AUTO_COMPACT_THRESHOLD of 0 disables auto-compaction."""
-        os.environ["AUTO_COMPACT_THRESHOLD"] = "0"
-        # Force reload of the config module
-        if "aicoder.config" in sys.modules:
-            del sys.modules["aicoder.config"]
+        # With CONTEXT_COMPACT_PERCENTAGE = 0, auto-compaction should be disabled
+        os.environ["CONTEXT_COMPACT_PERCENTAGE"] = "0"
+        # Import and reload config module
+        import aicoder.config
+        importlib.reload(aicoder.config)
         from aicoder.config import AUTO_COMPACT_THRESHOLD
 
         self.assertEqual(AUTO_COMPACT_THRESHOLD, 0)
 
     def test_auto_compact_threshold_negative_value(self):
-        """Test that negative AUTO_COMPACT_THRESHOLD values are accepted."""
-        os.environ["AUTO_COMPACT_THRESHOLD"] = "-500"
-        # Force reload of the config module
-        if "aicoder.config" in sys.modules:
-            del sys.modules["aicoder.config"]
-        from aicoder.config import AUTO_COMPACT_THRESHOLD
+        """Test that percentage values over 100 are handled properly."""
+        # Test with percentage > 100, should cap at 100%
+        os.environ["CONTEXT_SIZE"] = "10000"
+        os.environ["CONTEXT_COMPACT_PERCENTAGE"] = "150"  # This should be capped at 100%
+        # Import and reload config module
+        import aicoder.config
+        importlib.reload(aicoder.config)
+        from aicoder.config import AUTO_COMPACT_THRESHOLD, CONTEXT_SIZE
 
-        self.assertEqual(AUTO_COMPACT_THRESHOLD, -500)
+        # With 150% of 10000, it should cap at 100% (CONTEXT_SIZE), so threshold should be CONTEXT_SIZE
+        self.assertEqual(AUTO_COMPACT_THRESHOLD, CONTEXT_SIZE)  # Should be 10000
 
     @patch("aicoder.app.MessageHistory")
     @patch("aicoder.app.Stats")
     def test_check_auto_compaction_disabled(self, mock_stats, mock_message_history):
         """Test that _check_auto_compaction does nothing when disabled."""
-        os.environ["AUTO_COMPACT_THRESHOLD"] = "0"
-        # Force reload of the config module
-        if "aicoder.config" in sys.modules:
-            del sys.modules["aicoder.config"]
+        os.environ["CONTEXT_COMPACT_PERCENTAGE"] = "0"  # Disable auto-compaction
+        # Import and reload config module
+        import aicoder.config
+        importlib.reload(aicoder.config)
 
         from aicoder.app import AICoder
 
@@ -90,10 +129,11 @@ class TestAutoCompact(unittest.TestCase):
     @patch("aicoder.app.Stats")
     def test_check_auto_compaction_triggered(self, mock_stats, mock_message_history):
         """Test that _check_auto_compaction triggers when threshold is exceeded."""
-        os.environ["AUTO_COMPACT_THRESHOLD"] = "500"
-        # Force reload of the config module
-        if "aicoder.config" in sys.modules:
-            del sys.modules["aicoder.config"]
+        os.environ["CONTEXT_SIZE"] = "1000"
+        os.environ["CONTEXT_COMPACT_PERCENTAGE"] = "50"  # 50% of 1000 = 500
+        # Import and reload config module
+        import aicoder.config
+        importlib.reload(aicoder.config)
 
         from aicoder.app import AICoder
 
@@ -103,6 +143,8 @@ class TestAutoCompact(unittest.TestCase):
         # Set up mocks
         app.stats = mock_stats
         app.message_history = mock_message_history
+        # Set the compaction flag to False to allow the first compaction
+        app.message_history._compaction_performed = False
         app.stats.current_prompt_size = 600  # This exceeds the threshold of 500
 
         # Call the method
@@ -117,10 +159,11 @@ class TestAutoCompact(unittest.TestCase):
         self, mock_stats, mock_message_history
     ):
         """Test that _check_auto_compaction does not trigger when below threshold."""
-        os.environ["AUTO_COMPACT_THRESHOLD"] = "1000"
-        # Force reload of the config module
-        if "aicoder.config" in sys.modules:
-            del sys.modules["aicoder.config"]
+        os.environ["CONTEXT_SIZE"] = "2000"
+        os.environ["CONTEXT_COMPACT_PERCENTAGE"] = "50"  # 50% of 2000 = 1000
+        # Import and reload config module
+        import aicoder.config
+        importlib.reload(aicoder.config)
 
         from aicoder.app import AICoder
 

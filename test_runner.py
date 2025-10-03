@@ -370,13 +370,15 @@ print('✓ Auto-compaction defaults to 0 (disabled)')
             "Auto-compaction custom threshold",
             """
 import os
-os.environ['AUTO_COMPACT_THRESHOLD'] = '1500'
+# Set context size and percentage to achieve 1500 tokens threshold
+os.environ['CONTEXT_SIZE'] = '15000'  # 15k context
+os.environ['CONTEXT_COMPACT_PERCENTAGE'] = '10'  # 10% of 15k = 1500
 # Force reload of config module
 import sys
 if 'aicoder.config' in sys.modules:
     del sys.modules['aicoder.config']
 from aicoder.config import AUTO_COMPACT_THRESHOLD
-assert AUTO_COMPACT_THRESHOLD == 1500
+assert AUTO_COMPACT_THRESHOLD == 1500  # 10% of 15000
 print('✓ Auto-compaction custom threshold works')
 """,
         ),

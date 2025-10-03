@@ -194,7 +194,7 @@ def apply_theme(theme_name="default"):
         config.RESET = theme["RESET"]
 
         # Update other modules that import these colors directly
-        _update_dependent_modules(theme)
+        #_update_dependent_modules(theme)
 
         print(f"✅ Applied theme: {theme_name}")
         return True

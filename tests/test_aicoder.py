@@ -10,12 +10,12 @@ from unittest.mock import patch, MagicMock
 import sys
 import os
 
-# Ensure YOLO_MODE is set to prevent hanging on approval prompts
-if "YOLO_MODE" not in os.environ:
-    os.environ["YOLO_MODE"] = "1"
-
 # Add the parent directory to the path to import aicoder modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+# Import config first and set YOLO_MODE directly
+import aicoder.config as config
+config.YOLO_MODE = True
 
 from aicoder.app import AICoder
 from aicoder.tool_manager.manager import MCPToolManager
@@ -81,6 +81,8 @@ class TestToolManagerIntegration(unittest.TestCase):
 
     def setUp(self):
         """Set up the test environment."""
+        # Ensure YOLO_MODE is set BEFORE creating the tool manager
+        config.YOLO_MODE = True
         self.stats = MagicMock()
         self.tool_manager = MCPToolManager(self.stats)
 

@@ -2,12 +2,15 @@
 Tool parameter validation for AI Coder.
 """
 
+import json
 from typing import Dict, Any, Tuple
-from ..config import DEBUG, RED, RESET
+
+from ..utils import parse_json_arguments
+from .. import config
 
 
 def validate_tool_parameters(
-    tool_name: str, tool_definition: Dict[str, Any], arguments: Dict[str, Any]
+    tool_name: str, tool_definition: Dict[str, Any], arguments: Any
 ) -> Tuple[bool, str]:
     """
     Validate tool parameters against tool definition.
@@ -21,6 +24,14 @@ def validate_tool_parameters(
         Tuple of (is_valid, error_message)
     """
     try:
+        # Arguments should already be parsed by the time this is called
+        # If they're still a string, try to parse for backward compatibility
+        if isinstance(arguments, str):
+            try:
+                arguments = parse_json_arguments(arguments)
+            except (json.JSONDecodeError, ValueError) as e:
+                return False, f"Invalid JSON in tool arguments for '{tool_name}': {str(e)}. Please ensure your JSON is properly formatted with double quotes."
+
         # Get parameters schema
         parameters = tool_definition.get("parameters", {})
         if not parameters:
@@ -69,8 +80,8 @@ def validate_tool_parameters(
         return True, ""
 
     except Exception as e:
-        if DEBUG:
-            print(f"{RED} *** Error during tool parameter validation: {e}{RESET}")
+        if config.DEBUG:
+            print(f"{config.RED} *** Error during tool parameter validation: {e}{config.RESET}")
         return True, ""  # Allow the tool to run if validation fails
 
 
@@ -133,8 +144,8 @@ def validate_function_signature(
         return True, ""
 
     except Exception as e:
-        if DEBUG:
-            print(f"{RED} *** Error during function signature validation: {e}{RESET}")
+        if config.DEBUG:
+            print(f"{config.RED} *** Error during function signature validation: {e}{config.RESET}")
         # Don't fail validation on inspection errors
         return True, ""
 
@@ -226,8 +237,8 @@ def format_validation_error(
         )
 
     except Exception as e:
-        if DEBUG:
-            print(f"{RED} *** Error formatting validation error: {e}{RESET}")
+        if config.DEBUG:
+            print(f"{config.RED} *** Error formatting validation error: {e}{config.RESET}")
         return f"ERROR: Invalid parameters for tool '{tool_name}': {error_message}"
 
 

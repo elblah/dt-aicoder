@@ -25,6 +25,10 @@ MAX_TOKENS = (
 ENABLE_STREAMING = not (os.environ.get("DISABLE_STREAMING", "0") == "1")
 # Stream log file - if set, all streaming SSE data will be logged to this file
 STREAM_LOG_FILE = os.environ.get("STREAM_LOG_FILE", None)
+# Streaming timeout - how long to wait without SSE data before giving up (default: 300 seconds = 5 minutes)
+STREAMING_TIMEOUT = int(os.environ.get("STREAMING_TIMEOUT", "300"))
+# Streaming read timeout - how long to wait for each individual line of SSE data (default: 30 seconds)
+STREAMING_READ_TIMEOUT = int(os.environ.get("STREAMING_READ_TIMEOUT", "30"))
 
 # Define some ANSI color codes
 RED = "\033[31m"
@@ -54,6 +58,14 @@ if "TOP_P" in os.environ:
 if "MAX_TOKENS" in os.environ:
     print(f"{GREEN}*** Max tokens is {MAX_TOKENS}{RESET}")
 
+# Print streaming timeout if set as environment variable
+if "STREAMING_TIMEOUT" in os.environ:
+    print(f"{GREEN}*** Streaming timeout is {STREAMING_TIMEOUT} seconds{RESET}")
+
+# Print streaming read timeout if set as environment variable
+if "STREAMING_READ_TIMEOUT" in os.environ:
+    print(f"{GREEN}*** Streaming read timeout is {STREAMING_READ_TIMEOUT} seconds{RESET}")
+
 # Configuration from environment variables
 API_KEY = os.environ.get("OPENAI_API_KEY", "YOUR_API_KEY")
 API_ENDPOINT = (
@@ -75,16 +87,31 @@ else:
     # This is calculated dynamically in MessageHistory by counting only chat messages (excluding initial system messages)
     COMPACT_MIN_MESSAGES = COMPACT_RECENT_MESSAGES + 1
 
-# Auto-compaction settings
-# Support both names for backward compatibility - AUTO_COMPACT_TOKENS_THRESHOLD is preferred
-AUTO_COMPACT_THRESHOLD = int(
-    os.environ.get(
-        "AUTO_COMPACT_TOKENS_THRESHOLD", os.environ.get("AUTO_COMPACT_THRESHOLD", "0")
-    )
-)  # 0 means disabled
+# Pruning settings for tool result compaction
+PRUNE_PROTECT_TOKENS = int(os.environ.get("PRUNE_PROTECT_TOKENS", "40000"))  # Keep recent context intact
+PRUNE_MINIMUM_TOKENS = int(os.environ.get("PRUNE_MINIMUM_TOKENS", "20000"))  # Only prune if saving significant space
+ENABLE_PRUNING_COMPACTION = os.environ.get("ENABLE_PRUNING_COMPACTION", "1") == "1"  # Enable pruning-based compaction
+
+# Auto-compaction settings - NEW CLEAR NAMING
+CONTEXT_SIZE = int(os.environ.get("CONTEXT_SIZE", "128000"))  # Default to 128k tokens
+CONTEXT_COMPACT_PERCENTAGE = int(os.environ.get("CONTEXT_COMPACT_PERCENTAGE", "0"))  # 0 means disabled
+
+# Calculate auto-compaction threshold based on percentage (0 percentage means disabled)
+if CONTEXT_COMPACT_PERCENTAGE > 0:
+    # Cap at 100% to prevent exceeding context size
+    capped_percentage = min(CONTEXT_COMPACT_PERCENTAGE, 100)
+    AUTO_COMPACT_THRESHOLD = int(CONTEXT_SIZE * (capped_percentage / 100.0))
+else:
+    AUTO_COMPACT_THRESHOLD = 0  # Disabled
+
+# Auto-compaction enabled flag
+AUTO_COMPACT_ENABLED = AUTO_COMPACT_THRESHOLD > 0
 
 # Truncation settings
 DEFAULT_TRUNCATION_LIMIT = int(os.environ.get("DEFAULT_TRUNCATION_LIMIT", "300"))
+
+# Tool result size limits
+MAX_TOOL_RESULT_SIZE = int(os.environ.get("MAX_TOOL_RESULT_SIZE", "300000"))  # 300KB default
 
 # Mode flags
 YOLO_MODE = "YOLO_MODE" in os.environ and os.environ.get("YOLO_MODE") == "1"
@@ -121,3 +148,6 @@ RETRY_INITIAL_DELAY = float(os.environ.get("RETRY_INITIAL_DELAY", "2"))
 RETRY_MAX_DELAY = float(os.environ.get("RETRY_MAX_DELAY", "64"))
 RETRY_FIXED_DELAY = float(os.environ.get("RETRY_FIXED_DELAY", "5"))
 RETRY_MAX_ATTEMPTS = int(os.environ.get("RETRY_MAX_ATTEMPTS", "0"))  # 0 means infinite
+
+# Token information display configuration
+ENABLE_TOKEN_INFO_DISPLAY = os.environ.get("ENABLE_TOKEN_INFO_DISPLAY", "1") == "1"
