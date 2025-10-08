@@ -569,12 +569,22 @@ def display_token_info(stats, auto_compact_threshold=None):
         bar_color = config.RED
     
     # Add color to filled balls based on usage level
-    #bars = f"{bar_color}{'●' * filled_bars}{'○' * empty_bars}{config.RESET}"
-    bars = f"{bar_color}{'█' * filled_bars}{'░' * empty_bars}{config.RESET}"
+    bars = f"{bar_color}{config.TOKEN_INFO_FILLED_CHAR * filled_bars}{config.TOKEN_INFO_EMPTY_CHAR * empty_bars}{config.RESET}"
     
-    # Display token info in the requested format
-    # Show current prompt size vs the context size
-    print(f"\nContext: {bars} {usage_percentage:.0f}% ({stats.current_prompt_size:,}/{display_threshold:,} tokens)", end="", flush=True)
+    # Format numbers for display - use abbreviated format for cleaner output
+    def format_token_count(count):
+        if count >= 1000000:
+            return f"{count / 1000000:.1f}M"
+        elif count >= 1000:
+            return f"{count / 1000:.1f}k"
+        else:
+            return str(count)
+    
+    current_size_formatted = format_token_count(stats.current_prompt_size)
+    threshold_formatted = format_token_count(display_threshold)
+    
+    # Display token info in the abbreviated format
+    print(f"\nContext: {bars} {usage_percentage:.0f}% ({current_size_formatted}/{threshold_formatted})", end="", flush=True)
 
 
 def cancellable_sleep(seconds: float, animator=None) -> bool:

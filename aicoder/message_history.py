@@ -9,6 +9,16 @@ from typing import List, Dict, Any
 from .stats import Stats
 from . import config
 
+# Global constants for message compaction to ensure single source of truth
+SUMMARY_MESSAGE_PREFIX = "Summary of earlier conversation:"
+NEUTRAL_USER_MESSAGE_CONTENT = "..."
+COMPACTED_TOOL_RESULT_CONTENT = "[Old tool result content cleared due to memory compaction]"
+
+
+class NoMessagesToCompactError(Exception):
+    """Raised when there are no messages to compact (all are recent or already compacted)."""
+    pass
+
 
 def clean_message_for_api(message: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -178,6 +188,8 @@ class MessageHistory:
         self.api_handler = None
         # Flag to track if compaction has been performed since last message addition
         self._compaction_performed = False
+        # Track autosave file if enabled (loaded from "autosave" in filename)
+        self.autosave_filename = None
 
     def _create_initial_messages(self) -> List[Dict[str, Any]]:
         """Create the initial system message."""
@@ -190,23 +202,22 @@ class MessageHistory:
             )
             # Replace placeholder with current date and time
             from datetime import datetime
+
             current_datetime = datetime.now()
             aicoder_content = aicoder_content.replace(
                 "{current_datetime}", current_datetime.strftime("%Y-%m-%d %H:%M:%S")
             )
-            
+
             # Detect available tools and add to context
             available_tools = self._detect_available_tools()
             aicoder_content = aicoder_content.replace(
                 "{available_tools}", available_tools
             )
-            
+
             # Add system information
             system_info = self._get_system_info()
-            aicoder_content = aicoder_content.replace(
-                "{system_info}", system_info
-            )
-            
+            aicoder_content = aicoder_content.replace("{system_info}", system_info)
+
             INITIAL_PROMPT = aicoder_content
             if config.DEBUG:
                 print(
@@ -244,34 +255,37 @@ class MessageHistory:
     def _detect_available_tools(self) -> str:
         """Detect available tools and return formatted string for prompt."""
         import shutil
-        
+
         tool_map = {
             "text search": ["rg", "ag", "grep"],
             "file search": ["fd", "rg", "find"],
             "file listing": ["eza", "exa", "ls"],
             "directory tree": ["tree", "eza"],
         }
-        
+
         available_sections = []
         for category, tools in tool_map.items():
             available = []
             for tool in tools:
                 # Skip "eza --tree" for which check, just check "eza"
-                tool_to_check = tool.split()[0] if ' ' in tool else tool
+                tool_to_check = tool.split()[0] if " " in tool else tool
                 if shutil.which(tool_to_check):
                     available.append(tool)
             if available:
                 available_sections.append(f"{category}: {', '.join(available)}")
-        
+
         if available_sections:
-            return "Some commands that are available for certain tasks on this system that you might use:\n" + "\n".join(f"- {section}" for section in available_sections)
+            return (
+                "Some commands that are available for certain tasks on this system that you might use:\n"
+                + "\n".join(f"- {section}" for section in available_sections)
+            )
         else:
             return "Standard Unix/Linux tools are available on this system."
 
     def _get_system_info(self) -> str:
         """Get system information for context."""
         import platform
-        
+
         system = platform.system()
         machine = platform.machine()
         return f"This is a {system} system on {machine} architecture"
@@ -344,8 +358,9 @@ class MessageHistory:
 
         # Check if pruning was sufficient by estimating tokens after pruning
         from .utils import estimate_messages_tokens
+
         tokens_after_pruning = estimate_messages_tokens(pruned_messages)
-        
+
         # If pruning brought us below the auto-compaction threshold, keep the pruned messages
         # without doing AI summarization
         if tokens_after_pruning < config.AUTO_COMPACT_THRESHOLD:
@@ -356,14 +371,19 @@ class MessageHistory:
             self.messages = pruned_messages
             # Set the flag to True to indicate compaction has been attempted
             self._compaction_performed = True
-            
+
             # Recalculate token count after compaction
             from .utils import estimate_messages_tokens
-            if self.api_handler and hasattr(self.api_handler, 'stats'):
-                self.api_handler.stats.current_prompt_size = estimate_messages_tokens(self.messages)
+
+            if self.api_handler and hasattr(self.api_handler, "stats"):
+                self.api_handler.stats.current_prompt_size = estimate_messages_tokens(
+                    self.messages
+                )
                 if config.DEBUG:
-                    print(f"{config.GREEN} *** Token count recalculated after compaction: {self.api_handler.stats.current_prompt_size} tokens{config.RESET}")
-            
+                    print(
+                        f"{config.GREEN} *** Token count recalculated after compaction: {self.api_handler.stats.current_prompt_size} tokens{config.RESET}"
+                    )
+
             return self.messages
 
         # If pruning wasn't sufficient, proceed with AI summarization approach
@@ -371,7 +391,7 @@ class MessageHistory:
         recent_messages = self._get_preserved_recent_messages()
 
         # Create summary of older messages (everything except initial system messages and recent messages)
-        # Filter out malformed messages
+        # Filter out malformed messages and previously compacted messages
         first_chat_index = self._get_first_chat_message_index()
         older_messages = (
             pruned_messages[first_chat_index : -len(recent_messages)]
@@ -379,121 +399,160 @@ class MessageHistory:
             else []
         )
 
-        # Clean up older messages before summarization
-        clean_older_messages = [
-            clean_message_for_api(msg) for msg in older_messages
+        # Filter out previously compacted messages (messages that start with SUMMARY_MESSAGE_PREFIX)
+        older_messages = [
+            msg for msg in older_messages
+            if not (
+                msg.get("role") == "system" and 
+                msg.get("content", "").startswith(SUMMARY_MESSAGE_PREFIX)
+            )
         ]
 
-        if clean_older_messages:
-            summary = self._summarize_old_messages(clean_older_messages)
-        else:
-            summary = ""
+        # Clean up older messages before summarization
+        clean_older_messages = [clean_message_for_api(msg) for msg in older_messages]
 
-        summary_content = "Summary of earlier conversation: " + (
+        # If there are no messages to summarize, raise exception to skip compaction
+        if not clean_older_messages:
+            raise NoMessagesToCompactError("No messages to summarize - all are recent or already compacted")
+
+        summary = self._summarize_old_messages(clean_older_messages)
+
+        summary_content = SUMMARY_MESSAGE_PREFIX + " " + (
             summary if summary else "no prior content"
         )
         summary_message = {"role": "system", "content": summary_content}
 
-        # Reconstruct the messages list: system prompt + summary + recent messages
-        new_messages = [
-            self.initial_system_prompt,
-            summary_message,
-        ] + recent_messages
+        # Find the insertion point - it's the first chat message index
+        # All messages before this are system messages (including previous summaries)
+        first_chat_index = self._get_first_chat_message_index()
+        
+        # Reconstruct the messages list:
+        # 1. All system messages (initial prompt + previous summaries)
+        # 2. The new summary (inserted at the correct position)
+        # 3. The recent messages
+        new_messages = (
+            self.messages[:first_chat_index] +  # All existing system messages
+            [summary_message] +                  # New summary
+            recent_messages                      # Recent messages
+        )
+
+        # Ensure the first message after system is a user message for compatibility
+        # Note: OpenAI API does NOT require this, but GLM models from z.ai are strict about this requirement
+        # GLM from z.ai returns error: {"error":{"code":"1214","message":"The messages parameter is illegal. Please check the documentation."}}
+        # when the first message after system is not a user message
+        # This requirement was discovered through trial and error (not documented in their API docs)
+        # If recent_messages doesn't start with a user message, insert a neutral user message
+        if recent_messages and recent_messages[0].get("role") != "user":
+            neutral_user_message = {"role": "user", "content": NEUTRAL_USER_MESSAGE_CONTENT}
+            # Insert the neutral user message after the new summary (at position first_chat_index + 1)
+            new_messages = (
+                new_messages[:first_chat_index + 1] +  # All system messages + new summary
+                [neutral_user_message] +               # Neutral user message
+                recent_messages                         # Recent messages
+            )
+            if config.DEBUG:
+                print(
+                    f"{config.YELLOW} *** Inserted neutral user message for z.ai GLM model compatibility{config.RESET}"
+                )
+                print(
+                    f"{config.YELLOW} *** This prevents error 1214: 'The messages parameter is illegal' (OpenAI API doesn't require this){config.RESET}"
+                )
 
         self.messages = new_messages
         # Set the flag to True to indicate compaction has been attempted
         self._compaction_performed = True
-        
+
         # Recalculate token count after compaction
         from .utils import estimate_messages_tokens
-        if self.api_handler and hasattr(self.api_handler, 'stats'):
-            self.api_handler.stats.current_prompt_size = estimate_messages_tokens(self.messages)
+
+        if self.api_handler and hasattr(self.api_handler, "stats"):
+            self.api_handler.stats.current_prompt_size = estimate_messages_tokens(
+                self.messages
+            )
             if config.DEBUG:
-                print(f"{config.GREEN} *** Token count recalculated after compaction: {self.api_handler.stats.current_prompt_size} tokens{config.RESET}")
-        
+                print(
+                    f"{config.GREEN} *** Token count recalculated after compaction: {self.api_handler.stats.current_prompt_size} tokens{config.RESET}"
+                )
+
         return self.messages
 
     def _prune_old_tool_results(self) -> tuple:
         """Prune old tool results while keeping tool calls and conversation flow.
-        
+
         Returns:
             tuple: (pruned_messages_list, actual_pruning_occurred_bool)
         """
+        if "DISABLE_PRUNING" in os.environ:
+            return self.messages, False
+
         from .utils import estimate_messages_tokens
 
         # Make a copy of messages to work with
         messages = [msg.copy() for msg in self.messages]
 
-        # Calculate total token count to determine if pruning is needed
-        total_tokens = estimate_messages_tokens(messages)
-
-        # Only proceed with pruning if we have more tokens than the protection threshold
-        if total_tokens <= config.PRUNE_PROTECT_TOKENS:
-            if config.DEBUG:
-                print(
-                    f"{config.GREEN} *** Skipping pruning - total tokens ({total_tokens}) below protection threshold ({config.PRUNE_PROTECT_TOKENS}){config.RESET}"
-                )
-            return messages, False  # No pruning occurred
-
-        # Identify which messages are tool results that can be pruned
-        # We'll go backwards through messages, keeping recent conversations and
-        # only pruning old tool result content (not tool calls themselves)
-
-        # First, identify recent conversation turns to preserve
-        recent_turns_to_keep = config.COMPACT_RECENT_MESSAGES
+        # Token-based pruning: work backwards accumulating tokens until protection threshold
+        tokens_accumulated = 0
         turns_found = 0
-        preserve_from_index = len(messages)
+        preserve_turns = 2  # Protect last 2 user turns (like established tools)
+        prune_from_index = 0
+        to_prune = []
+        total_pruned_tokens = 0
 
-        # Go backwards to find recent conversation turns
+        # Go backwards through messages to find protection boundary
         for i in range(len(messages) - 1, -1, -1):
             msg = messages[i]
+
+            # Count conversation turns
             if msg.get("role") == "user":
                 turns_found += 1
-                if turns_found >= recent_turns_to_keep:
-                    preserve_from_index = i
-                    break
 
-        # Prune tool results that are older than the preserved section
-        pruned_count = 0
-        pruned_tokens = 0
+            # Always protect recent turns
+            if turns_found < preserve_turns:
+                continue
 
-        for i in range(preserve_from_index):
+            # Accumulate tokens for protection calculation
+            msg_tokens = len(str(msg.get("content", ""))) // 4  # Rough estimate
+            tokens_accumulated += msg_tokens
+
+            # Once we've protected enough tokens, start marking older tool results for pruning
+            if tokens_accumulated >= config.PRUNE_PROTECT_TOKENS:
+                prune_from_index = i
+                break
+
+        # Identify tool results to prune (only older than protection boundary)
+        for i in range(prune_from_index):
             msg = messages[i]
-            if msg.get("role") == "tool":
-                # Prune the content of old tool results, but keep the message structure
-                if "content" in msg and msg["content"]:
-                    original_content = msg["content"]
-                    original_tokens = (
-                        len(str(original_content)) // 4
-                    )  # Rough token estimation
+            if msg.get("role") == "tool" and msg.get("content"):
+                # Only prune substantial tool results
+                if len(str(msg["content"])) > 100:
+                    msg_tokens = len(str(msg["content"])) // 4
+                    to_prune.append((i, msg_tokens))
+                    total_pruned_tokens += msg_tokens
 
-                    # Only prune if the content is substantial (more than 100 characters)
-                    if len(str(original_content)) > 100:
-                        msg["content"] = (
-                            "[Old tool result content cleared due to memory compaction]"
-                        )
-                        pruned_count += 1
-                        pruned_tokens += original_tokens
-                        if config.DEBUG:
-                            print(
-                                f"{config.YELLOW} *** Pruned tool result: {len(str(original_content))} chars -> [compacted]{config.RESET}"
-                            )
-
-        # If we pruned any messages, return the pruned version
-        # This ensures that the placeholder messages are kept to indicate what was compacted
-        if pruned_count > 0:
+        # Check if pruning meets minimum threshold before applying
+        if total_pruned_tokens < config.PRUNE_MINIMUM_TOKENS:
             if config.DEBUG:
                 print(
-                    f"{config.GREEN} *** Applied pruning of {pruned_count} tool results, saving approximately {pruned_tokens} tokens{config.RESET}"
+                    f"{config.YELLOW} *** Pruning savings ({total_pruned_tokens}) below minimum ({config.PRUNE_MINIMUM_TOKENS}), skipping pruning{config.RESET}"
                 )
-            return messages, True  # Pruning occurred
-        else:
-            # Only return original if no pruning actually occurred
+            return [msg.copy() for msg in self.messages], False
+
+        # Apply pruning to marked tool results
+        pruned_count = 0
+        for msg_index, original_tokens in to_prune:
+            messages[msg_index]["content"] = COMPACTED_TOOL_RESULT_CONTENT
+            pruned_count += 1
             if config.DEBUG:
                 print(
-                    f"{config.YELLOW} *** No pruning occurred, returning original messages{config.RESET}"
+                    f"{config.YELLOW} *** Pruned tool result: ~{original_tokens} tokens -> [compacted]{config.RESET}"
                 )
-            return [msg.copy() for msg in self.messages], False  # No pruning occurred
+
+        if config.DEBUG:
+            print(
+                f"{config.GREEN} *** Applied pruning of {pruned_count} tool results, saving approximately {total_pruned_tokens} tokens{config.RESET}"
+            )
+
+        return messages, True  # Pruning occurred
 
     def _get_first_chat_message_index(self) -> int:
         """Find the index of the first non-system message."""
@@ -503,16 +562,32 @@ class MessageHistory:
         return len(self.messages)  # All messages are system messages
 
     def _get_preserved_recent_messages(self) -> List[Dict[str, Any]]:
-        """Get recent messages while preserving tool call/response pairs."""
+        """Get recent messages while preserving tool call/response pairs using token-based approach."""
         first_chat_index = self._get_first_chat_message_index()
-        chat_message_count = len(self.messages) - first_chat_index
+        chat_messages = self.messages[first_chat_index:]
 
-        # If we have few enough chat messages, keep all of them
-        if chat_message_count <= config.COMPACT_RECENT_MESSAGES:
-            return self.messages[first_chat_index:]  # All chat messages
+        # Protect by conversation turns instead of fixed message count
+        protect_turns = (
+            config.COMPACT_RECENT_MESSAGES
+        )  # Protect last N user turns for AI summarization
+        turns_found = 0
+        preserve_from_index = len(chat_messages)
 
-        # Get the recent messages (last N chat messages)
-        recent_messages = self.messages[-config.COMPACT_RECENT_MESSAGES :]
+        # Work backwards to find recent conversation turns
+        for i in range(len(chat_messages) - 1, -1, -1):
+            msg = chat_messages[i]
+            if msg.get("role") == "user":
+                turns_found += 1
+                if turns_found >= protect_turns:
+                    preserve_from_index = i
+                    break
+
+        # Keep everything from the protection point onwards
+        recent_messages = (
+            chat_messages[preserve_from_index:]
+            if preserve_from_index < len(chat_messages)
+            else chat_messages
+        )
 
         # Scan from oldest to newest to find the first tool call
         # Any tool response before that first tool call is an orphan and should be removed
@@ -537,19 +612,20 @@ class MessageHistory:
         return cleaned_messages
 
     def _summarize_old_messages(self, messages_to_summarize: List[Dict]) -> str:
-        """Summarize old messages via API, including tool context."""
+        """Summarize old messages via API, with safe failure handling to prevent data loss."""
         if not messages_to_summarize:
             return ""
 
-        # If we don't have an API handler, return a placeholder
+        # If we don't have an API handler, we cannot safely compact
         if not self.api_handler:
-            return "Summary unavailable - no API handler available"
+            raise Exception("Cannot compact: No API handler available")
 
         try:
-            # Format messages to include tool context
+            # Format messages to include tool context with temporal indicators
             formatted_messages = []
-            for msg in messages_to_summarize:
-                formatted = self._format_message_for_summary(msg)
+            total_messages = len(messages_to_summarize)
+            for i, msg in enumerate(messages_to_summarize):
+                formatted = self._format_message_for_summary(msg, total_messages, i + 1)
                 if formatted.strip():
                     formatted_messages.append(formatted)
 
@@ -559,62 +635,94 @@ class MessageHistory:
             # Join with clear separation
             text = "\n---\n".join(formatted_messages)
 
-            # Limit text length to avoid token limits
-            MAX_SUMMARY_LENGTH = 30000  # Roughly 10K tokens
-            if len(text) > MAX_SUMMARY_LENGTH:
-                text = text[:MAX_SUMMARY_LENGTH] + "... [truncated]"
-
-            # Create a better summary prompt that focuses on important context
-            summary_prompt = f"""
-Please provide a concise summary of the following conversation history. 
-Focus on:
-- What files or directories are being worked on
-- What tools were used and what they did
-- What the current task or goal is
-- What was accomplished recently
-- What needs to be done next
-
-The summary should help continue the conversation effectively.
-
-Conversation history:
-{text}
-"""
-
+            # Create a structured technical handover report summary prompt (WINNING PROMPT TEST 3)
             summary_messages = [
                 {
                     "role": "system",
-                    "content": "You are a helpful assistant that creates concise summaries of conversation history. Focus on important context like files being worked on, tools used, current tasks, and next steps.",
+                    "content": """You are a helpful AI assistant tasked with summarizing conversations.
+
+When asked to summarize, provide a detailed but concise summary of the conversation.
+Focus on information that would be helpful for continuing the conversation, including:
+
+- What was done
+- What is currently being worked on
+- Which files are being modified
+- What needs to be done next
+
+Your summary should be comprehensive enough to provide context but concise enough to be quickly understood.""",
                 },
-                {"role": "user", "content": summary_prompt},
+                {
+                    "role": "user",
+                    "content": f"""Based on the conversation below:
+
+Numbered conversation to analyze:
+{text}
+
+---
+Provide a detailed but concise summary of our conversation above. Focus on information that would be helpful for continuing the conversation, including what we did, what we're doing, which files we're working on, and what we're going to do next. Generate at least 1000 if you have enough information available to do so."
+""",
+                },
             ]
 
-            # Make API request for summary (disable streaming and tools for internal prompts)
-            response = self.api_handler._make_api_request(
-                summary_messages, disable_streaming_mode=True, disable_tools=True
-            )
+            # Make API request for summary with temperature=0 to stop GLM randomness
+            # Force temperature=0 by temporarily setting config.TEMPERATURE
+            original_temp = getattr(config, "TEMPPERATURE", None)
+            config.TEMPERATURE = 0
+            try:
+                response = self.api_handler._make_api_request(
+                    summary_messages, disable_streaming_mode=True, disable_tools=True
+                )
+            finally:
+                # Restore original temperature
+                if original_temp is not None:
+                    config.TEMPERATURE = original_temp
+                else:
+                    delattr(config, "TEMPERATURE")
 
             if response and "choices" in response and response["choices"]:
                 summary = response["choices"][0]["message"].get("content", "").strip()
                 if summary:
                     return summary
 
-            # Fallback if API request fails
-            return "Summary of conversation history (API request failed)"
+            # If we get here, API succeeded but returned invalid data
+            raise Exception("API returned invalid summary response")
+
         except Exception as e:
+            # CRITICAL: Don't continue compaction - raise the exception to preserve user data
             if config.DEBUG:
-                print(f"{config.RED} *** Error creating summary: {e}{config.RESET}")
+                print(f"{config.RED} *** Compaction API error: {e}{config.RESET}")
                 import traceback
 
                 traceback.print_exc()
-            # Fallback if there's an exception
-            return (
-                "Summary of conversation history (error occurred during summarization)"
-            )
 
-    def _format_message_for_summary(self, message: Dict) -> str:
-        """Format a message for AI summarization, including tool context."""
+            # Re-raise with clear error message
+            raise Exception(f"Compaction failed due to API error: {str(e)}")
+
+    def _format_message_for_summary(
+        self, message: Dict, total_messages: int = 0, current_index: int = 0
+    ) -> str:
+        """Format a message for AI summarization with temporal priority indicators."""
         role = message.get("role", "unknown")
         content = message.get("content", "")
+
+        # Calculate temporal priority if we have context
+        if total_messages > 0 and current_index > 0:
+            position_ratio = current_index / total_messages
+            position_percent = position_ratio * 100
+
+            # Add temporal priority indicator
+            if position_percent >= 80:
+                priority = "🔴 VERY RECENT (Last 20%)"
+            elif position_percent >= 60:
+                priority = "🟡 RECENT (Last 40%)"
+            elif position_percent >= 30:
+                priority = "🟢 MIDDLE"
+            else:
+                priority = "🔵 OLD (First 30%)"
+
+            prefix = f"[{current_index:3d}/{total_messages}] {priority} "
+        else:
+            prefix = ""
 
         if role == "assistant":
             # Include tool calls if present
@@ -626,9 +734,9 @@ Conversation history:
                         func_name = tool_call["function"].get("name", "unknown")
                         func_args = tool_call["function"].get("arguments", "{}")
                         tool_info.append(f"Tool Call: {func_name}({func_args})")
-                return f"Assistant: {content}\n" + "\n".join(tool_info)
+                return f"{prefix}Assistant: {content}\n" + "\n".join(tool_info)
             else:
-                return f"Assistant: {content}"
+                return f"{prefix}Assistant: {content}"
         elif role == "tool":
             # Include tool call ID and result
             tool_call_id = message.get("tool_call_id", "unknown")
@@ -645,13 +753,18 @@ Conversation history:
         self.stats = Stats()
         # Reset the compaction flag since we have a fresh session
         self._compaction_performed = False
-        
+
         # Recalculate token count after resetting session
         from .utils import estimate_messages_tokens
-        if self.api_handler and hasattr(self.api_handler, 'stats'):
-            self.api_handler.stats.current_prompt_size = estimate_messages_tokens(self.messages)
+
+        if self.api_handler and hasattr(self.api_handler, "stats"):
+            self.api_handler.stats.current_prompt_size = estimate_messages_tokens(
+                self.messages
+            )
             if config.DEBUG:
-                print(f"{config.GREEN} *** Token count recalculated after reset: {self.api_handler.stats.current_prompt_size} tokens{config.RESET}")
+                print(
+                    f"{config.GREEN} *** Token count recalculated after reset: {self.api_handler.stats.current_prompt_size} tokens{config.RESET}"
+                )
 
     def save_session(self, filename: str = "session.json"):
         """Save the current session to a file."""
@@ -659,6 +772,16 @@ Conversation history:
             with open(filename, "w") as f:
                 json.dump(self.messages, f, indent=4)
             print(f"\n{config.GREEN} *** Session saved: {filename}{config.RESET}")
+            
+            # Check if autosave should be enabled/disabled based on filename
+            if "autosave" in filename.lower():
+                self.autosave_filename = filename
+                print(f"{config.CYAN} *** Autosave ENABLED (filename contains 'autosave'){config.RESET}")
+                print(f"{config.CYAN} *** Session will auto-save before each prompt{config.RESET}")
+            else:
+                if self.autosave_filename:
+                    print(f"{config.YELLOW} *** Autosave DISABLED (filename does not contain 'autosave'){config.RESET}")
+                self.autosave_filename = None
         except Exception as e:
             print(
                 f"\n{config.RED} *** Error saving session to {filename}: {e}{config.RESET}"
@@ -676,18 +799,46 @@ Conversation history:
             self.messages = clean_messages
             # Reset the compaction flag since we loaded a new session
             self._compaction_performed = False
-            print(f"\n{config.GREEN} *** Session loaded: {filename}{config.RESET}")
             
+            # Check if this is an autosave session (contains "autosave" in filename)
+            if "autosave" in filename.lower():
+                self.autosave_filename = filename
+                print(f"\n{config.GREEN} *** Session loaded with autosave enabled: {filename}{config.RESET}")
+                print(f"{config.CYAN} *** Auto-saving session before each prompt...{config.RESET}")
+            else:
+                self.autosave_filename = None
+                print(f"\n{config.GREEN} *** Session loaded: {filename}{config.RESET}")
+
             # Recalculate token count after loading session
             from .utils import estimate_messages_tokens
-            if self.api_handler and hasattr(self.api_handler, 'stats'):
-                self.api_handler.stats.current_prompt_size = estimate_messages_tokens(self.messages)
+
+            if self.api_handler and hasattr(self.api_handler, "stats"):
+                self.api_handler.stats.current_prompt_size = estimate_messages_tokens(
+                    self.messages
+                )
                 if config.DEBUG:
-                    print(f"{config.GREEN} *** Token count recalculated: {self.api_handler.stats.current_prompt_size} tokens{config.RESET}")
+                    print(
+                        f"{config.GREEN} *** Token count recalculated: {self.api_handler.stats.current_prompt_size} tokens{config.RESET}"
+                    )
         except Exception as e:
             print(
                 f"\n{config.RED} *** Error loading session from {filename}: {e}{config.RESET}"
             )
+
+    def autosave_if_enabled(self):
+        """Auto-save the session if autosave is enabled."""
+        if self.autosave_filename:
+            try:
+                # For now, save the entire JSON. In future, we could implement SSE format
+                with open(self.autosave_filename, "w") as f:
+                    json.dump(self.messages, f, indent=4)
+                if config.DEBUG:
+                    print(f"{config.CYAN} *** Session auto-saved to: {self.autosave_filename}{config.RESET}")
+            except Exception as e:
+                # Always warn the user if autosave fails - this is about data safety!
+                print(f"{config.RED} *** ⚠️  AUTOSAVE FAILED: Could not save to {self.autosave_filename}{config.RESET}")
+                print(f"{config.RED} *** Error: {e}{config.RESET}")
+                print(f"{config.YELLOW} *** Your session may not be saved if the application crashes!{config.RESET}")
 
     def summarize_context(self):
         """Summarize the conversation context to manage token usage."""

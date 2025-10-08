@@ -13,6 +13,7 @@ DEFAULT_FILE_LIMIT = 2000
 
 # Tool metadata
 TOOL_DEFINITION = {
+
     "type": "internal",
     "auto_approved": True,
     "approval_excludes_arguments": False,

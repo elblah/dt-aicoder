@@ -33,7 +33,7 @@ class MCPToolManager:
         total_tools: int = 0,
     ) -> str:
         """Execute a single tool."""
-        result, _, _ = self.executor.execute_tool(
+        result, _, _, _ = self.executor.execute_tool(
             tool_name, arguments, tool_index, total_tools
         )
         return result

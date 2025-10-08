@@ -9,6 +9,7 @@ import subprocess
 import pprint
 from typing import Tuple, List
 from . import config
+from .message_history import NoMessagesToCompactError
 
 
 class CommandHandlerMixin:
@@ -70,16 +71,23 @@ class CommandHandlerMixin:
             if content.strip():
                 print(f"\n{config.GREEN}>>> Memory updated...{config.RESET}")
                 self.message_history.messages = json.loads(content)
-                
+
                 # Re-estimate tokens since memory content changed
                 try:
                     from ..utils import estimate_messages_tokens
-                    estimated_tokens = estimate_messages_tokens(self.message_history.messages)
-                    print(f"{config.BLUE}>>> Context re-estimated: ~{estimated_tokens} tokens{config.RESET}")
+
+                    estimated_tokens = estimate_messages_tokens(
+                        self.message_history.messages
+                    )
+                    print(
+                        f"{config.BLUE}>>> Context re-estimated: ~{estimated_tokens} tokens{config.RESET}"
+                    )
                 except Exception as e:
                     if config.DEBUG:
-                        print(f"{config.RED} *** Error re-estimating tokens: {e}{config.RESET}")
-                
+                        print(
+                            f"{config.RED} *** Error re-estimating tokens: {e}{config.RESET}"
+                        )
+
                 return False, False
             else:
                 print(f"\n{config.YELLOW}*** Edit cancelled, no content.{config.RESET}")
@@ -134,7 +142,22 @@ class CommandHandlerMixin:
 
     def _handle_summary(self, args: List[str]) -> Tuple[bool, bool]:
         """Forces session compaction."""
-        self.message_history.compact_memory()
+        try:
+            self.message_history.compact_memory()
+            print(f"\n{config.GREEN} ✓ Compaction completed successfully{config.RESET}")
+        except NoMessagesToCompactError:
+            print(f"\n{config.YELLOW} ℹ️  Nothing to compact - all messages are recent or already compacted{config.RESET}")
+        except Exception as e:
+            # CRITICAL: Compaction failed - preserve user data and inform user
+            print(f"\n{config.RED} ❌ Compaction failed: {str(e)}{config.RESET}")
+            print(
+                f"{config.YELLOW} *** Your conversation history has been preserved.{config.RESET}"
+            )
+            print(
+                f"{config.YELLOW} *** Options: Try '/compact' again, save with '/save', or continue with a new message.{config.RESET}"
+            )
+            # Reset compaction flag to allow retry
+            self.message_history._compaction_performed = False
         return False, False
 
     def _handle_model(self, args: List[str]) -> Tuple[bool, bool]:
@@ -144,7 +167,7 @@ class CommandHandlerMixin:
             import aicoder.config
 
             aicoder.config.API_MODEL = args[0]
-        
+
         print(f"\n{config.GREEN} *** Model: {config.API_MODEL}{config.RESET}")
         return False, False
 
@@ -157,12 +180,16 @@ class CommandHandlerMixin:
     def _handle_save_session(self, args: List[str]) -> Tuple[bool, bool]:
         """Saves the current session to a file."""
         fname = args[0] if args else "session.json"
+        # Expand ~ to home directory
+        fname = os.path.expanduser(fname)
         self.message_history.save_session(fname)
         return False, False
 
     def _handle_load_session(self, args: List[str]) -> Tuple[bool, bool]:
         """Loads a session from a file."""
         fname = args[0] if args else "session.json"
+        # Expand ~ to home directory
+        fname = os.path.expanduser(fname)
         self.message_history.load_session(fname)
         return False, False
 
@@ -203,7 +230,43 @@ class CommandHandlerMixin:
             aicoder.config.YOLO_MODE = False
             print(f"\n{config.GREEN}*** YOLO mode disabled{config.RESET}")
         else:
-            print(f"\n{config.RED}*** Invalid argument. Use: /yolo [on|off]{config.RESET}")
+            print(
+                f"\n{config.RED}*** Invalid argument. Use: /yolo [on|off]{config.RESET}"
+            )
+
+        return False, False
+
+    def _handle_plan(self, args: List[str]) -> Tuple[bool, bool]:
+        """Manage planning mode: /plan [on|off|start|end|true|false|toggle] - Show or toggle planning mode."""
+        from .planning_mode import get_planning_mode
+        
+        planning_mode = get_planning_mode()
+        
+        if not args:
+            # Show current status
+            print(f"\n{planning_mode.get_status_text()}")
+            return False, False
+
+        arg = args[0].lower()
+        if arg == "toggle":
+            # Toggle planning mode
+            new_state = planning_mode.toggle_plan_mode()
+            if new_state:
+                print(f"\n{config.GREEN}*** Planning mode enabled (read-only){config.RESET}")
+            else:
+                print(f"\n{config.GREEN}*** Planning mode disabled (read-write){config.RESET}")
+        elif arg in ["on", "start", "enable", "1", "true"]:
+            # Enable planning mode
+            planning_mode.set_plan_mode(True)
+            print(f"\n{config.GREEN}*** Planning mode enabled (read-only){config.RESET}")
+        elif arg in ["off", "end", "disable", "0", "false"]:
+            # Disable planning mode
+            planning_mode.set_plan_mode(False)
+            print(f"\n{config.GREEN}*** Planning mode disabled (read-write){config.RESET}")
+        else:
+            print(
+                f"\n{config.RED}*** Invalid argument. Use: /plan [on|off|start|end|true|false|toggle]{config.RESET}"
+            )
 
         return False, False
 
@@ -222,9 +285,12 @@ class CommandHandlerMixin:
 
         # Check if debug mode is enabled and notify user
         import os
+
         if os.environ.get("DEBUG") == "1" and os.environ.get("STREAM_LOG_FILE"):
-            print(f"{config.YELLOW}*** Debug mode is active - will log to: {os.environ.get('STREAM_LOG_FILE')}{config.RESET}")
-        
+            print(
+                f"{config.YELLOW}*** Debug mode is active - will log to: {os.environ.get('STREAM_LOG_FILE')}{config.RESET}"
+            )
+
         # Simply resend the current context without modifying history
         return False, True
 
@@ -248,7 +314,9 @@ class CommandHandlerMixin:
         arg = args[0].lower()
         if arg in ["on", "enable", "1", "true"]:
             if current_debug and current_stream_log:
-                print(f"\n{config.GREEN}*** Debug logging is already enabled{config.RESET}")
+                print(
+                    f"\n{config.GREEN}*** Debug logging is already enabled{config.RESET}"
+                )
                 print("    - DEBUG mode: ON")
                 print(f"    - Stream logging: {current_stream_log}")
                 return False, False
@@ -273,11 +341,15 @@ class CommandHandlerMixin:
             print("    - Streaming timeout: 600s")
             print("    - Read timeout: 120s")
             print("    - HTTP timeout: 600s")
-            print(f"{config.YELLOW}*** Run /retry or make a request to capture debug data.{config.RESET}")
+            print(
+                f"{config.YELLOW}*** Run /retry or make a request to capture debug data.{config.RESET}"
+            )
 
         elif arg in ["off", "disable", "0", "false"]:
             if not current_debug:
-                print(f"\n{config.GREEN}*** Debug logging is already disabled{config.RESET}")
+                print(
+                    f"\n{config.GREEN}*** Debug logging is already disabled{config.RESET}"
+                )
                 return False, False
 
             # Disable debug logging
@@ -297,7 +369,9 @@ class CommandHandlerMixin:
             print("    - Stream logging: OFF")
 
         else:
-            print(f"\n{config.RED}*** Invalid argument. Use: /debug [on|off]{config.RESET}")
+            print(
+                f"\n{config.RED}*** Invalid argument. Use: /debug [on|off]{config.RESET}"
+            )
 
         return False, False
 

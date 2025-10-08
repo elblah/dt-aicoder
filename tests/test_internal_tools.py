@@ -5,7 +5,6 @@ Tests for internal tools.
 import sys
 import os
 import tempfile
-import unittest
 
 # Ensure YOLO_MODE is set to prevent hanging on approval prompts
 if "YOLO_MODE" not in os.environ:
@@ -29,108 +28,108 @@ class MockStats:
         self.tool_errors = 0
 
 
-class TestInternalTools(unittest.TestCase):
-    """Test cases for internal tools."""
+def test_write_file_tool():
+    """Test the write_file tool."""
+    mock_stats = MockStats()
+    with tempfile.TemporaryDirectory() as temp_dir:
+        test_file = os.path.join(temp_dir, "test.txt")
+        content = "Hello, World!"
 
-    def setUp(self):
-        """Set up test fixtures."""
-        self.mock_stats = MockStats()
-
-    def test_write_file_tool(self):
-        """Test the write_file tool."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            test_file = os.path.join(temp_dir, "test.txt")
-            content = "Hello, World!"
-
-            # Test writing a file
-            result = execute_write_file(
-                path=test_file, content=content, stats=self.mock_stats
-            )
-
-            # Verify the file was created with correct content
-            self.assertTrue(os.path.exists(test_file))
-            with open(test_file, "r") as f:
-                self.assertEqual(f.read(), content)
-
-            # Verify the tool returns a success message
-            self.assertIn("Successfully", result)
-
-    def test_read_file_tool(self):
-        """Test the read_file tool."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            test_file = os.path.join(temp_dir, "test.txt")
-            content = "Hello, World!"
-
-            # Create a test file
-            with open(test_file, "w") as f:
-                f.write(content)
-
-            # Test reading the file
-            result = execute_read_file(path=test_file, stats=self.mock_stats)
-
-            # Verify the content is correct
-            self.assertEqual(result, content)
-
-    def test_read_nonexistent_file(self):
-        """Test reading a file that doesn't exist."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            test_file = os.path.join(temp_dir, "nonexistent.txt")
-
-            # Test reading a nonexistent file
-            result = execute_read_file(path=test_file, stats=self.mock_stats)
-
-            # Should return an error message
-            self.assertTrue("Error" in result or "not found" in result)
-
-    def test_list_directory_tool(self):
-        """Test the list_directory tool."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # Create some test files
-            test_files = ["file1.txt", "file2.txt", "file3.py"]
-            for filename in test_files:
-                with open(os.path.join(temp_dir, filename), "w") as f:
-                    f.write("test content")
-
-            # Test listing directory contents
-            result = execute_list_directory(path=temp_dir, stats=self.mock_stats)
-
-            # Verify all files are listed
-            for filename in test_files:
-                self.assertIn(filename, result)
-
-    def test_run_shell_command_tool(self):
-        """Test the run_shell_command tool."""
-        # Test a simple command
-        result = execute_run_shell_command(
-            command="echo 'Hello World'", stats=self.mock_stats
+        # Test writing a file
+        result = execute_write_file(
+            path=test_file, content=content, stats=mock_stats
         )
 
-        # Verify the command output is in the result (without Command: prefix)
-        self.assertIn("Hello World", result)
-        # Verify that the old format (with Command:) is not present
-        self.assertNotIn("Command: echo 'Hello World'", result)
-        # Verify return code is present
-        self.assertIn("Return code:", result)
-        # Verify stdout label is present
-        self.assertIn("Stdout:", result)
+        # Verify the file was created with correct content
+        assert os.path.exists(test_file)
+        with open(test_file, "r") as f:
+            assert f.read() == content
 
-    def test_run_shell_command_with_reason(self):
-        """Test the run_shell_command tool with a reason."""
-        result = execute_run_shell_command(
-            command="echo 'Test'",
-            reason="Testing shell command execution",
-            stats=self.mock_stats,
-        )
-
-        # Verify the command executed successfully
-        self.assertIn("Test", result)
-        # Verify that the reason is not included in the output anymore
-        self.assertNotIn("Reason: Testing shell command execution", result)
-        # Verify return code is present
-        self.assertIn("Return code:", result)
-        # Verify stdout label is present
-        self.assertIn("Stdout:", result)
+        # Verify the tool returns a success message
+        assert "Successfully" in result
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_read_file_tool():
+    """Test the read_file tool."""
+    mock_stats = MockStats()
+    with tempfile.TemporaryDirectory() as temp_dir:
+        test_file = os.path.join(temp_dir, "test.txt")
+        content = "Hello, World!"
+
+        # Create a test file
+        with open(test_file, "w") as f:
+            f.write(content)
+
+        # Test reading the file
+        result = execute_read_file(path=test_file, stats=mock_stats)
+
+        # Verify the content is correct
+        assert result == content
+
+
+def test_read_nonexistent_file():
+    """Test reading a file that doesn't exist."""
+    mock_stats = MockStats()
+    with tempfile.TemporaryDirectory() as temp_dir:
+        test_file = os.path.join(temp_dir, "nonexistent.txt")
+
+        # Test reading a nonexistent file
+        result = execute_read_file(path=test_file, stats=mock_stats)
+
+        # Should return an error message
+        assert "Error" in result or "not found" in result
+
+
+def test_list_directory_tool():
+    """Test the list_directory tool."""
+    mock_stats = MockStats()
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Create some test files
+        test_files = ["file1.txt", "file2.txt", "file3.py"]
+        for filename in test_files:
+            with open(os.path.join(temp_dir, filename), "w") as f:
+                f.write("test content")
+
+        # Test listing directory contents
+        result = execute_list_directory(path=temp_dir, stats=mock_stats)
+
+        # Verify all files are listed
+        for filename in test_files:
+            assert filename in result
+
+
+def test_run_shell_command_tool():
+    """Test the run_shell_command tool."""
+    mock_stats = MockStats()
+    # Test a simple command
+    result = execute_run_shell_command(
+        command="echo 'Hello World'", stats=mock_stats
+    )
+
+    # Verify the command output is in the result (without Command: prefix)
+    assert "Hello World" in result
+    # Verify that the old format (with Command:) is not present
+    assert "Command: echo 'Hello World'" not in result
+    # Verify return code is present
+    assert "Return code:" in result
+    # Verify stdout label is present
+    assert "Stdout:" in result
+
+
+def test_run_shell_command_with_reason():
+    """Test the run_shell_command tool with a reason."""
+    mock_stats = MockStats()
+    result = execute_run_shell_command(
+        command="echo 'Test'",
+        reason="Testing shell command execution",
+        stats=mock_stats,
+    )
+
+    # Verify the command executed successfully
+    assert "Test" in result
+    # Verify that the reason is not included in the output anymore
+    assert "Reason: Testing shell command execution" not in result
+    # Verify return code is present
+    assert "Return code:" in result
+    # Verify stdout label is present
+    assert "Stdout:" in result

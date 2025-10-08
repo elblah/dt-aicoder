@@ -57,6 +57,16 @@ class APIClient:
         # Tool settings
         if not disable_tools and tool_manager:
             api_data["tools"] = tool_manager.get_tool_definitions()
+            
+            # Set activeTools based on planning mode
+            try:
+                from .planning_mode import get_planning_mode
+                planning_mode = get_planning_mode()
+                if planning_mode.is_plan_mode_active():
+                    api_data["activeTools"] = planning_mode.get_active_tools(api_data["tools"])
+            except ImportError:
+                pass  # Planning mode not available
+            
             api_data["tool_choice"] = "auto"
 
         return api_data

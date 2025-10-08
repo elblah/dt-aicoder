@@ -24,7 +24,6 @@ When both environment variables are set, they take precedence over all model-spe
 pricing configurations and disable multitier support, providing simple fixed pricing.
 """
 
-import builtins
 import os
 import functools
 import atexit
@@ -307,95 +306,86 @@ atexit.register(save_cost_data)
 # Store reference to stats instance
 _stats_instance = None
 
-# Store the original input function
-_original_input = builtins.input
-
-
-def cost_displaying_input(prompt=""):
-    """Custom input function that displays cost information above prompts."""
+def on_before_user_prompt():
+    """Called before user prompt is displayed - show cost information."""
     if not PLUGIN_ENABLED:
-        return _original_input(prompt)
+        return
 
-    # Check if this is a prompt that contains ">"
-    if ">" in prompt:
-        # Try to get stats instance if we don't have it yet
-        if _stats_instance is None:
-            _try_get_stats_instance()
+    # Try to get stats instance if we don't have it yet
+    if _stats_instance is None:
+        _try_get_stats_instance()
 
-        # Only display cost if we have a stats instance and tokens
-        if _stats_instance is not None:
-            # Check for current_prompt_size first (new field), then fall back to cumulative prompt_tokens
-            has_current_prompt_size = (
-                hasattr(_stats_instance, "current_prompt_size")
-                and _stats_instance.current_prompt_size > 0
+    # Only display cost if we have a stats instance and tokens
+    if _stats_instance is not None:
+        # Check for current_prompt_size first (new field), then fall back to cumulative prompt_tokens
+        has_current_prompt_size = (
+            hasattr(_stats_instance, "current_prompt_size")
+            and _stats_instance.current_prompt_size > 0
+        )
+        has_prompt_tokens = _stats_instance.prompt_tokens > 0
+
+        if (
+            has_current_prompt_size
+            or has_prompt_tokens
+            or _stats_instance.completion_tokens > 0
+        ):
+            model_name = get_model_name()
+            # Use current_prompt_size for the last request cost calculation when available
+            current_prompt_size = getattr(_stats_instance, "current_prompt_size", 0)
+            input_cost, output_cost, total_cost, pricing_tier, tier_index = (
+                calculate_cost(
+                    _last_request_tokens["prompt_tokens"]
+                    or current_prompt_size
+                    or _stats_instance.prompt_tokens,  # Fallback to cumulative for backward compatibility
+                    _last_request_tokens["completion_tokens"]
+                    or _stats_instance.completion_tokens,
+                    model_name,
+                )
             )
-            has_prompt_tokens = _stats_instance.prompt_tokens > 0
 
-            if (
-                has_current_prompt_size
-                or has_prompt_tokens
-                or _stats_instance.completion_tokens > 0
-            ):
-                model_name = get_model_name()
-                # Use current_prompt_size for the last request cost calculation when available
-                current_prompt_size = getattr(_stats_instance, "current_prompt_size", 0)
-                input_cost, output_cost, total_cost, pricing_tier, tier_index = (
-                    calculate_cost(
-                        _last_request_tokens["prompt_tokens"]
-                        or current_prompt_size
-                        or _stats_instance.prompt_tokens,  # Fallback to cumulative for backward compatibility
-                        _last_request_tokens["completion_tokens"]
-                        or _stats_instance.completion_tokens,
-                        model_name,
-                    )
+            # Check if model has tiers
+            model_pricing = get_model_pricing(model_name)
+            has_tiers = "tiers" in model_pricing and len(model_pricing["tiers"]) > 1
+
+            # Only show cost if it's greater than zero
+            if total_cost > 0:
+                # Display last request cost
+                last_cost_display = format_cost_display(
+                    input_cost,
+                    output_cost,
+                    total_cost,
+                    model_name,
+                    _last_request_tokens["prompt_tokens"]
+                    or _stats_instance.prompt_tokens,
+                    tier_index,
+                    has_tiers,
+                    "last",
                 )
 
-                # Check if model has tiers
-                model_pricing = get_model_pricing(model_name)
-                has_tiers = "tiers" in model_pricing and len(model_pricing["tiers"]) > 1
+                # Display accumulated costs
+                total_cost_display = format_cost_display(
+                    _accumulated_costs["input_cost"],
+                    _accumulated_costs["output_cost"],
+                    _accumulated_costs["total_cost"],
+                    model_name,
+                    0,
+                    0,
+                    False,
+                    "total",
+                )
 
-                # Only show cost if it's greater than zero
-                if total_cost > 0:
-                    # Display last request cost
-                    last_cost_display = format_cost_display(
-                        input_cost,
-                        output_cost,
-                        total_cost,
-                        model_name,
-                        _last_request_tokens["prompt_tokens"]
-                        or _stats_instance.prompt_tokens,
-                        tier_index,
-                        has_tiers,
-                        "last",
-                    )
-
-                    # Display accumulated costs
-                    total_cost_display = format_cost_display(
-                        _accumulated_costs["input_cost"],
-                        _accumulated_costs["output_cost"],
-                        _accumulated_costs["total_cost"],
-                        model_name,
-                        0,
-                        0,
-                        False,
-                        "total",
-                    )
-
-                    # Print both cost displays in a noticeable way (yellow color with money emoji)
-                    print(
-                        f"\n\033[93m💰 {last_cost_display}\033[0m"
-                    )  # Yellow color for visibility
-                    print(
-                        f"\033[93m💰 {total_cost_display}\033[0m"
-                    )  # Yellow color for visibility
-                elif total_cost == 0:
-                    # Model price not found
-                    print(
-                        f"\n\033[93m💰 Model price not found for [{model_name}]\033[0m"
-                    )
-
-    # Call the original input function
-    return _original_input(prompt)
+                # Print both cost displays in a noticeable way (yellow color with money emoji)
+                print(
+                    f"\n\033[93m💰 {last_cost_display}\033[0m"
+                )  # Yellow color for visibility
+                print(
+                    f"\033[93m💰 {total_cost_display}\033[0m"
+                )  # Yellow color for visibility
+            elif total_cost == 0:
+                # Model price not found
+                print(
+                    f"\n\033[93m💰 Model price not found for [{model_name}]\033[0m"
+                )
 
 
 def _try_get_stats_instance():
@@ -404,7 +394,18 @@ def _try_get_stats_instance():
 
     # Try to find stats instance in common places
     import gc
-    from aicoder.stats import Stats
+    
+    # Import stats class safely
+    try:
+        from aicoder.stats import Stats
+    except ImportError:
+        # In plugin context, might need different import
+        try:
+            import aicoder.stats as stats_module
+            Stats = stats_module.Stats
+        except ImportError:
+            # Can't find stats class, skip
+            return
 
     # Look for Stats instances in garbage collector
     for obj in gc.get_objects():
@@ -413,9 +414,7 @@ def _try_get_stats_instance():
             return
 
 
-# Monkey patch the input function only if plugin is enabled
-if PLUGIN_ENABLED:
-    builtins.input = cost_displaying_input
+# No longer monkey-patching input function - using event hooks instead
 
 # Also track token usage from API responses
 

@@ -5,7 +5,6 @@ Comprehensive tests for the AI Coder application.
 Tests automatically set YOLO_MODE=1 if not already set to prevent hanging.
 """
 
-import unittest
 from unittest.mock import patch, MagicMock
 import sys
 import os
@@ -21,19 +20,13 @@ from aicoder.app import AICoder
 from aicoder.tool_manager.manager import MCPToolManager
 
 
-class TestAICoder(unittest.TestCase):
-    """Test cases for the main AI Coder application."""
-
-    def setUp(self):
-        """Set up the test environment."""
-        self.app = AICoder()
-
-    @patch("aicoder.app.AICoder._get_multiline_input")
-    @patch("aicoder.app.AICoder._make_api_request")
-    def test_application_run_loop_with_tool_call(
-        self, mock_make_api_request, mock_get_multiline_input
-    ):
-        """Test the main application run loop with a tool call."""
+def test_application_run_loop_with_tool_call():
+    """Test the main application run loop with a tool call."""
+    app = AICoder()
+    
+    with patch("aicoder.app.AICoder._get_multiline_input") as mock_get_multiline_input, \
+         patch("aicoder.app.AICoder._make_api_request") as mock_make_api_request:
+        
         # Mock user input and API response
         mock_get_multiline_input.side_effect = ["use the shell to echo hello", "/quit"]
         mock_make_api_request.side_effect = [
@@ -60,7 +53,7 @@ class TestAICoder(unittest.TestCase):
         # Run the app
         with patch("builtins.print") as mock_print:
             with patch("builtins.input", return_value="a"):
-                self.app.run()
+                app.run()
 
                 # Assert that the app printed the AI's final response
                 # Check for the content without worrying about exact formatting
@@ -73,40 +66,31 @@ class TestAICoder(unittest.TestCase):
                     ):
                         found = True
                         break
-                self.assertTrue(found, "Expected AI response not found in print calls")
+                assert found, "Expected AI response not found in print calls"
 
 
-class TestToolManagerIntegration(unittest.TestCase):
-    """Test cases for the tool manager."""
+def test_tool_execution_with_approval():
+    """Test the execution of a tool with user approval."""
+    # Ensure YOLO_MODE is set BEFORE creating the tool manager
+    config.YOLO_MODE = True
+    stats = MagicMock()
+    tool_manager = MCPToolManager(stats)
+    
+    # Mock a tool call
+    tool_call = {
+        "id": "call_123",
+        "function": {
+            "name": "run_shell_command",
+            "arguments": '{"command": "echo hello"}',
+        },
+    }
+    message = {"tool_calls": [tool_call]}
 
-    def setUp(self):
-        """Set up the test environment."""
-        # Ensure YOLO_MODE is set BEFORE creating the tool manager
-        config.YOLO_MODE = True
-        self.stats = MagicMock()
-        self.tool_manager = MCPToolManager(self.stats)
+    # Mock user approval
+    with patch("builtins.input", return_value="a"):
+        # Execute the tool call
+        results, _ = tool_manager.execute_tool_calls(message)
 
-    def test_tool_execution_with_approval(self):
-        """Test the execution of a tool with user approval."""
-        # Mock a tool call
-        tool_call = {
-            "id": "call_123",
-            "function": {
-                "name": "run_shell_command",
-                "arguments": '{"command": "echo hello"}',
-            },
-        }
-        message = {"tool_calls": [tool_call]}
-
-        # Mock user approval
-        with patch("builtins.input", return_value="a"):
-            # Execute the tool call
-            results, _ = self.tool_manager.execute_tool_calls(message)
-
-            # Assert that the tool was executed
-            self.assertEqual(len(results), 1)
-            self.assertIn("hello", results[0]["content"])
-
-
-if __name__ == "__main__":
-    unittest.main()
+        # Assert that the tool was executed
+        assert len(results) == 1
+        assert "hello" in results[0]["content"]

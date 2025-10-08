@@ -10,7 +10,6 @@ This test triggers tool approval prompts that will hang indefinitely without YOL
 
 import sys
 import os
-import unittest
 import json
 import tempfile
 import http.server
@@ -81,26 +80,40 @@ class MockHTTPHandler(http.server.BaseHTTPRequestHandler):
         pass
 
 
-class TestExternalMCPTools(unittest.TestCase):
-    """Test cases for external MCP tools."""
+def test_tool_registry_loads_external_tools():
+    """Test that tool registry loads external tools from mcp_tools.json."""
+    # Create a temporary directory for testing
+    temp_dir = tempfile.TemporaryDirectory()
+    original_cwd = os.getcwd()
+    original_mcp_tools_path = os.environ.get("MCP_TOOLS_CONF_PATH")
 
-    def setUp(self):
-        """Set up test fixtures."""
-        # Create a temporary directory for testing
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.original_cwd = os.getcwd()
-        self.original_mcp_tools_path = os.environ.get("MCP_TOOLS_CONF_PATH")
+    # Change to the temp directory
+    os.chdir(temp_dir.name)
 
-        # Change to the temp directory
-        os.chdir(self.temp_dir.name)
+    # Start a mock HTTP server for JSON-RPC testing
+    httpd = None
+    server_thread = None
+    
+    # Try to find an available port
+    server_port = None
+    for port in range(8000, 9000):
+        try:
+            httpd = http.server.HTTPServer(
+                ("localhost", port), MockHTTPHandler
+            )
+            server_thread = threading.Thread(target=httpd.serve_forever)
+            server_thread.daemon = True
+            server_thread.start()
+            server_port = port
+            break
+        except OSError:
+            # Port is in use, try the next one
+            continue
+    if server_port is None:
+        raise Exception("Could not find an available port for mock server")
 
-        # Start a mock HTTP server for JSON-RPC testing
-        self.httpd = None
-        self.server_thread = None
-        self.server_port = self._start_mock_server()
-
-        # Create mcp_tools.json with tools that don't make external requests
-        mcp_tools_content = f"""{{
+    # Create mcp_tools.json with tools that don't make external requests
+    mcp_tools_content = f"""{{
   "sample_command_tool": {{
     "type": "command",
     "description": "A sample command tool for testing",
@@ -119,7 +132,7 @@ class TestExternalMCPTools(unittest.TestCase):
   "sample_jsonrpc_tool": {{
     "type": "jsonrpc",
     "description": "A sample JSON-RPC tool for testing",
-    "url": "http://localhost:{self.server_port}/rpc",
+    "url": "http://localhost:{server_port}/rpc",
     "method": "test_method",
     "parameters": {{
       "type": "object",
@@ -150,73 +163,138 @@ class TestExternalMCPTools(unittest.TestCase):
   }}
 }}"""
 
-        # Write the config file to the current directory
-        self.config_file_path = os.path.join(self.temp_dir.name, "mcp_tools.json")
-        with open(self.config_file_path, "w") as f:
-            f.write(mcp_tools_content)
+    # Write the config file to the current directory
+    config_file_path = os.path.join(temp_dir.name, "mcp_tools.json")
+    with open(config_file_path, "w") as f:
+        f.write(mcp_tools_content)
 
-        # Set the environment variable to point to our test file
-        os.environ["MCP_TOOLS_CONF_PATH"] = self.config_file_path
+    # Set the environment variable to point to our test file
+    os.environ["MCP_TOOLS_CONF_PATH"] = config_file_path
 
-    def _start_mock_server(self):
-        """Start a mock HTTP server on a random port."""
-        # Try to find an available port
-        for port in range(8000, 9000):
-            try:
-                self.httpd = http.server.HTTPServer(
-                    ("localhost", port), MockHTTPHandler
-                )
-                self.server_thread = threading.Thread(target=self.httpd.serve_forever)
-                self.server_thread.daemon = True
-                self.server_thread.start()
-                return port
-            except OSError:
-                # Port is in use, try the next one
-                continue
-        raise Exception("Could not find an available port for mock server")
-
-    def tearDown(self):
-        """Tear down test fixtures."""
-        # Stop the mock server
-        if self.httpd:
-            self.httpd.shutdown()
-            self.httpd.server_close()
-
-        # Restore original environment
-        os.chdir(self.original_cwd)
-        if self.original_mcp_tools_path is not None:
-            os.environ["MCP_TOOLS_CONF_PATH"] = self.original_mcp_tools_path
-        elif "MCP_TOOLS_CONF_PATH" in os.environ:
-            del os.environ["MCP_TOOLS_CONF_PATH"]
-
-        self.temp_dir.cleanup()
-
-    def test_tool_registry_loads_external_tools(self):
-        """Test that tool registry loads external tools from mcp_tools.json."""
+    try:
         registry = ToolRegistry()
 
         # Check that external tools are loaded
-        self.assertIn("sample_command_tool", registry.mcp_tools)
-        self.assertIn("sample_jsonrpc_tool", registry.mcp_tools)
-        self.assertNotIn(
-            "sample_disabled_tool", registry.mcp_tools
-        )  # Should be disabled
+        assert "sample_command_tool" in registry.mcp_tools
+        assert "sample_jsonrpc_tool" in registry.mcp_tools
+        assert "sample_disabled_tool" not in registry.mcp_tools  # Should be disabled
 
         # Check tool configurations
         command_tool = registry.mcp_tools["sample_command_tool"]
-        self.assertEqual(command_tool["type"], "command")
-        self.assertEqual(
-            command_tool["command"], "echo 'Hello from command tool: {message}'"
-        )
+        assert command_tool["type"] == "command"
+        assert command_tool["command"] == "echo 'Hello from command tool: {message}'"
 
         jsonrpc_tool = registry.mcp_tools["sample_jsonrpc_tool"]
-        self.assertEqual(jsonrpc_tool["type"], "jsonrpc")
-        self.assertEqual(
-            jsonrpc_tool["url"], f"http://localhost:{self.server_port}/rpc"
-        )
+        assert jsonrpc_tool["type"] == "jsonrpc"
+        assert jsonrpc_tool["url"] == f"http://localhost:{server_port}/rpc"
+    finally:
+        # Stop the mock server
+        if httpd:
+            httpd.shutdown()
+            httpd.server_close()
 
-    def test_tool_registry_get_tool_definitions(self):
-        """Test that tool registry generates correct tool definitions."""
+        # Restore original environment
+        os.chdir(original_cwd)
+        if original_mcp_tools_path is not None:
+            os.environ["MCP_TOOLS_CONF_PATH"] = original_mcp_tools_path
+        elif "MCP_TOOLS_CONF_PATH" in os.environ:
+            del os.environ["MCP_TOOLS_CONF_PATH"]
+
+        temp_dir.cleanup()
+
+
+def test_tool_registry_get_tool_definitions():
+    """Test that tool registry generates correct tool definitions."""
+    # Create a temporary directory for testing
+    temp_dir = tempfile.TemporaryDirectory()
+    original_cwd = os.getcwd()
+    original_mcp_tools_path = os.environ.get("MCP_TOOLS_CONF_PATH")
+
+    # Change to the temp directory
+    os.chdir(temp_dir.name)
+
+    # Start a mock HTTP server for JSON-RPC testing
+    httpd = None
+    server_thread = None
+    
+    # Try to find an available port
+    server_port = None
+    for port in range(8000, 9000):
+        try:
+            httpd = http.server.HTTPServer(
+                ("localhost", port), MockHTTPHandler
+            )
+            server_thread = threading.Thread(target=httpd.serve_forever)
+            server_thread.daemon = True
+            server_thread.start()
+            server_port = port
+            break
+        except OSError:
+            # Port is in use, try the next one
+            continue
+    if server_port is None:
+        raise Exception("Could not find an available port for mock server")
+
+    # Create mcp_tools.json with tools that don't make external requests
+    mcp_tools_content = f"""{{
+  "sample_command_tool": {{
+    "type": "command",
+    "description": "A sample command tool for testing",
+    "command": "echo 'Hello from command tool: {{message}}'",
+    "parameters": {{
+      "type": "object",
+      "properties": {{
+        "message": {{
+          "type": "string",
+          "description": "Message to echo"
+        }}
+      }},
+      "required": ["message"]
+    }}
+  }},
+  "sample_jsonrpc_tool": {{
+    "type": "jsonrpc",
+    "description": "A sample JSON-RPC tool for testing",
+    "url": "http://localhost:{server_port}/rpc",
+    "method": "test_method",
+    "parameters": {{
+      "type": "object",
+      "properties": {{
+        "data": {{
+          "type": "string",
+          "description": "Data to send"
+        }}
+      }},
+      "required": ["data"]
+    }}
+  }},
+  "sample_disabled_tool": {{
+    "type": "command",
+    "description": "A disabled tool that should not be loaded",
+    "command": "echo 'This should not appear'",
+    "disabled": true,
+    "parameters": {{
+      "type": "object",
+      "properties": {{
+        "message": {{
+          "type": "string",
+          "description": "Message to echo"
+        }}
+      }},
+      "required": ["message"]
+    }}
+  }}
+}}"""
+
+    # Write the config file to the current directory
+    config_file_path = os.path.join(temp_dir.name, "mcp_tools.json")
+    with open(config_file_path, "w") as f:
+        f.write(mcp_tools_content)
+
+    # Set the environment variable to point to our test file
+    os.environ["MCP_TOOLS_CONF_PATH"] = config_file_path
+
+    try:
         registry = ToolRegistry()
         definitions = registry.get_tool_definitions()
 
@@ -231,21 +309,126 @@ class TestExternalMCPTools(unittest.TestCase):
                 jsonrpc_tool_def = definition
 
         # Check that definitions exist
-        self.assertIsNotNone(command_tool_def)
-        self.assertIsNotNone(jsonrpc_tool_def)
+        assert command_tool_def is not None
+        assert jsonrpc_tool_def is not None
 
         # Check command tool definition
-        self.assertEqual(command_tool_def["type"], "function")
-        self.assertEqual(command_tool_def["function"]["name"], "sample_command_tool")
-        self.assertIn("message", str(command_tool_def["function"]["parameters"]))
+        assert command_tool_def["type"] == "function"
+        assert command_tool_def["function"]["name"] == "sample_command_tool"
+        assert "message" in str(command_tool_def["function"]["parameters"])
 
         # Check JSON-RPC tool definition
-        self.assertEqual(jsonrpc_tool_def["type"], "function")
-        self.assertEqual(jsonrpc_tool_def["function"]["name"], "sample_jsonrpc_tool")
-        self.assertIn("data", str(jsonrpc_tool_def["function"]["parameters"]))
+        assert jsonrpc_tool_def["type"] == "function"
+        assert jsonrpc_tool_def["function"]["name"] == "sample_jsonrpc_tool"
+        assert "data" in str(jsonrpc_tool_def["function"]["parameters"])
+    finally:
+        # Stop the mock server
+        if httpd:
+            httpd.shutdown()
+            httpd.server_close()
 
-    def test_mcp_tool_manager_initialization_with_external_tools(self):
-        """Test that MCP tool manager initializes correctly with external tools."""
+        # Restore original environment
+        os.chdir(original_cwd)
+        if original_mcp_tools_path is not None:
+            os.environ["MCP_TOOLS_CONF_PATH"] = original_mcp_tools_path
+        elif "MCP_TOOLS_CONF_PATH" in os.environ:
+            del os.environ["MCP_TOOLS_CONF_PATH"]
+
+        temp_dir.cleanup()
+
+
+def test_mcp_tool_manager_initialization_with_external_tools():
+    """Test that MCP tool manager initializes correctly with external tools."""
+    # Create a temporary directory for testing
+    temp_dir = tempfile.TemporaryDirectory()
+    original_cwd = os.getcwd()
+    original_mcp_tools_path = os.environ.get("MCP_TOOLS_CONF_PATH")
+
+    # Change to the temp directory
+    os.chdir(temp_dir.name)
+
+    # Start a mock HTTP server for JSON-RPC testing
+    httpd = None
+    server_thread = None
+    
+    # Try to find an available port
+    server_port = None
+    for port in range(8000, 9000):
+        try:
+            httpd = http.server.HTTPServer(
+                ("localhost", port), MockHTTPHandler
+            )
+            server_thread = threading.Thread(target=httpd.serve_forever)
+            server_thread.daemon = True
+            server_thread.start()
+            server_port = port
+            break
+        except OSError:
+            # Port is in use, try the next one
+            continue
+    if server_port is None:
+        raise Exception("Could not find an available port for mock server")
+
+    # Create mcp_tools.json with tools that don't make external requests
+    mcp_tools_content = f"""{{
+  "sample_command_tool": {{
+    "type": "command",
+    "description": "A sample command tool for testing",
+    "command": "echo 'Hello from command tool: {{message}}'",
+    "parameters": {{
+      "type": "object",
+      "properties": {{
+        "message": {{
+          "type": "string",
+          "description": "Message to echo"
+        }}
+      }},
+      "required": ["message"]
+    }}
+  }},
+  "sample_jsonrpc_tool": {{
+    "type": "jsonrpc",
+    "description": "A sample JSON-RPC tool for testing",
+    "url": "http://localhost:{server_port}/rpc",
+    "method": "test_method",
+    "parameters": {{
+      "type": "object",
+      "properties": {{
+        "data": {{
+          "type": "string",
+          "description": "Data to send"
+        }}
+      }},
+      "required": ["data"]
+    }}
+  }},
+  "sample_disabled_tool": {{
+    "type": "command",
+    "description": "A disabled tool that should not be loaded",
+    "command": "echo 'This should not appear'",
+    "disabled": true,
+    "parameters": {{
+      "type": "object",
+      "properties": {{
+        "message": {{
+          "type": "string",
+          "description": "Message to echo"
+        }}
+      }},
+      "required": ["message"]
+    }}
+  }}
+}}"""
+
+    # Write the config file to the current directory
+    config_file_path = os.path.join(temp_dir.name, "mcp_tools.json")
+    with open(config_file_path, "w") as f:
+        f.write(mcp_tools_content)
+
+    # Set the environment variable to point to our test file
+    os.environ["MCP_TOOLS_CONF_PATH"] = config_file_path
+
+    try:
         mock_stats = MockStats()
         mock_animator = MockAnimator()
 
@@ -253,17 +436,122 @@ class TestExternalMCPTools(unittest.TestCase):
         manager = MCPToolManager(mock_stats, animator=mock_animator)
 
         # Check that external tools are available
-        self.assertIn("sample_command_tool", manager.mcp_tools)
-        self.assertIn("sample_jsonrpc_tool", manager.mcp_tools)
+        assert "sample_command_tool" in manager.mcp_tools
+        assert "sample_jsonrpc_tool" in manager.mcp_tools
 
         # Check tool definitions
         definitions = manager.get_tool_definitions()
         tool_names = [definition["function"]["name"] for definition in definitions]
-        self.assertIn("sample_command_tool", tool_names)
-        self.assertIn("sample_jsonrpc_tool", tool_names)
+        assert "sample_command_tool" in tool_names
+        assert "sample_jsonrpc_tool" in tool_names
+    finally:
+        # Stop the mock server
+        if httpd:
+            httpd.shutdown()
+            httpd.server_close()
 
-    def test_execute_command_tool(self):
-        """Test executing a command tool."""
+        # Restore original environment
+        os.chdir(original_cwd)
+        if original_mcp_tools_path is not None:
+            os.environ["MCP_TOOLS_CONF_PATH"] = original_mcp_tools_path
+        elif "MCP_TOOLS_CONF_PATH" in os.environ:
+            del os.environ["MCP_TOOLS_CONF_PATH"]
+
+        temp_dir.cleanup()
+
+
+def test_execute_command_tool():
+    """Test executing a command tool."""
+    # Create a temporary directory for testing
+    temp_dir = tempfile.TemporaryDirectory()
+    original_cwd = os.getcwd()
+    original_mcp_tools_path = os.environ.get("MCP_TOOLS_CONF_PATH")
+
+    # Change to the temp directory
+    os.chdir(temp_dir.name)
+
+    # Start a mock HTTP server for JSON-RPC testing
+    httpd = None
+    server_thread = None
+    
+    # Try to find an available port
+    server_port = None
+    for port in range(8000, 9000):
+        try:
+            httpd = http.server.HTTPServer(
+                ("localhost", port), MockHTTPHandler
+            )
+            server_thread = threading.Thread(target=httpd.serve_forever)
+            server_thread.daemon = True
+            server_thread.start()
+            server_port = port
+            break
+        except OSError:
+            # Port is in use, try the next one
+            continue
+    if server_port is None:
+        raise Exception("Could not find an available port for mock server")
+
+    # Create mcp_tools.json with tools that don't make external requests
+    mcp_tools_content = f"""{{
+  "sample_command_tool": {{
+    "type": "command",
+    "description": "A sample command tool for testing",
+    "command": "echo 'Hello from command tool: {{message}}'",
+    "parameters": {{
+      "type": "object",
+      "properties": {{
+        "message": {{
+          "type": "string",
+          "description": "Message to echo"
+        }}
+      }},
+      "required": ["message"]
+    }}
+  }},
+  "sample_jsonrpc_tool": {{
+    "type": "jsonrpc",
+    "description": "A sample JSON-RPC tool for testing",
+    "url": "http://localhost:{server_port}/rpc",
+    "method": "test_method",
+    "parameters": {{
+      "type": "object",
+      "properties": {{
+        "data": {{
+          "type": "string",
+          "description": "Data to send"
+        }}
+      }},
+      "required": ["data"]
+    }}
+  }},
+  "sample_disabled_tool": {{
+    "type": "command",
+    "description": "A disabled tool that should not be loaded",
+    "command": "echo 'This should not appear'",
+    "disabled": true,
+    "parameters": {{
+      "type": "object",
+      "properties": {{
+        "message": {{
+          "type": "string",
+          "description": "Message to echo"
+        }}
+      }},
+      "required": ["message"]
+    }}
+  }}
+}}"""
+
+    # Write the config file to the current directory
+    config_file_path = os.path.join(temp_dir.name, "mcp_tools.json")
+    with open(config_file_path, "w") as f:
+        f.write(mcp_tools_content)
+
+    # Set the environment variable to point to our test file
+    os.environ["MCP_TOOLS_CONF_PATH"] = config_file_path
+
+    try:
         mock_stats = MockStats()
         mock_animator = MockAnimator()
 
@@ -276,11 +564,116 @@ class TestExternalMCPTools(unittest.TestCase):
         )
 
         # Verify the result
-        self.assertIn("Hello from command tool: Test message", result)
-        self.assertNotIn("Error", result)
+        assert "Hello from command tool: Test message" in result
+        assert "Error" not in result
+    finally:
+        # Stop the mock server
+        if httpd:
+            httpd.shutdown()
+            httpd.server_close()
 
-    def test_execute_jsonrpc_tool(self):
-        """Test executing a JSON-RPC tool."""
+        # Restore original environment
+        os.chdir(original_cwd)
+        if original_mcp_tools_path is not None:
+            os.environ["MCP_TOOLS_CONF_PATH"] = original_mcp_tools_path
+        elif "MCP_TOOLS_CONF_PATH" in os.environ:
+            del os.environ["MCP_TOOLS_CONF_PATH"]
+
+        temp_dir.cleanup()
+
+
+def test_execute_jsonrpc_tool():
+    """Test executing a JSON-RPC tool."""
+    # Create a temporary directory for testing
+    temp_dir = tempfile.TemporaryDirectory()
+    original_cwd = os.getcwd()
+    original_mcp_tools_path = os.environ.get("MCP_TOOLS_CONF_PATH")
+
+    # Change to the temp directory
+    os.chdir(temp_dir.name)
+
+    # Start a mock HTTP server for JSON-RPC testing
+    httpd = None
+    server_thread = None
+    
+    # Try to find an available port
+    server_port = None
+    for port in range(8000, 9000):
+        try:
+            httpd = http.server.HTTPServer(
+                ("localhost", port), MockHTTPHandler
+            )
+            server_thread = threading.Thread(target=httpd.serve_forever)
+            server_thread.daemon = True
+            server_thread.start()
+            server_port = port
+            break
+        except OSError:
+            # Port is in use, try the next one
+            continue
+    if server_port is None:
+        raise Exception("Could not find an available port for mock server")
+
+    # Create mcp_tools.json with tools that don't make external requests
+    mcp_tools_content = f"""{{
+  "sample_command_tool": {{
+    "type": "command",
+    "description": "A sample command tool for testing",
+    "command": "echo 'Hello from command tool: {{message}}'",
+    "parameters": {{
+      "type": "object",
+      "properties": {{
+        "message": {{
+          "type": "string",
+          "description": "Message to echo"
+        }}
+      }},
+      "required": ["message"]
+    }}
+  }},
+  "sample_jsonrpc_tool": {{
+    "type": "jsonrpc",
+    "description": "A sample JSON-RPC tool for testing",
+    "url": "http://localhost:{server_port}/rpc",
+    "method": "test_method",
+    "parameters": {{
+      "type": "object",
+      "properties": {{
+        "data": {{
+          "type": "string",
+          "description": "Data to send"
+        }}
+      }},
+      "required": ["data"]
+    }}
+  }},
+  "sample_disabled_tool": {{
+    "type": "command",
+    "description": "A disabled tool that should not be loaded",
+    "command": "echo 'This should not appear'",
+    "disabled": true,
+    "parameters": {{
+      "type": "object",
+      "properties": {{
+        "message": {{
+          "type": "string",
+          "description": "Message to echo"
+        }}
+      }},
+      "required": ["message"]
+    }}
+  }}
+}}"""
+
+    # Write the config file to the current directory
+    config_file_path = os.path.join(temp_dir.name, "mcp_tools.json")
+    with open(config_file_path, "w") as f:
+        f.write(mcp_tools_content)
+
+    # Set the environment variable to point to our test file
+    os.environ["MCP_TOOLS_CONF_PATH"] = config_file_path
+
+    try:
         mock_stats = MockStats()
         mock_animator = MockAnimator()
 
@@ -291,13 +684,118 @@ class TestExternalMCPTools(unittest.TestCase):
         result = manager.execute_tool("sample_jsonrpc_tool", {"data": "test data"})
 
         # Verify the result contains expected data
-        self.assertNotIn("Error", result)
-        self.assertIn("Mock response for testing", result)
-        self.assertIn("test_method", result)
-        self.assertIn("test data", result)
+        assert "Error" not in result
+        assert "Mock response for testing" in result
+        assert "test_method" in result
+        assert "test data" in result
+    finally:
+        # Stop the mock server
+        if httpd:
+            httpd.shutdown()
+            httpd.server_close()
 
-    def test_execute_disabled_tool_returns_error(self):
-        """Test that executing a disabled tool returns an error."""
+        # Restore original environment
+        os.chdir(original_cwd)
+        if original_mcp_tools_path is not None:
+            os.environ["MCP_TOOLS_CONF_PATH"] = original_mcp_tools_path
+        elif "MCP_TOOLS_CONF_PATH" in os.environ:
+            del os.environ["MCP_TOOLS_CONF_PATH"]
+
+        temp_dir.cleanup()
+
+
+def test_execute_disabled_tool_returns_error():
+    """Test that executing a disabled tool returns an error."""
+    # Create a temporary directory for testing
+    temp_dir = tempfile.TemporaryDirectory()
+    original_cwd = os.getcwd()
+    original_mcp_tools_path = os.environ.get("MCP_TOOLS_CONF_PATH")
+
+    # Change to the temp directory
+    os.chdir(temp_dir.name)
+
+    # Start a mock HTTP server for JSON-RPC testing
+    httpd = None
+    server_thread = None
+    
+    # Try to find an available port
+    server_port = None
+    for port in range(8000, 9000):
+        try:
+            httpd = http.server.HTTPServer(
+                ("localhost", port), MockHTTPHandler
+            )
+            server_thread = threading.Thread(target=httpd.serve_forever)
+            server_thread.daemon = True
+            server_thread.start()
+            server_port = port
+            break
+        except OSError:
+            # Port is in use, try the next one
+            continue
+    if server_port is None:
+        raise Exception("Could not find an available port for mock server")
+
+    # Create mcp_tools.json with tools that don't make external requests
+    mcp_tools_content = f"""{{
+  "sample_command_tool": {{
+    "type": "command",
+    "description": "A sample command tool for testing",
+    "command": "echo 'Hello from command tool: {{message}}'",
+    "parameters": {{
+      "type": "object",
+      "properties": {{
+        "message": {{
+          "type": "string",
+          "description": "Message to echo"
+        }}
+      }},
+      "required": ["message"]
+    }}
+  }},
+  "sample_jsonrpc_tool": {{
+    "type": "jsonrpc",
+    "description": "A sample JSON-RPC tool for testing",
+    "url": "http://localhost:{server_port}/rpc",
+    "method": "test_method",
+    "parameters": {{
+      "type": "object",
+      "properties": {{
+        "data": {{
+          "type": "string",
+          "description": "Data to send"
+        }}
+      }},
+      "required": ["data"]
+    }}
+  }},
+  "sample_disabled_tool": {{
+    "type": "command",
+    "description": "A disabled tool that should not be loaded",
+    "command": "echo 'This should not appear'",
+    "disabled": true,
+    "parameters": {{
+      "type": "object",
+      "properties": {{
+        "message": {{
+          "type": "string",
+          "description": "Message to echo"
+        }}
+      }},
+      "required": ["message"]
+    }}
+  }}
+}}"""
+
+    # Write the config file to the current directory
+    config_file_path = os.path.join(temp_dir.name, "mcp_tools.json")
+    with open(config_file_path, "w") as f:
+        f.write(mcp_tools_content)
+
+    # Set the environment variable to point to our test file
+    os.environ["MCP_TOOLS_CONF_PATH"] = config_file_path
+
+    try:
         mock_stats = MockStats()
         mock_animator = MockAnimator()
 
@@ -310,41 +808,139 @@ class TestExternalMCPTools(unittest.TestCase):
         )
 
         # Should return an error since the tool is disabled
-        self.assertIn("Error", result)
-        self.assertIn("not found", result)
+        assert "Error" in result
+        assert "not found" in result
+    finally:
+        # Stop the mock server
+        if httpd:
+            httpd.shutdown()
+            httpd.server_close()
 
-    def test_tool_registry_handles_missing_mcp_tools_file(self):
-        """Test that tool registry handles missing mcp_tools.json gracefully."""
-        # Change to a directory without mcp_tools.json and unset the env var
-        with tempfile.TemporaryDirectory():
-            original_mcp_tools_path = os.environ.get("MCP_TOOLS_CONF_PATH")
-            if "MCP_TOOLS_CONF_PATH" in os.environ:
-                del os.environ["MCP_TOOLS_CONF_PATH"]
+        # Restore original environment
+        os.chdir(original_cwd)
+        if original_mcp_tools_path is not None:
+            os.environ["MCP_TOOLS_CONF_PATH"] = original_mcp_tools_path
+        elif "MCP_TOOLS_CONF_PATH" in os.environ:
+            del os.environ["MCP_TOOLS_CONF_PATH"]
 
-            try:
-                # Create registry - should not fail even without mcp_tools.json
-                registry = ToolRegistry()
+        temp_dir.cleanup()
 
-                # Should still have internal tools
-                self.assertGreater(len(registry.mcp_tools), 0)
-            finally:
-                if original_mcp_tools_path is not None:
-                    os.environ["MCP_TOOLS_CONF_PATH"] = original_mcp_tools_path
 
-    def test_tool_registry_handles_malformed_json(self):
-        """Test that tool registry handles malformed JSON gracefully."""
+def test_tool_registry_handles_missing_mcp_tools_file():
+    """Test that tool registry handles missing mcp_tools.json gracefully."""
+    # Change to a directory without mcp_tools.json and unset the env var
+    with tempfile.TemporaryDirectory():
+        original_mcp_tools_path = os.environ.get("MCP_TOOLS_CONF_PATH")
+        if "MCP_TOOLS_CONF_PATH" in os.environ:
+            del os.environ["MCP_TOOLS_CONF_PATH"]
+
+        try:
+            # Create registry - should not fail even without mcp_tools.json
+            registry = ToolRegistry()
+
+            # Should still have internal tools
+            assert len(registry.mcp_tools) > 0
+        finally:
+            if original_mcp_tools_path is not None:
+                os.environ["MCP_TOOLS_CONF_PATH"] = original_mcp_tools_path
+
+
+def test_tool_registry_handles_malformed_json():
+    """Test that tool registry handles malformed JSON gracefully."""
+    # Create a temporary directory for testing
+    temp_dir = tempfile.TemporaryDirectory()
+    original_cwd = os.getcwd()
+    original_mcp_tools_path = os.environ.get("MCP_TOOLS_CONF_PATH")
+
+    # Change to the temp directory
+    os.chdir(temp_dir.name)
+
+    # Create mcp_tools.json with tools that don't make external requests
+    mcp_tools_content = f"""{{
+  "sample_command_tool": {{
+    "type": "command",
+    "description": "A sample command tool for testing",
+    "command": "echo 'Hello from command tool: {{message}}'",
+    "parameters": {{
+      "type": "object",
+      "properties": {{
+        "message": {{
+          "type": "string",
+          "description": "Message to echo"
+        }}
+      }},
+      "required": ["message"]
+    }}
+  }}
+}}"""
+
+    # Write the config file to the current directory
+    config_file_path = os.path.join(temp_dir.name, "mcp_tools.json")
+    with open(config_file_path, "w") as f:
+        f.write(mcp_tools_content)
+
+    # Set the environment variable to point to our test file
+    os.environ["MCP_TOOLS_CONF_PATH"] = config_file_path
+
+    try:
         # Create a malformed mcp_tools.json
-        with open(self.config_file_path, "w") as f:
+        with open(config_file_path, "w") as f:
             f.write("{ invalid json }")
 
         # Create registry - should not fail even with malformed JSON
         registry = ToolRegistry()
 
         # Should still have internal tools
-        self.assertGreater(len(registry.mcp_tools), 0)
+        assert len(registry.mcp_tools) > 0
+    finally:
+        # Restore original environment
+        os.chdir(original_cwd)
+        if original_mcp_tools_path is not None:
+            os.environ["MCP_TOOLS_CONF_PATH"] = original_mcp_tools_path
+        elif "MCP_TOOLS_CONF_PATH" in os.environ:
+            del os.environ["MCP_TOOLS_CONF_PATH"]
 
-    def test_tool_registry_handles_invalid_tool_config(self):
-        """Test that tool registry handles invalid tool configurations."""
+        temp_dir.cleanup()
+
+
+def test_tool_registry_handles_invalid_tool_config():
+    """Test that tool registry handles invalid tool configurations."""
+    # Create a temporary directory for testing
+    temp_dir = tempfile.TemporaryDirectory()
+    original_cwd = os.getcwd()
+    original_mcp_tools_path = os.environ.get("MCP_TOOLS_CONF_PATH")
+
+    # Change to the temp directory
+    os.chdir(temp_dir.name)
+
+    # Create mcp_tools.json with tools that don't make external requests
+    mcp_tools_content = f"""{{
+  "sample_command_tool": {{
+    "type": "command",
+    "description": "A sample command tool for testing",
+    "command": "echo 'Hello from command tool: {{message}}'",
+    "parameters": {{
+      "type": "object",
+      "properties": {{
+        "message": {{
+          "type": "string",
+          "description": "Message to echo"
+        }}
+      }},
+      "required": ["message"]
+    }}
+  }}
+}}"""
+
+    # Write the config file to the current directory
+    config_file_path = os.path.join(temp_dir.name, "mcp_tools.json")
+    with open(config_file_path, "w") as f:
+        f.write(mcp_tools_content)
+
+    # Set the environment variable to point to our test file
+    os.environ["MCP_TOOLS_CONF_PATH"] = config_file_path
+
+    try:
         # Create an mcp_tools.json with invalid tool config
         invalid_config = """{
   "invalid_tool": {
@@ -353,15 +949,20 @@ class TestExternalMCPTools(unittest.TestCase):
   }
 }"""
 
-        with open(self.config_file_path, "w") as f:
+        with open(config_file_path, "w") as f:
             f.write(invalid_config)
 
         # Create registry
         registry = ToolRegistry()
 
         # Should still load the tool (validation happens at execution time)
-        self.assertIn("invalid_tool", registry.mcp_tools)
+        assert "invalid_tool" in registry.mcp_tools
+    finally:
+        # Restore original environment
+        os.chdir(original_cwd)
+        if original_mcp_tools_path is not None:
+            os.environ["MCP_TOOLS_CONF_PATH"] = original_mcp_tools_path
+        elif "MCP_TOOLS_CONF_PATH" in os.environ:
+            del os.environ["MCP_TOOLS_CONF_PATH"]
 
-
-if __name__ == "__main__":
-    unittest.main()
+        temp_dir.cleanup()

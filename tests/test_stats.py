@@ -4,7 +4,6 @@ Tests for the stats module.
 
 import sys
 import os
-import unittest
 from unittest.mock import patch
 
 # Add the parent directory to the path to import aicoder modules
@@ -13,67 +12,68 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from aicoder.stats import Stats
 
 
-class TestStats(unittest.TestCase):
-    """Test cases for the Stats class."""
+def test_stats_initialization():
+    """Test that Stats object initializes with correct default values."""
+    stats = Stats()
 
-    def test_stats_initialization(self):
-        """Test that Stats object initializes with correct default values."""
-        stats = Stats()
+    # Check default values
+    assert stats.api_requests == 0
+    assert stats.api_success == 0
+    assert stats.api_errors == 0
+    assert stats.api_time_spent == 0.0
+    assert stats.tool_calls == 0
+    assert stats.tool_errors == 0
+    assert stats.tool_time_spent == 0.0
+    assert stats.messages_sent == 0
+    assert stats.tokens_processed == 0
+    assert stats.compactions == 0
 
-        # Check default values
-        self.assertEqual(stats.api_requests, 0)
-        self.assertEqual(stats.api_success, 0)
-        self.assertEqual(stats.api_errors, 0)
-        self.assertEqual(stats.api_time_spent, 0.0)
-        self.assertEqual(stats.tool_calls, 0)
-        self.assertEqual(stats.tool_errors, 0)
-        self.assertEqual(stats.tool_time_spent, 0.0)
-        self.assertEqual(stats.messages_sent, 0)
-        self.assertEqual(stats.tokens_processed, 0)
-        self.assertEqual(stats.compactions, 0)
+    # Check that session_start_time is set
+    assert isinstance(stats.session_start_time, float)
+    assert stats.session_start_time > 0
 
-        # Check that session_start_time is set
-        self.assertIsInstance(stats.session_start_time, float)
-        self.assertGreater(stats.session_start_time, 0)
 
-    def test_stats_increment_api_requests(self):
-        """Test incrementing API request counters."""
-        stats = Stats()
+def test_stats_increment_api_requests():
+    """Test incrementing API request counters."""
+    stats = Stats()
 
-        # Increment counters
-        stats.api_requests = 5
-        stats.api_success = 3
-        stats.api_errors = 2
+    # Increment counters
+    stats.api_requests = 5
+    stats.api_success = 3
+    stats.api_errors = 2
 
-        self.assertEqual(stats.api_requests, 5)
-        self.assertEqual(stats.api_success, 3)
-        self.assertEqual(stats.api_errors, 2)
+    assert stats.api_requests == 5
+    assert stats.api_success == 3
+    assert stats.api_errors == 2
 
-    def test_stats_increment_tool_calls(self):
-        """Test incrementing tool call counters."""
-        stats = Stats()
 
-        # Increment counters
-        stats.tool_calls = 10
-        stats.tool_errors = 1
+def test_stats_increment_tool_calls():
+    """Test incrementing tool call counters."""
+    stats = Stats()
 
-        self.assertEqual(stats.tool_calls, 10)
-        self.assertEqual(stats.tool_errors, 1)
+    # Increment counters
+    stats.tool_calls = 10
+    stats.tool_errors = 1
 
-    def test_stats_time_tracking(self):
-        """Test time tracking functionality."""
-        stats = Stats()
+    assert stats.tool_calls == 10
+    assert stats.tool_errors == 1
 
-        # Add some time
-        stats.api_time_spent = 5.5
-        stats.tool_time_spent = 5.5
 
-        self.assertEqual(stats.api_time_spent, 5.5)
-        self.assertEqual(stats.tool_time_spent, 5.5)
+def test_stats_time_tracking():
+    """Test time tracking functionality."""
+    stats = Stats()
 
-    @patch("time.time")
-    def test_stats_print_output(self, mock_time):
-        """Test that print_stats produces output."""
+    # Add some time
+    stats.api_time_spent = 5.5
+    stats.tool_time_spent = 5.5
+
+    assert stats.api_time_spent == 5.5
+    assert stats.tool_time_spent == 5.5
+
+
+def test_stats_print_output():
+    """Test that print_stats produces output."""
+    with patch("time.time") as mock_time:
         stats = Stats()
 
         # Set some values for a more meaningful output
@@ -99,14 +99,10 @@ class TestStats(unittest.TestCase):
         output = captured_output.getvalue()
 
         # Check that key information is in the output
-        self.assertIn("Session Statistics", output)
-        self.assertIn("API requests: 3", output)
-        self.assertIn("Tool calls: 4", output)
-        self.assertIn("Memory compactions: 1", output)
-        self.assertIn("API success rate:", output)
-        self.assertIn("Tool success rate:", output)
+        assert "Session Statistics" in output
+        assert "API requests: 3" in output
+        assert "Tool calls: 4" in output
+        assert "Memory compactions: 1" in output
+        assert "API success rate:" in output
+        assert "Tool success rate:" in output
         # Note: "Messages sent" may not appear in current output format
-
-
-if __name__ == "__main__":
-    unittest.main()

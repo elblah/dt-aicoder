@@ -3,16 +3,19 @@ Tool Executor for AI Coder - Handles execution of tool calls from the AI.
 """
 
 import os
+import re
 import json
 import time
 import urllib.request
 import subprocess
+import shlex
 from typing import Dict, Any, List, Tuple
 
 from ..utils import parse_json_arguments
 from datetime import datetime
 from .. import config
 from ..utils import colorize_diff_lines, make_readline_safe
+from ..prompt_history_manager import prompt_history_manager
 from .internal_tools import INTERNAL_TOOL_FUNCTIONS
 from .validator import (
     validate_tool_parameters,
@@ -29,6 +32,99 @@ except ImportError:
     pass
 
 DENIED_MESSAGE = "EXECUTION DENIED BY THE USER"
+
+
+def _check_approval_rules(command: str) -> tuple[bool, str]:
+    """
+    Check user-configurable approval rules with priority:
+    1. auto_deny (highest) - automatically reject
+    2. ask_approval (middle) - require manual approval
+    3. auto_approve (lowest) - automatically approve
+    
+    Args:
+        command: The shell command to check
+        
+    Returns:
+        tuple: (has_dangerous, reason)
+    """
+    
+    config_dir = os.path.expanduser("~/.config/aicoder")
+    
+    # Priority 1: Auto deny (highest priority)
+    has_match, matched_rule, action = _check_rule_file(
+        os.path.join(config_dir, "run_shell_command.auto_deny"), 
+        command, "deny"
+    )
+    if has_match:
+        return True, f"Auto denied. Regex: {matched_rule}"
+    
+    # Priority 2: Ask approval (middle priority)
+    has_match, matched_rule, action = _check_rule_file(
+        os.path.join(config_dir, "run_shell_command.ask_approval"), 
+        command, "ask"
+    )
+    if has_match:
+        return True, f"Detected in ask approval file. Regex: {matched_rule}"
+    
+    # Priority 3: Auto approve (lowest priority)
+    has_match, matched_rule, action = _check_rule_file(
+        os.path.join(config_dir, "run_shell_command.auto_approve"), 
+        command, "approve"
+    )
+    if has_match:
+        return False, ""  # Not dangerous, auto-approved
+    
+    return False, ""
+
+
+def _check_rule_file(rule_file: str, command: str, file_type: str) -> tuple[bool, str, str]:
+    """
+    Check a single rule file for matches.
+    
+    Args:
+        rule_file: Path to the rule file
+        command: The shell command to check
+        file_type: Type of file (deny/ask/approve)
+        
+    Returns:
+        tuple: (has_match, matched_rule, file_type)
+    """
+    
+    if not os.path.exists(rule_file):
+        return False, "", file_type
+    
+    try:
+        with open(rule_file, 'r') as f:
+            for line_num, line in enumerate(f, 1):
+                line = line.strip()
+                
+                # Skip empty lines (empty regex would match everything!)
+                if not line or line.startswith('#'):
+                    continue  # Skip empty lines and comments
+                
+                try:
+                    # Support negation with ! prefix (for auto_approve only)
+                    if line.startswith('!') and file_type == "approve":
+                        pattern = line[1:]  # Remove the ! prefix
+                        
+                        # Skip if negation pattern is empty (would match everything)
+                        if not pattern:
+                            continue
+                            
+                        if not re.search(pattern, command):
+                            # Negative pattern matched (command doesn't match pattern)
+                            return True, f"Auto approved (negated regex): {pattern}", file_type
+                    else:
+                        # Ensure pattern is not empty before searching
+                        if line and re.search(line, command):
+                            return True, line, file_type
+                except re.error as e:
+                    # Invalid regex, skip it
+                    continue
+    except (IOError, OSError):
+        pass  # File not readable, just skip
+    
+    return False, "", file_type
 
 
 class ToolExecutor:
@@ -233,8 +329,9 @@ class ToolExecutor:
                 result = "CANCELLED_BY_USER"
                 tool_config_for_display = None
                 guidance_content = None
+                guidance_requested = False
             else:
-                result, tool_config_for_display, guidance_content = self.execute_tool(
+                result, tool_config_for_display, guidance_content, guidance_requested = self.execute_tool(
                     func_name, arguments, tool_index, total_tools
                 )
 
@@ -269,9 +366,10 @@ class ToolExecutor:
                     # Don't print anything for hidden results
                     pass
                 else:
-                    # Truncate result display for cleaner output (increased limit for diffs)
+                    # Truncate result display for cleaner output (but not if guidance is requested)
                     result_display = str(result)
-                    if len(result_display) > config.DEFAULT_TRUNCATION_LIMIT:
+                    # Don't truncate if guidance is enabled - user needs full output for context
+                    if len(result_display) > config.DEFAULT_TRUNCATION_LIMIT and not guidance_requested:
                         result_display = (
                             result_display[:config.DEFAULT_TRUNCATION_LIMIT]
                             + "... [truncated]"
@@ -291,6 +389,11 @@ class ToolExecutor:
                 print(f"{config.RED} * Warning: Empty tool_call_id for {func_name}{config.RESET}")
 
             tool_results.append(tool_result_entry)
+
+            # Handle guidance after showing the result for all tools
+            if guidance_requested and not guidance_content:
+                # Now prompt for guidance after showing the tool output
+                guidance_content = self._handle_guidance_prompt(True)
 
             # Collect guidance messages with tool call ID references instead of adding immediately
             if guidance_content and guidance_content.strip():
@@ -326,14 +429,51 @@ class ToolExecutor:
         if with_guidance:
             try:
                 self.animator.stop_cursor_blinking()
+                
+                # Switch to user input mode for guidance (share history with user commands)
+                prompt_history_manager.setup_user_input_mode()
+                
                 guidance_prompt = f"{config.BOLD}{config.GREEN}Guidance: {config.RESET}"
                 safe_guidance_prompt = make_readline_safe(guidance_prompt)
                 guidance_content = input(safe_guidance_prompt).strip()
+                
+                # Save guidance to user input history
+                if guidance_content:
+                    prompt_history_manager.save_user_input(guidance_content)
             except (EOFError, KeyboardInterrupt):
                 # If user cancels guidance input, proceed without guidance
                 guidance_content = None
             self.animator.start_cursor_blinking()
         return guidance_content
+
+    def _print_command_info_once(self, command: str, timeout: int = 30,
+                                 auto_approved: bool = False,
+                                 allow_session: bool = False):
+        """Print command information only once per tool call.
+        
+        Args:
+            command: The shell command being executed
+            timeout: Timeout in seconds (default: 30)
+        """
+        if command and not self._command_info_printed:
+            mode_msg = ""
+            if config.YOLO_MODE:
+                mode_msg = "YOLO!"
+            elif allow_session:
+                mode_msg = "ALLOWED FOR SESSION!"
+            elif auto_approved:
+                mode_msg = "AUTO APPROVED!"
+            if mode_msg:
+                mode_msg = f"{config.BOLD}{config.RED}**{mode_msg}**{config.RESET}"
+            
+            # Check for dangerous patterns and show warning
+            from .internal_tools.run_shell_command import has_dangerous_patterns
+            has_dangerous, reason = has_dangerous_patterns(command)
+            if has_dangerous:
+                print(f"   - ⚠️  {reason} - requires manual approval")
+            
+            print(f"\n   {config.YELLOW}AI wants to run a command:{config.RESET} {mode_msg}\n    {config.BOLD}Command: {command}{config.RESET}\n    Timeout: {timeout} seconds")
+            self._command_info_printed = True
 
     def _validate_internal_tool_call(
         self,
@@ -377,13 +517,28 @@ class ToolExecutor:
         arguments: Dict[str, Any],
         tool_index: int = 0,
         total_tools: int = 0,
-    ) -> Tuple[str, Dict[str, Any], str]:
+    ) -> Tuple[str, Dict[str, Any], str, bool]:
         """Execute an MCP tool based on its configuration."""
+        # Check if tool is disabled due to planning mode
+        try:
+            from ..planning_mode import get_planning_mode
+            planning_mode = get_planning_mode()
+            if planning_mode.should_disable_tool(tool_name):
+                return f"Error: Tool '{tool_name}' is disabled in planning mode. Planning mode only allows read-only operations. Use '/plan off' to disable planning mode.", {}, None, False
+        except ImportError:
+            pass  # Planning mode not available
+            
         # Track tool execution time
         tool_start_time = time.time()
         tool_config = {}  # Initialize tool_config to empty dict
         try:
             tool_config = self.tool_registry.mcp_tools.get(tool_name)
+            
+            # Special handling for run_shell_command to enable dynamic auto-approval
+            if tool_name == "run_shell_command" and tool_config:
+                from .internal_tools.run_shell_command import get_dynamic_tool_config
+                tool_config = get_dynamic_tool_config(tool_config, arguments)
+            
             if not tool_config:
                 # Check if this is a tool from an MCP server
                 for server_name, (_, tools) in self.tool_registry.mcp_servers.items():
@@ -392,7 +547,7 @@ class ToolExecutor:
                         break
 
                 if not tool_config:
-                    return f"Error: Tool '{tool_name}' not found.", {}, None
+                    return f"Error: Tool '{tool_name}' not found.", {}, None, False
 
             if config.DEBUG:
                 print(f"DEBUG: Executing tool {tool_name} with config: {tool_config}")
@@ -414,6 +569,7 @@ class ToolExecutor:
                         f"Error: Internal tool '{tool_name}' has no implementation.",
                         tool_config,
                         None,
+                        False,
                     )
 
                 # Validate internal tool call before execution
@@ -430,7 +586,7 @@ class ToolExecutor:
                     formatted_error = format_validation_error(
                         tool_name, error_message, tool_config, arguments
                     )
-                    return formatted_error, tool_config, None
+                    return formatted_error, tool_config, None, False
 
                 try:
                     # Handle approval for internal tools
@@ -438,35 +594,121 @@ class ToolExecutor:
                     needs_approval = not auto_approved and not config.YOLO_MODE
                     yolo_approval = not auto_approved and config.YOLO_MODE
                     
-                    if needs_approval or yolo_approval:
+                    # Reset command info printed flag for this new tool call
+                    self._command_info_printed = False
+                    
+                    if yolo_approval:
+                        # YOLO mode - check user rules first
+                        if tool_name == "run_shell_command":
+                            command = arguments.get("command", "")
+                            has_dangerous, reason = _check_approval_rules(command)
+                            if has_dangerous:
+                                print(f"   - ⚠️  {reason} - YOLO mode respects user rules")
+                                error_msg = f"Command denied by GLOBAL RULE: {command}"
+                                return error_msg, tool_config, None, False
+                            approved, with_guidance = (not has_dangerous, False)
+                        else:
+                            approved, with_guidance = True, False
+                    elif needs_approval:
                         prompt_message = self.approval_system.format_tool_prompt(
                             tool_name, arguments, tool_config
                         )
                         # Check if prompt_message is a validation error
                         if prompt_message.startswith("Error:"):
                             # Return validation error directly
-                            return prompt_message, tool_config, None
+                            return prompt_message, tool_config, None, False
+                        # Special handling for run_shell_command cache key generation
+                        if tool_name == "run_shell_command":
+                            # Generate a cache key based on the main command name for session approval
+                            command = arguments.get("command", "")
+                            try:
+                                parts = shlex.split(command.strip())
+                                if parts:
+                                    main_command = os.path.basename(parts[0])
+                                    cache_key = f"{tool_name}:{main_command}"
+                                else:
+                                    cache_key = tool_name
+                            except (ValueError, ImportError):
+                                cache_key = tool_name
 
-                        if needs_approval:  # Non-YOLO mode - ask user
+                            # Check for dangerous patterns in the current command (even if session approved)
+                            from .internal_tools.run_shell_command import has_dangerous_patterns
+                            
+                            # ALWAYS check auto_deny rules first, even in YOLO mode
+                            auto_deny_file = os.path.expanduser("~/.config/aicoder/run_shell_command.auto_deny")
+                            has_deny_match, deny_rule, _ = _check_rule_file(auto_deny_file, command, "deny")
+                            if has_deny_match:
+                                print(f"   - 🚫 Command auto denied: {deny_rule}")
+                                return DENIED_MESSAGE, tool_config, None, False
+                            has_dangerous, reason = has_dangerous_patterns(command)
+                            if has_dangerous:
+                                # Found dangerous pattern - require manual approval
+                                print(f"   - ⚠️  {reason} - requires manual approval")
+                            else:
+                                # Check user-configurable approval rules (ask and auto)
+                                has_dangerous, reason = _check_approval_rules(command)
+                                if has_dangerous:
+                                    print(f"   - ⚠️  {reason} - requires manual approval")
+                            
+                            # Check if this specific command was approved for session AND is safe
+                            if cache_key in self.approval_system.tool_approvals_session:
+                                if has_dangerous:
+                                    # Need to ask for approval despite session approval
+                                    approved, with_guidance = (
+                                        self.approval_system.request_user_approval(
+                                            prompt_message, tool_name, arguments, tool_config
+                                        )
+                                    )
+                                else:
+                                    # Safe command and session approved - show command info but skip prompt
+                                    self._print_command_info_once(arguments.get("command", ""), 
+                                            arguments.get("timeout", 30),
+                                            auto_approved=auto_approved,
+                                            allow_session=True)
+                                    approved, with_guidance = True, False
+                            else:
+                                # Need to ask for approval - temporarily use our cache key
+                                original_generate_cache_key = self.approval_system._generate_approval_cache_key
+                                self.approval_system._generate_approval_cache_key = lambda tn, args, exclude_args: cache_key
+                                
+                                try:
+                                    approved, with_guidance = (
+                                        self.approval_system.request_user_approval(
+                                            prompt_message, tool_name, arguments, tool_config
+                                        )
+                                    )
+                                finally:
+                                    # Restore original cache key function
+                                    self.approval_system._generate_approval_cache_key = original_generate_cache_key
+                        else:
+                            # Normal approval flow for other tools
                             approved, with_guidance = (
                                 self.approval_system.request_user_approval(
                                     prompt_message, tool_name, arguments, tool_config
                                 )
                             )
+                        
+                        if needs_approval:  # Non-YOLO mode - check approval result
                             if not approved:
                                 # Handle guidance prompt even for denied tools
                                 guidance_content = self._handle_guidance_prompt(
                                     with_guidance
                                 )
-                                return DENIED_MESSAGE, tool_config, guidance_content
+                                return DENIED_MESSAGE, tool_config, guidance_content, False
 
                             # Store guidance flag for later use
                             if with_guidance:
                                 # We'll handle guidance after execution
                                 pass
-                        else:  # YOLO mode - auto approve but show the prompt
-                            print(f"\n{config.YELLOW}{prompt_message}{config.RESET}")
-                            print(f"{config.GREEN}Auto approving... running YOLO MODE!{config.RESET}")
+                        else:  # YOLO mode - check if user rules denied it
+                            if not approved:
+                                # User rules denied approval even in YOLO mode
+                                guidance_content = self._handle_guidance_prompt(with_guidance)
+                                return DENIED_MESSAGE, tool_config, guidance_content, False
+                            else:
+                                print(f"\n{config.YELLOW}{prompt_message}{config.RESET}")
+                                print(f"{config.GREEN}Auto approving... running YOLO MODE!{config.RESET}")
+                    # If auto_approved is True, no approval needed - skip approval logic
 
                     # Normalize arguments to ensure they are in dictionary format
                     arguments = self._normalize_arguments(arguments)
@@ -480,10 +722,27 @@ class ToolExecutor:
                             f"double quotes for strings, and proper escaping."
                         )
                         print(f"{config.RED} * {error_msg}{config.RESET}")
-                        return error_msg, tool_config, None
-
+                        return error_msg, tool_config, None, False
+                    # Check if user used diff-edit to modify the file
+                    if hasattr(self.approval_system, '_diff_edit_result') and self.approval_system._diff_edit_result:
+                        diff_edit_result = self.approval_system._diff_edit_result
+                        self.approval_system._diff_edit_result = None  # Clear it
+                        
+                        # Format the result like a successful tool execution
+                        formatted_result = f"✅ SUCCESS: {diff_edit_result['message']}\n\n💡 AI Guidance: {diff_edit_result['ai_guidance']}"
+                        
+                        # Return the diff-edit result immediately
+                        return formatted_result, tool_config, None, False
                     # Special handling for run_shell_command to pass tool_index and total_tools
                     if tool_name == "run_shell_command":
+                        # Only show command info if we're not showing an approval prompt (to avoid duplicates)
+                        if not needs_approval:
+                            self._print_command_info_once(
+                                    arguments.get("command", ""),
+                                    arguments.get("timeout", 30),
+                                    auto_approved=auto_approved,
+                                    allow_session=False)
+                        
                         result = func(
                             **arguments,
                             tool_index=tool_index,
@@ -493,20 +752,34 @@ class ToolExecutor:
                     else:
                         result = func(**arguments, stats=self.stats)
 
+                    # Track efficiency for file operations
+                    if tool_name in ["edit_file", "write_file", "read_file"] and "path" in arguments:
+                        from .file_tracker import track_file_edit, track_file_read
+                        if tool_name == "edit_file":
+                            track_file_edit(arguments["path"], self.tool_registry.message_history)
+                        elif tool_name == "write_file":
+                            track_file_edit(arguments["path"], self.tool_registry.message_history)
+                        elif tool_name == "read_file":
+                            track_file_read(arguments["path"], self.tool_registry.message_history)
+
                     # Handle guidance prompt after successful execution
                     guidance_content = None
+                    # Don't prompt for guidance here anymore - it's handled in the main loop
+                    # Just pass along whether guidance was requested
+                    guidance_requested = False
                     if not auto_approved and not config.YOLO_MODE and with_guidance:
-                        guidance_content = self._handle_guidance_prompt(with_guidance)
+                        guidance_requested = True
 
-                    return result, tool_config, guidance_content
+                    return result, tool_config, guidance_content, guidance_requested
                 except Exception as e:
                     self.stats.tool_errors += 1
                     if str(e) == "CANCEL_ALL_TOOL_CALLS":
-                        return "CANCEL_ALL_TOOL_CALLS", tool_config, None
+                        return "CANCEL_ALL_TOOL_CALLS", tool_config, None, False
                     return (
                         f"Error executing internal tool '{tool_name}': {e}",
                         tool_config,
                         None,
+                        guidance_requested,  # Use the existing guidance_requested value
                     )
 
             elif tool_type == "command":
@@ -664,8 +937,7 @@ class ToolExecutor:
                         # Check if prompt_message is a validation error
                         if prompt_message.startswith("Error:"):
                             # Return validation error directly
-                            return prompt_message, tool_config, None
-
+                            return prompt_message, tool_config, None, False
                         approved, with_guidance = (
                             self.approval_system.request_user_approval(
                                 prompt_message, tool_name, arguments, tool_config
@@ -676,7 +948,12 @@ class ToolExecutor:
                             guidance_content = self._handle_guidance_prompt(
                                 with_guidance
                             )
-                            return DENIED_MESSAGE, tool_config, guidance_content
+                            return DENIED_MESSAGE, tool_config, guidance_content, False
+
+                    # Determine if guidance was requested
+                    guidance_requested = False
+                    if not auto_approved and not config.YOLO_MODE and with_guidance:
+                        guidance_requested = True
 
                     # Normalize arguments to ensure they are in dictionary format
                     arguments = self._normalize_arguments(arguments)
@@ -724,15 +1001,19 @@ class ToolExecutor:
                     if not auto_approved and not config.YOLO_MODE and with_guidance:
                         guidance_content = self._handle_guidance_prompt(with_guidance)
 
-                    return "\n".join(result_lines), tool_config, guidance_content
+                    return "\n".join(result_lines), tool_config, guidance_content, guidance_requested
                 except Exception as e:
                     self.stats.tool_errors += 1
+                    # Define guidance_requested in case it wasn't defined in approval flow
+                    if 'guidance_requested' not in locals():
+                        guidance_requested = False
                     if str(e) == "CANCEL_ALL_TOOL_CALLS":
-                        return "CANCEL_ALL_TOOL_CALLS", tool_config, None
+                        return "CANCEL_ALL_TOOL_CALLS", tool_config, None, False
                     return (
                         f"Error executing command tool '{tool_name}': {e}",
                         tool_config,
                         None,
+                        guidance_requested,
                     )
 
             elif tool_type == "jsonrpc":
@@ -746,8 +1027,7 @@ class ToolExecutor:
                         # Check if prompt_message is a validation error
                         if prompt_message.startswith("Error:"):
                             # Return validation error directly
-                            return prompt_message, tool_config, None
-
+                            return prompt_message, tool_config, None, False
                         approved, with_guidance = (
                             self.approval_system.request_user_approval(
                                 prompt_message, tool_name, arguments, tool_config
@@ -758,7 +1038,12 @@ class ToolExecutor:
                             guidance_content = self._handle_guidance_prompt(
                                 with_guidance
                             )
-                            return DENIED_MESSAGE, tool_config, guidance_content
+                            return DENIED_MESSAGE, tool_config, guidance_content, False
+
+                    # Determine if guidance was requested
+                    guidance_requested = False
+                    if not auto_approved and not config.YOLO_MODE and with_guidance:
+                        guidance_requested = True
 
                     # Normalize arguments to ensure they are in dictionary format
                     arguments = self._normalize_arguments(arguments)
@@ -782,7 +1067,7 @@ class ToolExecutor:
                         rpc_result = json.loads(response.read().decode("utf-8"))
                         if "error" in rpc_result:
                             self.stats.tool_errors += 1
-                            return json.dumps(rpc_result["error"]), tool_config, None
+                            return json.dumps(rpc_result["error"]), tool_config, None, False
                         result = json.dumps(rpc_result.get("result"))
 
                         # Handle guidance prompt after successful execution
@@ -792,15 +1077,19 @@ class ToolExecutor:
                                 with_guidance
                             )
 
-                        return result, tool_config, guidance_content
+                        return result, tool_config, guidance_content, guidance_requested
                 except Exception as e:
                     self.stats.tool_errors += 1
+                    # Define guidance_requested in case it wasn't defined in approval flow
+                    if 'guidance_requested' not in locals():
+                        guidance_requested = False
                     if str(e) == "CANCEL_ALL_TOOL_CALLS":
-                        return "CANCEL_ALL_TOOL_CALLS", tool_config, None
+                        return "CANCEL_ALL_TOOL_CALLS", tool_config, None, False
                     return (
                         f"Error executing JSON-RPC tool '{tool_name}': {e}",
                         tool_config,
                         None,
+                        guidance_requested,  # Use the actual guidance_requested value
                     )
 
             elif tool_type == "mcp-stdio":
@@ -833,8 +1122,7 @@ class ToolExecutor:
                         # Check if prompt_message is a validation error
                         if prompt_message.startswith("Error:"):
                             # Return validation error directly
-                            return prompt_message, tool_config, None
-
+                            return prompt_message, tool_config, None, False
                         approved, with_guidance = (
                             self.approval_system.request_user_approval(
                                 prompt_message, tool_name, arguments, tool_config
@@ -845,7 +1133,12 @@ class ToolExecutor:
                             guidance_content = self._handle_guidance_prompt(
                                 with_guidance
                             )
-                            return DENIED_MESSAGE, tool_config, guidance_content
+                            return DENIED_MESSAGE, tool_config, guidance_content, False
+
+                    # Determine if guidance was requested
+                    guidance_requested = False
+                    if not auto_approved and not config.YOLO_MODE and with_guidance:
+                        guidance_requested = True
 
                     # Execute tool call
                     tool_call_request = {
@@ -866,15 +1159,19 @@ class ToolExecutor:
                     if not auto_approved and not config.YOLO_MODE and with_guidance:
                         guidance_content = self._handle_guidance_prompt(with_guidance)
 
-                    return result, tool_config, guidance_content
+                    return result, tool_config, guidance_content, guidance_requested
                 except Exception as e:
                     self.stats.tool_errors += 1
+                    # Define guidance_requested in case it wasn't defined in approval flow
+                    if 'guidance_requested' not in locals():
+                        guidance_requested = False
                     if str(e) == "CANCEL_ALL_TOOL_CALLS":
-                        return "CANCEL_ALL_TOOL_CALLS", tool_config, None
+                        return "CANCEL_ALL_TOOL_CALLS", tool_config, None, False
                     return (
                         f"Error executing MCP stdio tool '{tool_name}': {e}",
                         tool_config,
                         None,
+                        guidance_requested,
                     )
 
             else:
@@ -883,12 +1180,13 @@ class ToolExecutor:
                     f"Error: Unknown tool type '{tool_type}' for tool '{tool_name}'.",
                     tool_config,
                     None,
+                    False,
                 )
         except Exception as e:
             self.stats.tool_errors += 1
             if str(e) == "CANCEL_ALL_TOOL_CALLS":
-                return "CANCEL_ALL_TOOL_CALLS", tool_config, None
-            return f"Error in tool execution system: {e}", tool_config, None
+                return "CANCEL_ALL_TOOL_CALLS", tool_config, None, False
+            return f"Error in tool execution system: {e}", tool_config, None, False
         finally:
             # Record time spent on tool call
             self.stats.tool_time_spent += time.time() - tool_start_time

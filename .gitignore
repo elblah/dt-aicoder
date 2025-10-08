@@ -214,3 +214,5 @@ temp/
 *.njsproj
 *.sln
 *.sw?
+
+.notify-prompt

@@ -25,6 +25,12 @@ classifiers = [
 requires-python = ">=3.8"
 dependencies = []
 
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0.0",
+    "pytest-mock>=3.10.0",
+]
+
 [project.urls]
 Homepage = "https://github.com/elblah/dt-aicoder"
 Repository = "https://github.com/elblah/dt-aicoder"

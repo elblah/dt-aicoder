@@ -1,0 +1,10 @@
+# Commands that should NEVER be allowed, even in YOLO mode
+sudo
+rm.*-rf.*/
+format
+fdisk
+mkfs
+dd.*if=.*of=/dev/
+curl.*sudo
+wget.*sudo
+python.*rm.*-rf

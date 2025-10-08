@@ -5,6 +5,7 @@ Test script for context summary functionality with compaction
 
 import sys
 import os
+from unittest.mock import Mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -14,8 +15,20 @@ from aicoder.config import COMPACT_MIN_MESSAGES, COMPACT_RECENT_MESSAGES
 
 def test_context_summary_compact():
     """Test the context summary functionality with enough messages to trigger compaction"""
-    # Create a message history instance
+    # Create a message history instance with mock API handler
+    mock_api_handler = Mock()
+    mock_api_handler._make_api_request.return_value = {
+        "choices": [
+            {
+                "message": {
+                    "content": "Test summary for integration test"
+                }
+            }
+        ]
+    }
+    
     history = MessageHistory()
+    history.api_handler = mock_api_handler
 
     # Temporarily reduce the compaction thresholds for testing
     original_min = COMPACT_MIN_MESSAGES

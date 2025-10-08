@@ -103,3 +103,54 @@ def notify_plugins_of_aicoder_init(loaded_plugins, aicoder_instance):
                 print(
                     f"    - Warning: Plugin {plugin_name} failed in on_aicoder_init: {e}"
                 )
+
+
+def notify_plugins_before_user_prompt(loaded_plugins):
+    """Notify plugins that have the on_before_user_prompt hook before displaying user prompt.
+
+    Args:
+        loaded_plugins (list): List of (name, module) tuples from load_plugins()
+    """
+    for plugin_name, module in loaded_plugins:
+        # Check if the module has an on_before_user_prompt function
+        if hasattr(module, "on_before_user_prompt"):
+            try:
+                module.on_before_user_prompt()
+            except Exception as e:
+                print(
+                    f"    - Warning: Plugin {plugin_name} failed in on_before_user_prompt: {e}"
+                )
+
+
+def notify_plugins_before_ai_prompt(loaded_plugins):
+    """Notify plugins that have the on_before_ai_prompt hook before displaying AI response.
+
+    Args:
+        loaded_plugins (list): List of (name, module) tuples from load_plugins()
+    """
+    for plugin_name, module in loaded_plugins:
+        # Check if the module has an on_before_ai_prompt function
+        if hasattr(module, "on_before_ai_prompt"):
+            try:
+                module.on_before_ai_prompt()
+            except Exception as e:
+                print(
+                    f"    - Warning: Plugin {plugin_name} failed in on_before_ai_prompt: {e}"
+                )
+
+
+def notify_plugins_before_approval_prompt(loaded_plugins):
+    """Notify plugins that have the on_before_approval_prompt hook before displaying approval prompt.
+
+    Args:
+        loaded_plugins (list): List of (name, module) tuples from load_plugins()
+    """
+    for plugin_name, module in loaded_plugins:
+        # Check if the module has an on_before_approval_prompt function
+        if hasattr(module, "on_before_approval_prompt"):
+            try:
+                module.on_before_approval_prompt()
+            except Exception as e:
+                print(
+                    f"    - Warning: Plugin {plugin_name} failed in on_before_approval_prompt: {e}"
+                )

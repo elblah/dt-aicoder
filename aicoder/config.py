@@ -35,6 +35,9 @@ RED = "\033[31m"
 GREEN = "\033[32m"
 YELLOW = "\033[33m"
 BLUE = "\033[34m"
+MAGENTA = "\033[35m"
+CYAN = "\033[36m"
+WHITE = "\033[37m"
 RESET = "\033[0m"
 BOLD = "\033[1m"
 
@@ -64,7 +67,9 @@ if "STREAMING_TIMEOUT" in os.environ:
 
 # Print streaming read timeout if set as environment variable
 if "STREAMING_READ_TIMEOUT" in os.environ:
-    print(f"{GREEN}*** Streaming read timeout is {STREAMING_READ_TIMEOUT} seconds{RESET}")
+    print(
+        f"{GREEN}*** Streaming read timeout is {STREAMING_READ_TIMEOUT} seconds{RESET}"
+    )
 
 # Configuration from environment variables
 API_KEY = os.environ.get("OPENAI_API_KEY", "YOUR_API_KEY")
@@ -76,7 +81,7 @@ if "API_ENDPOINT" in os.environ:
 API_MODEL = os.environ.get("OPENAI_MODEL", "gpt-5-nano")
 
 # Compaction settings (for manual /compact command)
-COMPACT_RECENT_MESSAGES = int(os.environ.get("COMPACT_RECENT_MESSAGES", "5"))
+COMPACT_RECENT_MESSAGES = int(os.environ.get("COMPACT_RECENT_MESSAGES", "2"))
 
 # Set COMPACT_MIN_MESSAGES: environment variable takes priority, otherwise use dynamic calculation
 if "COMPACT_MIN_MESSAGES" in os.environ:
@@ -87,14 +92,49 @@ else:
     # This is calculated dynamically in MessageHistory by counting only chat messages (excluding initial system messages)
     COMPACT_MIN_MESSAGES = COMPACT_RECENT_MESSAGES + 1
 
-# Pruning settings for tool result compaction
-PRUNE_PROTECT_TOKENS = int(os.environ.get("PRUNE_PROTECT_TOKENS", "40000"))  # Keep recent context intact
-PRUNE_MINIMUM_TOKENS = int(os.environ.get("PRUNE_MINIMUM_TOKENS", "20000"))  # Only prune if saving significant space
-ENABLE_PRUNING_COMPACTION = os.environ.get("ENABLE_PRUNING_COMPACTION", "1") == "1"  # Enable pruning-based compaction
-
 # Auto-compaction settings - NEW CLEAR NAMING
 CONTEXT_SIZE = int(os.environ.get("CONTEXT_SIZE", "128000"))  # Default to 128k tokens
-CONTEXT_COMPACT_PERCENTAGE = int(os.environ.get("CONTEXT_COMPACT_PERCENTAGE", "0"))  # 0 means disabled
+CONTEXT_COMPACT_PERCENTAGE = int(
+    os.environ.get("CONTEXT_COMPACT_PERCENTAGE", "0")
+)  # 0 means disabled
+
+# Calculate auto-compaction threshold based on percentage (0 percentage means disabled)
+if CONTEXT_COMPACT_PERCENTAGE > 0:
+    # Cap at 100% to prevent exceeding context size
+    capped_percentage = min(CONTEXT_COMPACT_PERCENTAGE, 100)
+    AUTO_COMPACT_THRESHOLD = int(CONTEXT_SIZE * (capped_percentage / 100.0))
+else:
+    AUTO_COMPACT_THRESHOLD = 0  # Disabled
+
+# Auto-compaction enabled flag
+AUTO_COMPACT_ENABLED = AUTO_COMPACT_THRESHOLD > 0
+
+# Dynamic pruning settings proportional to context size
+PRUNE_PROTECT_PERCENTAGE = int(
+    os.environ.get("PRUNE_PROTECT_PERCENTAGE", "25")
+)  # 25% of context size
+PRUNE_PROTECT_TOKENS = int(
+    os.environ.get(
+        "PRUNE_PROTECT_TOKENS", str(int(CONTEXT_SIZE * PRUNE_PROTECT_PERCENTAGE / 100))
+    )
+)
+# Cap at reasonable maximum (50k tokens) for huge contexts
+PRUNE_PROTECT_TOKENS = min(PRUNE_PROTECT_TOKENS, 50000)
+
+PRUNE_MINIMUM_PERCENTAGE = int(
+    os.environ.get("PRUNE_MINIMUM_PERCENTAGE", "15")
+)  # 15% of context size
+PRUNE_MINIMUM_TOKENS = int(
+    os.environ.get(
+        "PRUNE_MINIMUM_TOKENS", str(int(CONTEXT_SIZE * PRUNE_MINIMUM_PERCENTAGE / 100))
+    )
+)
+# Minimum cap for small contexts
+PRUNE_MINIMUM_TOKENS = max(PRUNE_MINIMUM_TOKENS, 10000)
+
+ENABLE_PRUNING_COMPACTION = (
+    os.environ.get("ENABLE_PRUNING_COMPACTION", "1") == "1"
+)  # Enable pruning-based compaction
 
 # Calculate auto-compaction threshold based on percentage (0 percentage means disabled)
 if CONTEXT_COMPACT_PERCENTAGE > 0:
@@ -111,7 +151,9 @@ AUTO_COMPACT_ENABLED = AUTO_COMPACT_THRESHOLD > 0
 DEFAULT_TRUNCATION_LIMIT = int(os.environ.get("DEFAULT_TRUNCATION_LIMIT", "300"))
 
 # Tool result size limits
-MAX_TOOL_RESULT_SIZE = int(os.environ.get("MAX_TOOL_RESULT_SIZE", "300000"))  # 300KB default
+MAX_TOOL_RESULT_SIZE = int(
+    os.environ.get("MAX_TOOL_RESULT_SIZE", "300000")
+)  # 300KB default
 
 # Mode flags
 YOLO_MODE = "YOLO_MODE" in os.environ and os.environ.get("YOLO_MODE") == "1"
@@ -151,3 +193,7 @@ RETRY_MAX_ATTEMPTS = int(os.environ.get("RETRY_MAX_ATTEMPTS", "0"))  # 0 means i
 
 # Token information display configuration
 ENABLE_TOKEN_INFO_DISPLAY = os.environ.get("ENABLE_TOKEN_INFO_DISPLAY", "1") == "1"
+
+# Token information bar characters (goose bar chars ● ○)
+TOKEN_INFO_FILLED_CHAR = os.environ.get("TOKEN_INFO_FILLED_CHAR", "█")
+TOKEN_INFO_EMPTY_CHAR = os.environ.get("TOKEN_INFO_EMPTY_CHAR", "░")

@@ -1,0 +1,402 @@
+{
+  "decision_making_tool": {
+    "type": "command",
+    "auto_approved": true,
+    "command": "message=$(cat <<'EOF'\n{message}\nEOF\n)\ntimeout 60s tgpt \"you are a decision maker... please help me decide... $message\" | grep -v \".\\s\\sLoading\"",
+    "preview_command": "echo \"This tool will ask the user for a decision with the message: {message}\"",
+    "truncated_chars": 500,
+    "description": "Ask user to make decisions when you have multiple options or need clarification. ALWAYS use this tool instead of normal prompts when asking questions. Provide: 1) Context about what you're doing, 2) Clear options as 'Option 1:...', 'Option 2:...', etc., 3) Any relevant information needed to choose. Only use normal prompts after all tasks are complete.",
+    "disabled": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string",
+          "description": "Message to be shown to the user."
+        }
+      },
+      "required": [
+        "message"
+      ]
+    }
+  },
+  "notify_user_tool": {
+    "type": "command",
+    "auto_approved": true,
+    "command": "message=$(cat <<'EOF'\n{message}\nEOF\n)\ntimeout 10 dunstify -t 60000 -- \"$message\"",
+    "preview_command": "echo \"This tool will show a desktop notification with the message: {message}\"",
+    "truncated_chars": 200,
+    "description": "This tool shows a message on the user desktop. A popup message like a notify-send.",
+    "disabled": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string",
+          "description": "Message to be shown to the user."
+        }
+      },
+      "required": [
+        "message"
+      ]
+    }
+  },
+  "ripgrep_search": {
+    "type": "command",
+    "auto_approved": true,
+    "command": "txt=$(cat <<'EOF'\n{text}\nEOF\n)\ntimeout 60 rg -- \"$txt\" | head -n 2000",
+    "preview_command": "echo \"This tool will search for text in files using ripgrep: {text}\"",
+    "truncated_chars": 1000,
+    "description": "Search text in files in the current directory using ripgrep. Returns max 2000 lines.",
+    "disabled": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "Text to search for."
+        }
+      },
+      "required": [
+        "text"
+      ]
+    }
+  },
+  "pwd": {
+    "type": "command",
+    "auto_approved": true,
+    "command": "pwd",
+    "truncated_chars": 1000,
+    "description": "Get the current working directory.",
+    "disabled": true
+  },
+  "ripgrep_list_files": {
+    "type": "command",
+    "auto_approved": true,
+    "command": "timeout 60 rg --files | head -n 2000",
+    "preview_command": "echo \"This tool will list files limited by 2000 lines of output. This tool might be more interesting then grep because it lists all dirs recursively while list_files list only one dir at the time.\"",
+    "truncated_chars": 1000,
+    "description": "List files in the current directory tree using ripgrep. Returns max 2000 lines.",
+    "disabled": true
+  },
+  "sum_tool": {
+    "type": "command",
+    "command": "python3 -c 'print({a} + {b})'",
+    "preview_command": "echo \"This tool will calculate the sum of {a} + {b}\"",
+    "truncated_chars": 0,
+    "description": "Calculates the sum of two numbers.",
+    "disabled": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "a": {
+          "type": "number",
+          "description": "The first number."
+        },
+        "b": {
+          "type": "number",
+          "description": "The second number."
+        }
+      },
+      "required": [
+        "a",
+        "b"
+      ]
+    }
+  },
+  "get_weather": {
+    "type": "jsonrpc",
+    "url": "http://localhost:8000/weather",
+    "method": "get_weather",
+    "truncated_chars": 300,
+    "disabled": true,
+    "description": "Gets the weather for a given city (example).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "city": {
+          "type": "string",
+          "description": "The city to get the weather for."
+        }
+      },
+      "required": [
+        "city"
+      ]
+    }
+  },
+  "fetch_server": {
+    "type": "mcp-stdio",
+    "disabled": true,
+    "truncated_chars": 500,
+    "command": "uvx mcp-server-fetch",
+    "description": "MCP server for fetching resources"
+  },
+  "pexpect_mcp_server": {
+    "type": "mcp-stdio",
+    "disabled": true,
+    "truncated_chars": 3000,
+    "command": "/home/blah/.local/bin/pexpect-mcp",
+    "description": "pexpect-mcp tool used to execute programs"
+  },
+  "gitmcp_crush_server": {
+    "type": "mcp-stdio",
+    "disabled": true,
+    "truncated_chars": 500,
+    "command": "npx mcp-remote https://gitmcp.io/charmbracelet/crush",
+    "description": "MCP server for crush github"
+  },
+  "sed_replace": {
+    "type": "command",
+    "approval_excludes_arguments": true,
+    "command": "sed -i 's/{search_pattern}/{replacement}/g' {file_path}",
+    "preview_command": "echo \"This tool will replace '{search_pattern}' with '{replacement}' in file '{file_path}'\"",
+    "truncated_chars": 0,
+    "description": "Fast text replacement using sed. For literal text, escape: backslash as \\\\, newline as \\\\n, tab as \\\\t, forward slash as \\\\/, ampersand as \\\\&. Example: to replace 'old text' with 'new line', use search_pattern='old text', replacement='new\\\\nline'.",
+    "disabled": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "file_path": {
+          "type": "string",
+          "description": "Path to the file to modify."
+        },
+        "search_pattern": {
+          "type": "string",
+          "description": "The pattern to search for (sed format). Escape special regex characters with backslashes for literal matching."
+        },
+        "replacement": {
+          "type": "string",
+          "description": "The replacement text. Use \\\\ for backslash, \\\\n for newline, \\\\/ for forward slash, \\\\& for ampersand."
+        }
+      },
+      "required": [
+        "file_path",
+        "search_pattern",
+        "replacement"
+      ]
+    }
+  },
+  "create_backup": {
+    "type": "command",
+    "command": "cp {source_file} {source_file}.bak",
+    "preview_command": "echo \"This tool will create a backup of '{source_file}' as '{source_file}.bak'\"",
+    "truncated_chars": 0,
+    "description": "Creates a backup of a file with .bak extension.",
+    "disabled": false,
+    "auto_approved": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "source_file": {
+          "type": "string",
+          "description": "Path to the file to backup."
+        }
+      },
+      "required": [
+        "source_file"
+      ]
+    }
+  },
+  "show_git_diff": {
+    "type": "command",
+    "approval_excludes_arguments": true,
+    "command": "git diff {file_path}",
+    "preview_command": "echo \"This tool will show git diff for file '{file_path}'\"",
+    "truncated_chars": 0,
+    "description": "Shows git diff for a specific file.",
+    "disabled": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "file_path": {
+          "type": "string",
+          "description": "Path to the file to show diff for."
+        }
+      },
+      "required": [
+        "file_path"
+      ]
+    }
+  },
+  "tree_view": {
+    "type": "command",
+    "auto_approved": true,
+    "command": "tree -L {levels} {directory}",
+    "preview_command": "echo \"This tool will show directory tree for '{directory}' up to {levels} levels\"",
+    "truncated_chars": 1000,
+    "description": "Shows directory structure as a tree.",
+    "disabled": false,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "directory": {
+          "type": "string",
+          "description": "Path to the directory to show."
+        },
+        "levels": {
+          "type": "number",
+          "description": "Maximum depth levels to show."
+        }
+      },
+      "required": [
+        "directory",
+        "levels"
+      ]
+    }
+  },
+  "extract_lines": {
+    "type": "command",
+    "auto_approved": true,
+    "command": "sed -n '{start_line},{end_line}p' {file_path}",
+    "preview_command": "echo \"This tool will extract lines {start_line} to {end_line} from file '{file_path}'\"",
+    "truncated_chars": 0,
+    "description": "Extract specific lines from a file. Use this only when you know the exact line range. For exploring code, use read_file or ripgrep_search instead to avoid excessive back-and-forth requests.",
+    "disabled": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "file_path": {
+          "type": "string",
+          "description": "Path to the file to extract from."
+        },
+        "start_line": {
+          "type": "number",
+          "description": "Starting line number."
+        },
+        "end_line": {
+          "type": "number",
+          "description": "Ending line number."
+        }
+      },
+      "required": [
+        "file_path",
+        "start_line",
+        "end_line"
+      ]
+    }
+  },
+  "apply_patch_git_style": {
+    "type": "command",
+    "approval_excludes_arguments": true,
+    "command": "diff_content=$(cat <<'EOF'\n{diff}\nEOF\n)\necho \"$diff_content\" | git apply --verbose --apply -",
+    "preview_command": "echo \"This tool will apply a unified diff patch to the file '{path}' using git apply\"",
+    "truncated_chars": 0,
+    "description": "This tool accepts patches only in Git-style diff format. The patch must specify the target file with a git-diff header (diff --git a/<path> b/<path>), include an index line, and valid ---/+++ sections with hunks. If the patch cannot be parsed as Git-style diff, return an explicit error. For best results, patch one file per invocation or ensure all hunks reference the correct path.",
+    "disabled": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "The path to the file to patch."
+        },
+        "diff": {
+          "type": "string",
+          "description": "The unified diff content to apply."
+        }
+      },
+      "required": [
+        "path",
+        "diff"
+      ]
+    }
+  },
+  "replace_lines": {
+    "type": "command",
+    "approval_excludes_arguments": true,
+    "command": "new_content=$(cat <<'EOF'\n{new_content}\nEOF\n) && escaped_content=$(echo \"$new_content\" | sed ':a;N;$!ba;s/\\n/\\\\n/g') && eval \"sed -i '{start_line},{end_line}c\\\\$escaped_content' {file_path}\"",
+    "preview_command": "echo \"This tool will replace lines {start_line} to {end_line} in file '{file_path}' with new content\"",
+    "truncated_chars": 0,
+    "description": "Replace specific lines in a file with new content. MUCH faster than write_file for large files. Use \\\\n for newlines in the new_content. Example: to replace lines 5-7 with 'line1\\\\nline2\\\\nline3', use start_line=5, end_line=7, new_content='line1\\\\nline2\\\\nline3'",
+    "disabled": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "file_path": {
+          "type": "string",
+          "description": "Path to the file to modify."
+        },
+        "start_line": {
+          "type": "number",
+          "description": "Starting line number (1-based)."
+        },
+        "end_line": {
+          "type": "number",
+          "description": "Ending line number (1-based)."
+        },
+        "new_content": {
+          "type": "string",
+          "description": "New content to replace the lines with. Use \\\\n for newlines."
+        }
+      },
+      "required": [
+        "file_path",
+        "start_line",
+        "end_line",
+        "new_content"
+      ]
+    }
+  },
+  "apply_patch": {
+    "type": "command",
+    "approval_excludes_arguments": true,
+    "auto_approved": false,
+    "command": "patch_content=$(cat <<'EOF'\n{patch}\nEOF\n)\necho \"$patch_content\" | apply_patch.py",
+    "preview_command": "patch_content=$(cat <<'EOF'\n{patch}\nEOF\n)\necho \"$patch_content\"",
+    "truncated_chars": 0,
+    "colorize_diff_lines": true,
+    "tool_description_command": "apply_patch.py --tool-description",
+    "append_to_system_prompt_command": "apply_patch.py --append-to-system-prompt",
+    "disabled": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "patch": {
+          "type": "string",
+          "description": "The patch content to apply in our custom patch format."
+        }
+      },
+      "required": [
+        "patch"
+      ]
+    }
+  },
+  "replace_tool": {
+    "type": "command",
+    "approval_excludes_arguments": true,
+    "auto_approved": false,
+    "command": "replace_tool.py --file-path={file_path} --old-string='{old_string}' --new-string='{new_string}' --expected-replacements={expected_replacements}",
+    "preview_command": "replace_tool.py --file-path={file_path} --old-string='{old_string}' --new-string='{new_string}' --expected-replacements={expected_replacements} --dry-run",
+    "truncated_chars": 0,
+    "colorize_diff_lines": true,
+    "tool_description_command": "replace_tool.py --tool-description",
+    "append_to_system_prompt_command": "replace_tool.py --append-to-system-prompt",
+    "disabled": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "file_path": {
+          "type": "string",
+          "description": "The absolute path to the file to modify. Must start with '/'."
+        },
+        "old_string": {
+          "type": "string",
+          "description": "The exact literal text to replace, preferably unescaped. For single replacements (default), include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely."
+        },
+        "new_string": {
+          "type": "string",
+          "description": "The exact literal text to replace old_string with, preferably unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic."
+        },
+        "expected_replacements": {
+          "type": "number",
+          "description": "Number of replacements expected. Defaults to 1 if not specified. Use when you want to replace multiple occurrences."
+        }
+      },
+      "required": [
+        "file_path",
+        "old_string",
+        "new_string"
+      ]
+    }
+  }
+}

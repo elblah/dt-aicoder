@@ -858,6 +858,11 @@ class StreamingAdapter(APIClient):
                     return None
 
                 if not first_token_received:
+                    # Notify plugins before AI response
+                    if hasattr(self.api_handler, 'loaded_plugins'):
+                        from .plugin_system.loader import notify_plugins_before_ai_prompt
+                        notify_plugins_before_ai_prompt(self.api_handler.loaded_plugins)
+                    
                     # Display token information before AI response if enabled
                     if config.ENABLE_TOKEN_INFO_DISPLAY and hasattr(self, 'stats'):
                         from .utils import display_token_info
@@ -867,8 +872,12 @@ class StreamingAdapter(APIClient):
                     first_token_received = True
                     self.animator.stop_animation()
                     self.animator.start_cursor_blinking()
+                    # Add [PLAN] prefix if planning mode is active
+                    from .planning_mode import get_planning_mode
+                    planning_mode = get_planning_mode()
+                    plan_prefix = "[PLAN] " if planning_mode.is_plan_mode_active() else ""
                     print(
-                        f"{config.BOLD}{config.GREEN}AI:{config.RESET} ",
+                        f"{config.BOLD}{config.GREEN}{plan_prefix}AI:{config.RESET} ",
                         end="",
                         flush=True,
                     )
@@ -913,6 +922,7 @@ class StreamingAdapter(APIClient):
                             usage_info = data["usage"]
 
                         # Process choices
+                        current_finish_reason = None
                         if "choices" in data and len(data["choices"]) > 0:
                             choice = data["choices"][0]
 
@@ -952,10 +962,26 @@ class StreamingAdapter(APIClient):
                                 full_response["choices"][0]["finish_reason"] = choice[
                                     "finish_reason"
                                 ]
+                                current_finish_reason = choice["finish_reason"]
+                                # Check if this is a final completion (stop, length, etc.)
+                                # Some providers close the connection after sending finish_reason
+                                # instead of sending a [DONE] message. We should recognize this as normal completion.
+                                if choice["finish_reason"] in ["stop", "length", "content_filter", "function_call", "tool_calls"]:
+                                    # Mark that we've received a completion signal
+                                    # We'll break after processing this chunk
+                                    full_response["choices"][0]["_completion_received"] = True
 
                     except json.JSONDecodeError:
                         # Skip invalid JSON lines
                         continue
+
+                    # Check if we received a completion signal (for providers that don't send [DONE])
+                    if (full_response["choices"][0].get("_completion_received") and 
+                        current_finish_reason in ["stop", "length", "content_filter", "function_call", "tool_calls"]):
+                        # Some providers close the connection after sending finish_reason
+                        # instead of sending [DONE]. We should break gracefully here.
+                        self._flush_print_buffers()
+                        break
 
             # Add final content to response
             full_response["choices"][0]["message"]["content"] = content_buffer

@@ -16,7 +16,30 @@ def test_context_summary():
     # Create a message history instance
     history = MessageHistory()
 
-    # Add some test messages
+    # Add a mock API handler
+    from unittest.mock import Mock
+    history.api_handler = Mock()
+    history.api_handler._make_api_request = Mock(return_value={
+        "choices": [{"message": {"content": "Test summary of the conversation"}}]
+    })
+
+    # Set low thresholds to trigger compaction
+    import aicoder.config as config
+    config.COMPACT_MIN_MESSAGES = 4
+    config.AUTO_COMPACT_THRESHOLD = 1000
+    config.COMPACT_RECENT_MESSAGES = 2
+
+    # Add enough messages to have some that can be compacted
+    # First, add some older messages that will be compacted
+    history.add_user_message("Initial request: help with task 1")
+    history.add_assistant_message({"role": "assistant", "content": "I'll help with task 1"})
+    history.add_tool_results([{"role": "tool", "tool_call_id": "call_1", "content": "Result for task 1"}])
+    
+    history.add_user_message("Request for task 2")
+    history.add_assistant_message({"role": "assistant", "content": "Working on task 2"})
+    history.add_tool_results([{"role": "tool", "tool_call_id": "call_2", "content": "Result for task 2"}])
+
+    # Add recent messages that will be preserved
     history.add_user_message("Hello, can you help me with a task?")
 
     # Add an assistant message with tool calls

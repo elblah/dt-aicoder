@@ -5,7 +5,7 @@ Write file internal tool implementation.
 import os
 import difflib
 from ...utils import colorize_diff_lines
-from ...file_tracker import check_file_modification
+from ..file_tracker import check_file_modification
 
 # Tool metadata
 TOOL_DEFINITION = {
@@ -13,12 +13,22 @@ TOOL_DEFINITION = {
     "auto_approved": False,
     "approval_excludes_arguments": True,
     "approval_key_exclude_arguments": ["content"],
+    "available_in_plan_mode": False,
     "hidden_parameters": ["content"],
-    "description": """Writes content to a specified file path, creating directories if needed. Checks if file was modified since last read.
+    "description": """Writes complete content to a file, creating directories as needed.
 
-FINANCIAL AWARENESS: Use this tool for large changes, complete rewrites, or when edit_file cost (sending old_content + new_content) is greater than the file size. For small, precise changes where you need to maintain context, consider edit_file instead.
+USE THIS TOOL FOR:
+- Complete file rewrites
+- New file creation
+- Multiple edits in one operation
+- When edit_file fails to find unique matches
 
-CRITICAL REQUIREMENT - READ FIRST: You MUST use read_file to understand the current file content before making significant changes to EXISTING files. This tool checks if the file was modified since it was last read to prevent accidental overwrites. For new files, reading is not required.""",
+SAFETY:
+- Checks if file was modified since last read to prevent accidental overwrites
+- Creates parent directories automatically
+- For existing files, you MUST use read_file first to establish baseline
+
+For small, precise modifications to existing files, consider using edit_file instead.""",
     "parameters": {
         "type": "object",
         "properties": {

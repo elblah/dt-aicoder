@@ -3,11 +3,12 @@
 export AICODER_THEME="original"
 export YOLO_MODE=1 
 
-python -m unittest discover --failfast -v
+#python -m unittest discover --failfast -v
+python -m pytest tests/ "$@"
 ret_unittest=$?
 printf "\n\n"
 
-./test_runner.py --full
+./app-run-tests.py --full
 ret_test_runner=$?
 
 echo -e "\nFinal Results:"

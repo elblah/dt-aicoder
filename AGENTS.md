@@ -1,221 +1,90 @@
-# Agent Development Notes
+# AI Coder Project-Specific Guidelines
 
-## **CRITICAL**: Always Run Tests with YOLO_MODE=1 and AICODER_THEME=original
+## IMPORTANT
 
-**WARNING: Tests that trigger tool approvals will hang indefinitely without YOLO_MODE=1**
+- **Prefer guard clauses/early exits** over nested if/else statements
+- **Keep functions focused** - One main responsibility per function
+- **Use Pythonic error handling** - `try/except` is idiomatic in Python (EAFP style)
+- **Be specific with exceptions** - Catch only what you can handle
+- **Use descriptive names** - Short is good, but clarity is better
+- **Avoid deep nesting** - Flatten code through early returns and helper functions
+- **CRITICAL: AVOID LAZY/LOCAL IMPORTS** python imports should be done at the top of the file
 
-Many tests in this project will trigger approval prompts (`input()` calls) that cause the test to hang waiting for user input. **This is the #1 reason LLMs fail when running tests.**
+## Code Structure Guidelines
 
-### ALWAYS run tests with YOLO_MODE=1:
-```bash
-# For individual test files
-AICODER_THEME=original YOLO_MODE=1 python tests/test_aicoder.py
+- **Keep methods short** - Methods should be under 50 lines, ideally under 30
+- **Avoid repetitive code** - Extract common patterns into helper methods
+- **Don't Repeat Yourself (DRY)** - If you copy-paste code, you need a helper method
+- **Single responsibility** - Each method should do one thing well
+- **Linear flow** - Prefer sequential guard clauses over nested logic
+- **Early returns** - Exit as soon as possible rather than nesting deeper
 
-# For unittest discover
-AICODER_THEME=original YOLO_MODE=1 python -m unittest discover
+## Python-Specific Best Practices
 
-# For any test that might involve tool execution
-AICODER_THEME=original YOLO_MODE=1 python your_test_script.py
-```
+- **Use `try/except` for flow control** - Python's "EAFP" (Easier to Ask for Forgiveness than Permission) style is preferred
+- **Specific exception handling** - Catch specific exceptions, not bare `except:`
+- **Context managers** - Use `with` statements for resource management
+- **Descriptive variable names** - `user_input` is better than `x`, `is_valid` is better than `flag`
+- **Follow PEP 8** - Python's style guide for readable code
+- **Type hints** - Use them for better code documentation and IDE support
 
-**MEMORIZE THIS: If a test might run tools, it needs YOLO_MODE=1**
+## **CRITICAL**: Testing Requirements
 
----
-
-## Project Structure
-
-```
-aicoder/
-├── AICODER.md
-├── __init__.py           # (4.0K)
-├── __main__.py           # (4.0K)
-├── animator.py           # (8.0K)
-├── api_client.py         # (8.0K)
-├── api_handler.py        # (12K)
-├── app.py                # (24K)
-├── command_handlers.py   # (12K)
-├── config.py             # (8.0K)
-├── file_tracker.py       # (4.0K)
-├── input_handler.py      # (4.0K)
-├── message_history.py    # (24K)
-├── retry_utils.py        # (12K)
-├── stats.py              # (8.0K)
-├── streaming_adapter.py  # (68K)
-├── tool_call_executor.py # (4.0K)
-├── utils.py              # (20K)
-└── plugin_system/        # Plugin system
-    ├── __init__.py       # (4.0K)
-    └── loader.py         # (4.0K)
-└── tool_manager/         # Tool management system (modular directory)
-    ├── __init__.py       # (4.0K)
-    ├── approval_system.py # (12K)
-    ├── executor.py       # (44K)
-    ├── manager.py        # (4.0K)
-    ├── registry.py       # (16K)
-    ├── validator.py      # (12K)
-    └── internal_tools/   # Individual tool implementations
-        ├── __init__.py   # (4.0K)
-        ├── edit_file.py  # (12K)
-        ├── glob.py       # (4.0K)
-        ├── grep.py       # (4.0K)
-        ├── list_directory.py # (4.0K)
-        ├── pwd.py        # (4.0K)
-        ├── read_file.py  # (4.0K)
-        ├── run_shell_command.py # (4.0K)
-        └── write_file.py # (4.0K)
-```
-
-### Tool Manager Structure
-- **Registry**: Handles what tools exist and their definitions
-- **Executor**: Handles how to run tools and execution logic
-- **Manager**: Coordinates both registry and executor
-- **Approval System**: Handles user permissions and approvals
-- **Internal Tools**: Each tool implementation in its own file
-
----
-
-## ⚠️ CRITICAL: Network Access Blocked in Tests
-
-**ALL NETWORK ACCESS IS BLOCKED IN TESTS** to protect API quota and ensure reliable, fast execution.
-
-- External URLs are blocked, local connections allowed
-- Use mocks/stubs for API responses, not real network calls
-- Tests will fail with clear error messages if network access is attempted
-
----
-
-## CRITICAL: Use run-tests.sh as the Definitive Test Method
-
-**`run-tests.sh`** is the definitive and comprehensive method for running ALL tests in the project:
-
-- **Complete test coverage**: Runs both the comprehensive test suite (`test_runner.py --full`) AND all individual unit tests (`python -m unittest discover`)
-- **Single command execution**: Executes all tests in one go, taking less than 30 seconds
-- **All-inclusive**: Includes syntax checks, imports, functionality tests, and unit tests
-- **Consistent environment**: Automatically sets YOLO_MODE=1 and other necessary environment variables
-
-**ALWAYS use `run-tests.sh` as the definitive method** to ensure complete test coverage before committing changes or verifying functionality.
+**Always run tests with YOLO_MODE=1** - Tests with tool approvals will hang without it:
 
 ```bash
-# This is the definitive test method - runs everything
+# Comprehensive testing method
 bash run-tests.sh
 ```
 
----
+## Project-Specific Context
 
-## CRITICAL: Unit Test Creation Protocol
+This is the AI Coder project - a CLI tool that provides AI assistance with file operations and tool execution. You have access to the full codebase and should understand the project architecture when making changes.
 
-**MANDATORY PROTOCOL: When implementing features, ALWAYS create proper unit tests in the `tests/` directory.**
+### Project Knowledge
+- **Architecture**: Modular design with tool_manager/, plugin_system/, and core components
+- **Key Files**: app.py (main application), message_history.py (conversation management), streaming_adapter.py (response handling)
+- **Testing**: **IMPORTANT:** CREATE TESTS FOR EVERY FEATURE
+- **Code Quality**: Enforced with `ruff check . && ruff format .`
 
-**When you create any functionality that might be useful to test in the future:**
-- ✅ **ALWAYS** create a `unittest` test file in the `tests/` directory
-- ✅ Use standard Python `unittest` framework (NOT pytest)
-- ✅ Name test files as `test_<feature_name>.py`
-- ✅ Place them in the `tests/` directory
-- ✅ Test both positive and negative cases
-- ✅ Include edge cases and error conditions
+## Development References
 
-**This is not optional - it's mandatory for every feature implementation.**
+- **Project Structure**: [docs/project_structure.md](docs/project_structure.md) - Complete directory overview
+- **Development Workflow**: [docs/development_workflow.md](docs/development_workflow.md) - Coding standards
+- **MCP Configuration**: [docs/mcp/configuration_guide.md](docs/mcp/configuration_guide.md) - Server setup
+- **Plugin Development**: [docs/plugins/README.md](docs/plugins/README.md) - Extension patterns
 
----
+## Project-Specific Behaviors
 
-## Project-Specific Features
+### Testing Protocol
+- **Unit Tests**: Create tests in `tests/test_<feature_name>.py` using unittest
+- **Network Access**: Blocked in tests - use mocks/stubs for external calls
+- **Test Execution**: Always use `YOLO_MODE=1` for tests with tool interactions
 
-### Batching Operations
-- **Batch operations when practical** to minimize the number of requests
-- Example: `ruff check . && ruff format . && python -m py_compile .` - This single command performs linting, formatting, and compilation checks
+### Code Patterns
+- **File Operations**: Prefer `edit_file`/`write_file` over shell commands
+- **Tool Batching**: Group multiple tool calls to reduce API requests
+- **Error Handling**: Check for "File has been modified since it was last read" errors
 
-### Code Quality Tools
-- **Ruff**: Use `ruff check .` to validate entire project syntax and style (much faster than python compilation)
-- **Ruff Format**: Use `ruff format .` to automatically format code according to style guidelines
+### Important Warnings
+- **Session Files**: Ignore session.json files - contain old contexts that cause confusion
+- **JSON Framework**: Must use double quotes, escape double quotes within strings with backslash
 
-### Streaming Adapter Feature
-Support SSE (Server-Sent Events) streaming responses:
+## Working with This Codebase
 
-- **File**: `streaming_adapter.py`
-- **Features**:
-  - Real-time display of AI responses as they're generated
-  - Streaming tool call processing
-  - ESC key cancellation support
-  - Fallback to regular mode if streaming fails
-  - **Improved Formatting**: Character buffering system prevents excessive whitespace during streaming
+When modifying AI Coder:
+1. Understand the modular architecture
+2. Follow existing patterns in similar files
+3. Create comprehensive tests
+4. Use the established tool system patterns
+5. Consider plugin compatibility
 
-### Token Usage Tracking
-The application automatically tracks token usage from API responses:
-
-- **Files Modified**: `stats.py`, `api_handler.py`, `streaming_adapter.py`
-- **Features**:
-  - Automatic extraction of prompt_tokens (input) and completion_tokens (output) from API responses
-  - Works with both streaming and non-streaming requests
-  - Usage information displayed in session statistics
-
-### Tool Call Batching
-When possible, send multiple tool calls in a single message rather than sequential calls:
-
-```json
-[
-  {"name": "read_file", "arguments": {"path": "config.py"}},
-  {"name": "read_file", "arguments": {"path": "utils.py"}},
-  {"name": "read_file", "arguments": {"path": "main.py"}}
-]
-```
-- This reduces the total number of API requests from 3 to 1
-- **NEVER create invalid method names** by concatenating tool names
+The codebase emphasizes practical solutions, efficient operations, and maintainable patterns.
 
 ---
 
-## Environment Variables
+## Important Warnings
 
-```bash
-# Enable debug mode
-DEBUG=1
-
-# API configuration
-OPENAI_API_KEY=your_api_key
-OPENAI_BASE_URL=https://api.openai.com/v1
-OPENAI_MODEL=gpt-5-nano
-
-# MCP tools configuration
-MCP_TOOLS_CONF_PATH=/path/to/mcp_tools.json
-
-# Shell command timeout (default: 30 seconds)
-SHELL_COMMAND_TIMEOUT=60
-```
-
----
-
-## File Modification Error Handling
-
-When you encounter an error message like:
-```
-Error: File /path/to/file.py has been modified since it was last read
-```
-
-**Solution:**
-1. Call `read_file` to get the current file content
-2. Then use `edit_file` or `write_file` with the updated content
-
-**Prevention:**
-- Prefer `edit_file` and `write_file` over shell commands like `sed`
-- Shell commands can cause modification conflicts
-
----
-
-## Plugin Development
-
-### Plugin Location
-Plugins should be created in `docs/plugins/examples/<stable or unstable dir>` directory, with each plugin in its own subdirectory.
-
-### Plugin Structure
-Each plugin should include:
-- A main Python file with the plugin implementation
-- A `README.md` explaining the plugin's purpose and usage
-- An `__init__.py` file with a brief description
-
-### Documentation Style
-- **Focus on quality over quantity**: Write one excellent README.md file
-- **Test functionality first** before writing documentation
-- **Avoid creating multiple documentation files** without explicit permission
-
-> **WARNING**: you should ignore session.json files (or any files with a similar name like <something>session<something>.json) because they are probably contexts from older chats avoid reading them and if any tool like grep finds any information inside this kind of tile you should ignore. Reading them will cause confusion on your understanding.
+> **WARNING**: Ignore session.json files (or similar names like <something>session<something>.json) - they contain old chat contexts that will cause confusion. Do not read them.
 
 > **WARNING**: JSON framework must be constructed with double-quotes. Double quotes within strings must be escaped with backslash, single quotes within strings will not be escaped.

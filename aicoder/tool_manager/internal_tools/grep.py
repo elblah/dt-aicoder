@@ -17,7 +17,7 @@ TOOL_DEFINITION = {
     "auto_approved": True,
     "approval_excludes_arguments": False,
     "approval_key_exclude_arguments": [],
-    "description": f"Search text in files using ripgrep. Path defaults to current directory. Returns max {DEFAULT_LINE_LIMIT} lines.",
+    "description": f"Search text in files using ripgrep with line numbers. Path defaults to current directory. Returns max {DEFAULT_LINE_LIMIT} lines.",
     "parameters": {
         "type": "object",
         "properties": {
@@ -39,12 +39,12 @@ TOOL_DEFINITION = {
 def _search_with_rg(text: str, line_limit: int = DEFAULT_LINE_LIMIT, path: str = None) -> str:
     """Search text using ripgrep."""
     try:
-        # Use rg with line limit and optional path (safe against injection)
+        # Use rg with line numbers and line limit (safe against injection)
         search_path = path if path else "."
-        # Build command as list to avoid shell injection
-        cmd = ["rg", text, search_path]
+        # Build command as list to avoid shell injection, add -n for line numbers
+        cmd = ["rg", "-n", text, search_path]
         # Use head -n via process substitution to avoid shell injection
-        full_cmd = ["bash", "-c", f'{{ "$1" "$2" "$3"; }} | head -n {line_limit}', "_", *cmd]
+        full_cmd = ["bash", "-c", f'{{ "$1" "$2" "$3" "$4"; }} | head -n {line_limit}', "_", *cmd]
 
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         if (
@@ -67,9 +67,9 @@ def _search_with_rg(text: str, line_limit: int = DEFAULT_LINE_LIMIT, path: str =
 def _search_with_grep(text: str, line_limit: int = DEFAULT_LINE_LIMIT, path: str = None) -> str:
     """Search text using grep."""
     try:
-        # Use grep with line limit and optional path (safe against injection)
+        # Use grep with line numbers and line limit (safe against injection)
         search_path = path if path else "."
-        cmd = ["bash", "-c", f'{{ "$1" -r "$2" "$3"; }} | head -n {line_limit}', "_", "grep", text, search_path]
+        cmd = ["bash", "-c", f'{{ "$1" -r -n "$2" "$3"; }} | head -n {line_limit}', "_", "grep", text, search_path]
 
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         if (

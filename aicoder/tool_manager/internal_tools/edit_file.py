@@ -6,7 +6,10 @@ import os
 import difflib
 from typing import Dict, Any
 from ...utils import colorize_diff_lines
-from ...file_tracker import record_file_read, check_file_modification_strict
+from ..file_tracker import record_file_read, check_file_modification_strict, track_file_edit
+
+# Environment variable to control write_file suggestions
+ENABLE_WRITEFILE_SUGGESTIONS = os.getenv("ENABLE_WRITEFILE_SUGGESTIONS", "true").lower() == "true"
 
 # Tool metadata
 TOOL_DEFINITION = {
@@ -15,41 +18,24 @@ TOOL_DEFINITION = {
     "approval_excludes_arguments": True,
     "approval_key_exclude_arguments": ["old_string", "new_string"],
     "hidden_parameters": ["old_string", "new_string"],
+    "available_in_plan_mode": False,
     "description": """Edits files by replacing text, creating new files, or deleting content.
 
-FINANCIAL AWARENESS: Use this tool for small, precise changes (1-20 lines) where you need to maintain context. For large changes or complete rewrites, consider write_file if the edit cost (sending old_content + new_content) is greater than the file size.
+CRITICAL REQUIREMENTS:
+- You MUST use read_file to understand the current file content before making edits
+- old_string must match the file content exactly, including whitespace and line breaks
+- Provide sufficient context to uniquely identify the text to replace
 
-CRITICAL FINANCIAL PRINCIPLE: Before making multiple changes to the same file, calculate the total cost. If you plan to make multiple edit_file calls on the same file, compare:
-- Total cost of all edit_file calls vs. 
-- Single write_file call cost (file size)
-If multiple edits cost more than a single write, use write_file instead.
+UNIQUE MATCHING:
+- old_string must be unique - the tool will fail if it appears multiple times
+- Include 3-5 lines of context before/after the change point when possible
+- If old_string appears multiple times, provide more context to make it unique
 
-CRITICAL REQUIREMENT - READ FIRST: You MUST use read_file to understand the current file content before making edits. This tool requires exact matching of existing content, including whitespace and line breaks.
+SPECIAL CASES:
+- Create new file: old_string="", new_string="content"
+- Delete content: new_string=""
 
-CRITICAL REQUIREMENTS FOR USING THIS TOOL:
-
-1. UNIQUENESS: The old_string MUST uniquely identify the specific instance you want to change. This means:
-   - Include AT LEAST 3-5 lines of context BEFORE the change point
-   - Include AT LEAST 3-5 lines of context AFTER the change point
-   - Include all whitespace, indentation, and surrounding code exactly as it appears in the file
-
-2. SINGLE INSTANCE: This tool can only change ONE instance at a time. If you need to change multiple instances:
-   - Make separate calls to this tool for each instance
-   - Each call must uniquely identify its specific instance using extensive context
-
-3. VERIFICATION: Before using this tool:
-   - Check how many instances of the target text exist in the file
-   - If multiple instances exist, gather enough context to uniquely identify each one
-   - Plan separate tool calls for each instance
-
-WARNING: If you do not follow these requirements:
-   - The tool will fail if old_string matches multiple locations
-   - The tool will fail if old_string doesn't match exactly (including whitespace)
-   - You may change the wrong instance if you don't include enough context
-
-Special cases:
-- To create a new file: provide path and new_string, leave old_string empty
-- To delete content: provide path and old_string, leave new_string empty""",
+WARNING: If old_string doesn't match exactly or appears multiple times, the operation will fail. For multiple edits, consider using write_file instead.""",
     "parameters": {
         "type": "object",
         "properties": {
@@ -107,6 +93,10 @@ def execute_edit_file(
     try:
         # Convert to absolute path
         path = os.path.abspath(path)
+        
+        # Track edit for efficiency optimization
+        # We need to pass message_history, but it's not available directly in edit_file
+        # The tracking will be handled at the executor level where message_history is available
 
         # Handle file creation (when old_string is empty)
         if old_string == "":
@@ -176,13 +166,22 @@ def _delete_content(path: str, old_string: str, stats) -> str:
 
         # Check if old_string exists
         if old_string not in old_content:
-            return "Error: old_string not found in file. Make sure it matches exactly, including whitespace and line breaks"
+            error_msg = "Error: old_string not found in file. Make sure it matches exactly, including whitespace and line breaks"
+            if ENABLE_WRITEFILE_SUGGESTIONS:
+                error_msg += "\nSUGGESTION: Use write_file instead - read the file first, then make comprehensive changes"
+            return error_msg
 
         # Check if old_string is unique
         first_index = old_content.find(old_string)
         last_index = old_content.rfind(old_string)
         if first_index != last_index:
-            return "Error: old_string appears multiple times in the file. Please provide more context to ensure a unique match"
+            error_msg = "Error: old_string appears multiple times in the file. Please provide more context to ensure a unique match"
+            if ENABLE_WRITEFILE_SUGGESTIONS:
+                error_msg += ("\nSUGGESTION: For complex changes with multiple matches, use write_file instead:\n"
+                             "1. Read the file with read_file()\n"
+                             "2. Make all necessary changes\n"
+                             "3. Write back with write_file()")
+            return error_msg
 
         # Create new content
         new_content = (
@@ -299,14 +298,23 @@ def validate_edit_file(arguments: Dict[str, Any]) -> str | bool:
 
         # Check if old_string exists (for deletion or replacement)
         if old_string != "" and old_string not in old_content:
-            return "Error: old_string not found in file. Make sure it matches exactly, including whitespace and line breaks"
+            error_msg = "Error: old_string not found in file. Make sure it matches exactly, including whitespace and line breaks"
+            if ENABLE_WRITEFILE_SUGGESTIONS:
+                error_msg += "\nSUGGESTION: Use write_file instead - read the file first, then make comprehensive changes"
+            return error_msg
 
         # Check if old_string is unique (if it exists)
         if old_string != "":
             first_index = old_content.find(old_string)
             last_index = old_content.rfind(old_string)
             if first_index != last_index:
-                return "Error: old_string appears multiple times in the file. Please provide more context to ensure a unique match"
+                error_msg = "Error: old_string appears multiple times in the file. Please provide more context to ensure a unique match"
+                if ENABLE_WRITEFILE_SUGGESTIONS:
+                    error_msg += ("\nSUGGESTION: For complex changes with multiple matches, use write_file instead:\n"
+                                 "1. Read the file with read_file()\n"
+                                 "2. Make all necessary changes\n"
+                                 "3. Write back with write_file()")
+                return error_msg
 
         # Check if content is actually changing (for replacement)
         if old_string != "" and new_string != "" and old_string == new_string:
