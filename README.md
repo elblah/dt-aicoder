@@ -308,10 +308,6 @@ pip install -e ".[dev]"
 pre-commit install
 ```
 
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) for details.
-
 ## 🙏 Acknowledgments
 
 - Built with [MCP (Model Context Protocol)](https://modelcontextprotocol.io/)

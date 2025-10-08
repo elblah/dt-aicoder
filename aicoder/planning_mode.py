@@ -11,27 +11,34 @@ from . import config
 
 
 PLAN_MODE_CONTENT = """<system-reminder>
-🟢 PLANNING MODE ACTIVE - Read-Only Operations Only
+PLANNING MODE ACTIVE - Read-Only Operations Only
 
 CRITICAL: You are currently in PLANNING MODE with restricted access:
-✅ ALLOWED: Read files, list directories, search content, analyze code
-❌ FORBIDDEN: File edits, modifications, system changes, write operations
+ALLOWED: Read files, list directories, search content, analyze code
+FORBIDDEN: File edits, modifications, system changes, write operations
 
 IMPORTANT RESTRICTIONS:
 - DO NOT use bash commands like: sed, tee, echo, cat with redirection (>), cp, mv, rm, chmod, mkdir, touch
 - DO NOT use run_shell_command with arguments that modify files or system
 - ONLY use bash commands for: reading (cat, grep, find), checking status, analysis
 
-All tool calls and bash commands that would modify files, run commands, or make system changes will be blocked.
+**FORBIDDEN**: ANY operation that could:
+- Modify file content or metadata
+- Change system state
+- Delete, move, or alter files
+- Execute potentially destructive code
+
 You may observe, analyze, plan, and prepare for future execution.
+
+**The use of any tool or shell command that could change the system in any way is STRICTLY FORBIDDEN**
 </system-reminder>"""
 
 BUILD_SWITCH_CONTENT = """<system-reminder>
-🔵 BUILD MODE ACTIVE - Full Tool Access Unlocked
+BUILD MODE ACTIVE - Full Tool Access Unlocked
 
 You are now in BUILD MODE with complete access to all tools:
-✅ AVAILABLE: File edits, write operations, command execution, system modifications
-✅ AVAILABLE: Read operations, analysis, planning (same as planning mode)
+AVAILABLE: File edits, write operations, command execution, system modifications
+AVAILABLE: Read operations, analysis, planning (same as planning mode)
 
 All AI Coder tools are now available for execution.
 </system-reminder>"""
