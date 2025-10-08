@@ -28,23 +28,11 @@ AI Coder is a blazing-fast, resource-efficient CLI for AI-powered coding that br
 
 ## 🚀 Quick Start
 
-### One-Command Installation
-```bash
-curl -sSL https://raw.githubusercontent.com/elblah/dt-aicoder/main/install.sh | bash
-```
-
-### Or Install with UV (Recommended)
+### Install with UV (Recommended)
 ```bash
 uv tool install git+https://github.com/elblah/dt-aicoder
 export OPENAI_API_KEY="your-api-key"
 uvx aicoder
-```
-
-### Traditional Installation
-```bash
-git clone https://github.com/elblah/dt-aicoder
-cd dt-aicoder
-./install.sh
 ```
 
 ## 🎯 Core Features
