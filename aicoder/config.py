@@ -45,6 +45,14 @@ BOLD = "\033[1m"
 ITALIC = "\033[3m"
 BRIGHT_GREEN = "\033[92m"
 
+# Tmux popup editor configuration
+# Set TMUX_POPUP_EDITOR=1 to enable tmux popup editor when running inside tmux
+ENABLE_TMUX_POPUP_EDITOR = os.environ.get("TMUX_POPUP_EDITOR", "1") == "1"
+
+# Tmux popup size configuration (percentage of terminal size)
+TMUX_POPUP_WIDTH_PERCENT = int(os.environ.get("TMUX_POPUP_WIDTH_PERCENT", "80"))
+TMUX_POPUP_HEIGHT_PERCENT = int(os.environ.get("TMUX_POPUP_HEIGHT_PERCENT", "80"))
+
 # Print debug status at startup
 if DEBUG:
     print(f"{YELLOW}DEBUG MODE IS ON{RESET}")

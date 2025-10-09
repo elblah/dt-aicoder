@@ -193,60 +193,30 @@ class MessageHistory:
 
     def _create_initial_messages(self) -> List[Dict[str, Any]]:
         """Create the initial system message."""
-        # AICODER.md now contains the complete system prompt
-        aicoder_content = self._load_aicoder_md()
-        if aicoder_content:
-            # Replace placeholder with actual current directory
-            aicoder_content = aicoder_content.replace(
-                "{current_directory}", os.getcwd()
-            )
-            # Replace placeholder with current date and time
-            from datetime import datetime
+        # Apply environment variable override for main prompt
+        from .prompt_loader import get_main_prompt
+        INITIAL_PROMPT = get_main_prompt()  # This will exit if no prompt found
 
-            current_datetime = datetime.now()
-            aicoder_content = aicoder_content.replace(
-                "{current_datetime}", current_datetime.strftime("%Y-%m-%d %H:%M:%S")
-            )
-
-            # Detect available tools and add to context
-            available_tools = self._detect_available_tools()
-            aicoder_content = aicoder_content.replace(
-                "{available_tools}", available_tools
-            )
-
-            # Add system information
-            system_info = self._get_system_info()
-            aicoder_content = aicoder_content.replace("{system_info}", system_info)
-
-            INITIAL_PROMPT = aicoder_content
-            if config.DEBUG:
-                print(
-                    f"{config.GREEN} *** Successfully loaded AICODER.md{config.RESET}"
-                )
-        else:
-            # Fallback minimal prompt if AICODER.md not found
-            INITIAL_PROMPT = "You are a helpful assistant with access to MCP tools. You must use them to answer user requests."
-            if config.DEBUG:
-                print(
-                    f"{config.YELLOW} *** AICODER.md not found, using fallback prompt{config.RESET}"
-                )
-
-        # Check if AGENTS.md exists and append its content
-        agents_files = ["AGENTS.md", "agents.md"]
+        # Check if project-specific context file exists and append its content
+        from .prompt_loader import get_project_filename
+        project_file = get_project_filename()
+        
+        # Also try lowercase version for compatibility
+        project_files = [project_file, project_file.lower()]
         agents_content = ""
 
-        for agents_file in agents_files:
-            if os.path.exists(agents_file):
+        for proj_file in project_files:
+            if os.path.exists(proj_file):
                 try:
-                    with open(agents_file, "r", encoding="utf-8") as f:
+                    with open(proj_file, "r", encoding="utf-8") as f:
                         agents_content = f.read().strip()
                     if agents_content:
-                        INITIAL_PROMPT += f"\n\nAdditional Context from {agents_file}:\n{agents_content}"
+                        INITIAL_PROMPT += f"\n\nAdditional Context from {proj_file}:\n{agents_content}"
                         break  # Found and processed the first available file
                 except Exception as e:
                     if config.DEBUG:
                         print(
-                            f"{config.RED} *** Error reading {agents_file}: {e}{config.RESET}"
+                            f"{config.RED} *** Error reading {proj_file}: {e}{config.RESET}"
                         )
                 break  # Try only the first file that exists
 
@@ -635,11 +605,13 @@ class MessageHistory:
             # Join with clear separation
             text = "\n---\n".join(formatted_messages)
 
-            # Create a structured technical handover report summary prompt (WINNING PROMPT TEST 3)
-            summary_messages = [
-                {
-                    "role": "system",
-                    "content": """You are a helpful AI assistant tasked with summarizing conversations.
+            # Apply environment variable override for compaction prompt
+            from .prompt_loader import get_compaction_prompt
+            compaction_prompt = get_compaction_prompt()
+            
+            # If no prompt found, use hardcoded fallback
+            if not compaction_prompt:
+                compaction_prompt = """You are a helpful AI assistant tasked with summarizing conversations.
 
 When asked to summarize, provide a detailed but concise summary of the conversation.
 Focus on information that would be helpful for continuing the conversation, including:
@@ -649,7 +621,15 @@ Focus on information that would be helpful for continuing the conversation, incl
 - Which files are being modified
 - What needs to be done next
 
-Your summary should be comprehensive enough to provide context but concise enough to be quickly understood.""",
+Your summary should be comprehensive enough to provide context but concise enough to be quickly understood."""
+                if config.DEBUG:
+                    print(f"{config.YELLOW} *** Using hardcoded compaction prompt fallback{config.RESET}")
+            
+            # Create a structured technical handover report summary prompt (WINNING PROMPT TEST 3)
+            summary_messages = [
+                {
+                    "role": "system",
+                    "content": compaction_prompt,
                 },
                 {
                     "role": "user",

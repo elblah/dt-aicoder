@@ -555,6 +555,9 @@ class ToolExecutor:
             tool_type = tool_config.get("type")
 
             if tool_type == "internal":
+                # Initialize guidance_requested to prevent undefined variable errors
+                guidance_requested = False
+                
                 # First check if it's in the standard internal tool functions
                 func = INTERNAL_TOOL_FUNCTIONS.get(tool_name)
                 if not func:

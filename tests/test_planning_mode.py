@@ -178,10 +178,10 @@ class TestPlanModeContent(unittest.TestCase):
 
     def test_plan_mode_content(self):
         """Test that plan mode content contains expected text."""
-        self.assertIn("PLANNING MODE ACTIVE", PLAN_MODE_CONTENT)
-        self.assertIn("Read-Only Operations Only", PLAN_MODE_CONTENT)
+        self.assertIn("PLANNING MODE", PLAN_MODE_CONTENT)
+        self.assertIn("READ-ONLY ACCESS", PLAN_MODE_CONTENT)
         self.assertIn("FORBIDDEN", PLAN_MODE_CONTENT)
-        self.assertIn("bash commands like", PLAN_MODE_CONTENT)
+        self.assertIn("file, directory, or system state", PLAN_MODE_CONTENT)
 
     def test_build_switch_content(self):
         """Test that build switch content contains expected text."""

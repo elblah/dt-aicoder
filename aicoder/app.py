@@ -123,6 +123,7 @@ class AICoder(
             "/breakpoint": self._handle_breakpoint,
             "/bp": self._handle_breakpoint,
             "/stats": self._handle_stats,
+            "/prompts": self._handle_prompts,
             "/retry": self._handle_retry,
             "/r": self._handle_retry,
             "/debug": self._handle_debug,
