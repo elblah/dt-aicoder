@@ -298,7 +298,10 @@ class CommandHandlerMixin:
             print(f"{config.YELLOW}   Status: ✅ Found{config.RESET}")
             print(f"{config.YELLOW}   Length: {len(project_content)} characters{config.RESET}")
             print(f"{config.CYAN}   ──────────────────────────────────────────────────────────────{config.RESET}")
-            print(f"{config.WHITE}{project_content[:300]}{'...' if len(project_content) > 300 else ''}{config.RESET}\n")
+            if full_mode:
+                print(f"{config.WHITE}{project_content}{config.RESET}\n")
+            else:
+                print(f"{config.WHITE}{project_content[:300]}{'...' if len(project_content) > 300 else ''}{config.RESET}\n")
         else:
             print(f"{config.YELLOW}   Status: ❌ Not found{config.RESET}\n")
         
@@ -320,7 +323,10 @@ class CommandHandlerMixin:
         print(f"{config.YELLOW}   Status: {'🟢 ACTIVE' if planning_mode.is_plan_mode_active() else '⚪ INACTIVE'}{config.RESET}")
         print(f"{config.YELLOW}   Length: {len(plan_prompt)} characters{config.RESET}")
         print(f"{config.CYAN}   ──────────────────────────────────────────────────────────────{config.RESET}")
-        print(f"{config.WHITE}{plan_prompt[:300]}{'...' if len(plan_prompt) > 300 else ''}{config.RESET}\n")
+        if full_mode:
+            print(f"{config.WHITE}{plan_prompt}{config.RESET}\n")
+        else:
+            print(f"{config.WHITE}{plan_prompt[:300]}{'...' if len(plan_prompt) > 300 else ''}{config.RESET}\n")
         
         # Build Switch Prompt
         build_prompt = get_build_switch_prompt()
@@ -336,7 +342,10 @@ class CommandHandlerMixin:
         print(f"{config.YELLOW}   Source: {build_source}{config.RESET}")
         print(f"{config.YELLOW}   Length: {len(build_prompt)} characters{config.RESET}")
         print(f"{config.CYAN}   ──────────────────────────────────────────────────────────────{config.RESET}")
-        print(f"{config.WHITE}{build_prompt[:300]}{'...' if len(build_prompt) > 300 else ''}{config.RESET}\n")
+        if full_mode:
+            print(f"{config.WHITE}{build_prompt}{config.RESET}\n")
+        else:
+            print(f"{config.WHITE}{build_prompt[:300]}{'...' if len(build_prompt) > 300 else ''}{config.RESET}\n")
         
         # Compaction Prompt
         compaction_prompt = get_compaction_prompt()
@@ -357,7 +366,10 @@ class CommandHandlerMixin:
         print(f"{config.YELLOW}   Length: {len(compaction_prompt) if compaction_prompt else 0} characters{config.RESET}")
         if compaction_prompt:
             print(f"{config.CYAN}   ──────────────────────────────────────────────────────────────{config.RESET}")
-            print(f"{config.WHITE}{compaction_prompt[:300]}{'...' if len(compaction_prompt) > 300 else ''}{config.RESET}\n")
+            if full_mode:
+                print(f"{config.WHITE}{compaction_prompt}{config.RESET}\n")
+            else:
+                print(f"{config.WHITE}{compaction_prompt[:300]}{'...' if len(compaction_prompt) > 300 else ''}{config.RESET}\n")
         
         # Environment Variables Summary
         print(f"{config.BOLD}{config.MAGENTA}⚙️  ENVIRONMENT VARIABLES{config.RESET}")
