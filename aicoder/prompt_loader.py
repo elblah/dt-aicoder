@@ -15,7 +15,8 @@ Supported environment variables:
 
 import os
 import sys
-from typing import Optional
+from typing import Optional, List, Tuple
+from pathlib import Path
 
 from . import config
 
@@ -23,21 +24,21 @@ from . import config
 def _load_default_prompt(prompt_name: str) -> Optional[str]:
     """
     Load default prompt content from the prompts directory, handling all execution scenarios.
-    
+
     This function mimics the robust loading logic used for AICODER.md to handle:
     - Regular installation
     - Development setup
     - Zipapp execution
     - Package data access
-    
+
     Args:
         prompt_name: Name of the prompt file (without extension)
-        
+
     Returns:
         Prompt content as string, or None if not found
     """
     prompt_filename = f"{prompt_name}.md"
-    
+
     # List of possible locations for prompt files (mirroring AICODER.md logic)
     possible_paths = []
 
@@ -221,43 +222,90 @@ def load_prompt_from_env(env_var_name: str, prompt_name: str) -> str:
         return env_value
 
 
-def get_main_prompt() -> str:
+def get_user_prompts_directory() -> Path:
     """
-    Get the main system prompt with environment variable override and template variables.
-    
+    Get the user prompts directory path.
+
     Returns:
-        Main prompt content as string with template variables applied
-        
-    Raises:
-        SystemExit: If no valid system prompt can be found (fatal error)
+        Path to ~/.config/aicoder/prompts
+    """
+    home = Path.home()
+    prompts_dir = home / ".config" / "aicoder" / "prompts"
+    return prompts_dir
+
+
+def list_available_prompts() -> List[Tuple[int, str, Path]]:
+    """
+    List all available prompt files in the user prompts directory.
+
+    Returns:
+        List of tuples (number, filename, full_path) sorted by filename
+    """
+    prompts_dir = get_user_prompts_directory()
+
+    if not prompts_dir.exists():
+        return []
+
+    prompt_files = []
+
+    # Get all .txt and .md files
+    for ext in ['*.txt', '*.md']:
+        for file_path in sorted(prompts_dir.glob(ext)):
+            prompt_files.append(file_path)
+
+    # Create numbered list
+    numbered_prompts = []
+    for i, file_path in enumerate(prompt_files, 1):
+        numbered_prompts.append((i, file_path.name, file_path))
+
+    return numbered_prompts
+
+
+def load_prompt_from_file(file_path: Path) -> Optional[str]:
+    """
+    Load prompt content from a file with variable replacement.
+
+    Args:
+        file_path: Path to the prompt file
+
+    Returns:
+        Prompt content with variables replaced, or None if file cannot be read
+    """
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        # Apply the same variable replacement as get_main_prompt
+        return _apply_prompt_variables(content)
+    except Exception:
+        return None
+
+
+def _apply_prompt_variables(base_prompt: str) -> str:
+    """
+    Apply template variables to prompt content.
+
+    Args:
+        base_prompt: Raw prompt content
+
+    Returns:
+        Prompt content with variables replaced
     """
     import os
     import sys
     from datetime import datetime
     import platform
     import shutil
-    
-    # Get the base prompt content
-    base_prompt = load_prompt_from_env('AICODER_PROMPT_MAIN', 'main')
-    
-    # If no prompt was found, this is a fatal error
-    if not base_prompt:
-        print(f"{config.RED} *** FATAL ERROR: No system prompt found!{config.RESET}", file=sys.stderr)
-        print(f"{config.RED} *** AI Coder cannot function without a system prompt.{config.RESET}", file=sys.stderr)
-        print(f"{config.RED} *** Please ensure one of the following exists:{config.RESET}", file=sys.stderr)
-        print(f"{config.RED} ***   - Set AICODER_PROMPT_MAIN environment variable{config.RESET}", file=sys.stderr)
-        print(f"{config.RED} ***   - Place a prompt file at aicoder/prompts/main.md{config.RESET}", file=sys.stderr)
-        print(f"{config.RED} ***   - Ensure AICODER.md is available{config.RESET}", file=sys.stderr)
-        sys.exit(1)
-    
+    import getpass
+
     # Apply template variables if they exist in the prompt
     if '{current_directory}' in base_prompt:
         base_prompt = base_prompt.replace('{current_directory}', os.getcwd())
-    
+
     if '{current_datetime}' in base_prompt:
         current_datetime = datetime.now()
         base_prompt = base_prompt.replace('{current_datetime}', current_datetime.strftime("%Y-%m-%d %H:%M:%S"))
-    
+
     if '{available_tools}' in base_prompt:
         # Detect available tools (same logic as message_history)
         tool_map = {
@@ -284,22 +332,64 @@ def get_main_prompt() -> str:
             )
         else:
             available_tools = "Standard Unix/Linux tools are available on this system."
-        
+
         base_prompt = base_prompt.replace('{available_tools}', available_tools)
-    
+
+    # Add platform information
+    if '{platform_info}' in base_prompt:
+        platform_info = f"{platform.system()} {platform.release()} ({platform.machine()})"
+        base_prompt = base_prompt.replace('{platform_info}', platform_info)
+
+    # Add current user
+    if '{current_user}' in base_prompt:
+        import getpass
+        current_user = getpass.getuser()
+        base_prompt = base_prompt.replace('{current_user}', current_user)
+
+    # Add system info
     if '{system_info}' in base_prompt:
         system = platform.system()
         machine = platform.machine()
         system_info = f"This is a {system} system on {machine} architecture"
         base_prompt = base_prompt.replace('{system_info}', system_info)
-    
+
     return base_prompt
+
+
+def get_main_prompt() -> str:
+    """
+    Get the main system prompt with environment variable override and template variables.
+
+    Returns:
+        Main prompt content as string with template variables applied
+
+    Raises:
+        SystemExit: If no valid system prompt can be found (fatal error)
+    """
+    import os
+    import sys
+
+    # Get the base prompt content
+    base_prompt = load_prompt_from_env('AICODER_PROMPT_MAIN', 'main')
+
+    # If no prompt was found, this is a fatal error
+    if not base_prompt:
+        print(f"{config.RED} *** FATAL ERROR: No system prompt found!{config.RESET}", file=sys.stderr)
+        print(f"{config.RED} *** AI Coder cannot function without a system prompt.{config.RESET}", file=sys.stderr)
+        print(f"{config.RED} *** Please ensure one of the following exists:{config.RESET}", file=sys.stderr)
+        print(f"{config.RED} ***   - Set AICODER_PROMPT_MAIN environment variable{config.RESET}", file=sys.stderr)
+        print(f"{config.RED} ***   - Place a prompt file at aicoder/prompts/main.md{config.RESET}", file=sys.stderr)
+        print(f"{config.RED} ***   - Ensure AICODER.md is available{config.RESET}", file=sys.stderr)
+        sys.exit(1)
+
+    # Apply template variables using the helper function
+    return _apply_prompt_variables(base_prompt)
 
 
 def get_plan_prompt() -> str:
     """
     Get the planning mode prompt with environment variable override.
-    
+
     Returns:
         Plan prompt content as string
     """
@@ -309,7 +399,7 @@ def get_plan_prompt() -> str:
 def get_build_switch_prompt() -> str:
     """
     Get the build switch prompt with environment variable override.
-    
+
     Returns:
         Build switch prompt content as string
     """
@@ -319,7 +409,7 @@ def get_build_switch_prompt() -> str:
 def get_compaction_prompt() -> str:
     """
     Get the compaction/summarization prompt with environment variable override.
-    
+
     Returns:
         Compaction prompt content as string
     """
@@ -329,17 +419,58 @@ def get_compaction_prompt() -> str:
 def get_project_filename() -> str:
     """
     Get the project-specific prompt filename from environment variable.
-    
+
     Returns:
         Project filename as string (e.g., "AGENTS.md", "CLAUDE.md", "GEMINI.md")
     """
     project_file = os.environ.get('AICODER_PROMPT_PROJECT', 'AGENTS.md')
-    
+
     # Ensure it has .md extension
     if not project_file.endswith('.md'):
         project_file += '.md'
-    
+
     if config.DEBUG:
         print(f"{config.GREEN} *** Using project prompt file: {project_file}{config.RESET}")
-    
+
     return project_file
+
+
+def print_prompt_override_info():
+    """
+    Print information about which prompts are overridden at startup.
+    """
+    import os
+
+    # Check each prompt environment variable
+    prompt_overrides = []
+
+    # Check main prompt
+    main_env = os.environ.get('AICODER_PROMPT_MAIN')
+    if main_env:
+        prompt_overrides.append(f"AICODER_PROMPT_MAIN: {main_env}")
+
+    # Check plan prompt
+    plan_env = os.environ.get('AICODER_PROMPT_PLAN')
+    if plan_env:
+        prompt_overrides.append(f"AICODER_PROMPT_PLAN: {plan_env}")
+
+    # Check build switch prompt
+    build_switch_env = os.environ.get('AICODER_PROMPT_BUILD_SWITCH')
+    if build_switch_env:
+        prompt_overrides.append(f"AICODER_PROMPT_BUILD_SWITCH: {build_switch_env}")
+
+    # Check compaction prompt
+    compaction_env = os.environ.get('AICODER_PROMPT_COMPACTION')
+    if compaction_env:
+        prompt_overrides.append(f"AICODER_PROMPT_COMPACTION: {compaction_env}")
+
+    # Check project prompt
+    project_env = os.environ.get('AICODER_PROMPT_PROJECT')
+    if project_env:
+        prompt_overrides.append(f"AICODER_PROMPT_PROJECT: {project_env}")
+
+    # Print all overrides if any exist
+    if prompt_overrides:
+        print(f"{config.GREEN}*** Prompt overrides detected:{config.RESET}")
+        for override in prompt_overrides:
+            print(f"{config.GREEN}  - {override}{config.RESET}")

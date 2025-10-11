@@ -14,6 +14,7 @@ from .stats import Stats
 from .message_history import MessageHistory, NoMessagesToCompactError
 from .tool_manager import MCPToolManager
 from .animator import Animator
+from .prompt_loader import get_main_prompt, get_plan_prompt, get_build_switch_prompt, get_compaction_prompt, get_project_filename
 
 from .api_handler import APIHandlerMixin
 from .tool_call_executor import ToolCallExecutorMixin
@@ -123,7 +124,7 @@ class AICoder(
             "/breakpoint": self._handle_breakpoint,
             "/bp": self._handle_breakpoint,
             "/stats": self._handle_stats,
-            "/prompts": self._handle_prompts,
+            "/prompt": self._handle_prompt,
             "/retry": self._handle_retry,
             "/r": self._handle_retry,
             "/debug": self._handle_debug,
@@ -147,6 +148,10 @@ class AICoder(
             print(
                 f"{config.GREEN}*** Auto-compaction enabled (context: {config.CONTEXT_SIZE} tokens, triggers at {config.CONTEXT_COMPACT_PERCENTAGE}%){config.RESET}"
             )
+
+        # Print prompt overrides at startup
+        from .prompt_loader import print_prompt_override_info
+        print_prompt_override_info()
 
     def _signal_handler(self, sig, frame):
         """Handle SIGINT (Ctrl+C) signal gracefully."""

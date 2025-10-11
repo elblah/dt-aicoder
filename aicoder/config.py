@@ -47,7 +47,7 @@ BRIGHT_GREEN = "\033[92m"
 
 # Tmux popup editor configuration
 # Set TMUX_POPUP_EDITOR=1 to enable tmux popup editor when running inside tmux
-ENABLE_TMUX_POPUP_EDITOR = os.environ.get("TMUX_POPUP_EDITOR", "1") == "1"
+ENABLE_TMUX_POPUP_EDITOR = os.environ.get("TMUX_POPUP_EDITOR", "0") == "1"
 
 # Tmux popup size configuration (percentage of terminal size)
 TMUX_POPUP_WIDTH_PERCENT = int(os.environ.get("TMUX_POPUP_WIDTH_PERCENT", "80"))

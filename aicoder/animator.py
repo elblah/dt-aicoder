@@ -56,7 +56,7 @@ class Animator:
                     cursor_code = "\033[?25l"  # Hide cursor
 
                 sys.stdout.write(
-                    f"\r{config.RESET}{config.BOLD}{message} {char} {elapsed_str} (Press ESC to cancel){config.RESET}{cursor_code}"
+                    f"\r{config.RESET}{config.BOLD}{message} {char} {int(elapsed)}s (ESC cancel){config.RESET}{cursor_code}"
                 )
                 sys.stdout.flush()
 

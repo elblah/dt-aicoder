@@ -59,7 +59,7 @@ class APIHandlerMixin(APIClient):
             tool_manager=getattr(self, "tool_manager", None),
         )
 
-        self.animator.start_animation("Making API request...")
+        self.animator.start_animation("Working...")
 
         # Track API call time
         api_start_time = time.time()

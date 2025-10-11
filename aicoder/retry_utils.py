@@ -10,6 +10,21 @@ from .utils import cancellable_sleep
 from . import config
 
 
+class ConnectionDroppedException(Exception):
+    """Custom exception for connection dropped errors that should be retried."""
+    pass
+
+
+class ConnectionResetException(Exception):
+    """Custom exception for connection reset errors that should be retried."""
+    pass
+
+
+class ReadTimeoutException(Exception):
+    """Custom exception for read timeout errors that should be retried."""
+    pass
+
+
 class _APIRetryHandlerSingleton:
     """Singleton implementation for API retry handler."""
     
@@ -223,3 +238,59 @@ class APIRetryHandler(_APIRetryHandlerSingleton):
         print(
             f"{config.YELLOW}Please check your connection and authentication credentials.{config.RESET}"
         )
+
+
+
+    def handle_connection_drop_error(self, error_message: str) -> bool:
+        """
+        Handle connection drop errors with retry logic.
+
+        Args:
+            error_message: The error message from the connection drop
+
+        Returns:
+            bool: True if the request should be retried, False if it should not
+        """
+        if self.stats:
+            self.stats.api_errors += 1
+
+        # Check if the error message contains connection drop indicators
+        should_retry = any(
+            keyword in error_message.lower()
+            for keyword in [
+                "connection dropped by server",
+                "eof detected",
+                "connection reset",
+                "broken pipe",
+                "server closed the connection",
+                "connection unexpectedly",
+            ]
+        )
+
+        if should_retry:
+            error_type = "Connection dropped"
+            base_delay = 5  # Base delay for connection drops
+            
+            # Calculate the actual retry delay using exponential backoff or fixed delay
+            retry_sleep_secs = self._calculate_retry_delay(base_delay)
+
+            # Check if we've exceeded maximum retry attempts (if configured)
+            if config.RETRY_MAX_ATTEMPTS > 0 and self.retry_attempt_count >= config.RETRY_MAX_ATTEMPTS:
+                print(
+                    f"{config.RED}    --- Maximum retry attempts ({config.RETRY_MAX_ATTEMPTS}) exceeded. Giving up.{config.RESET}"
+                )
+                return False  # Don't retry, max attempts reached
+
+            print(
+                f"{config.YELLOW}    --- {error_type} detected. Retrying in {retry_sleep_secs} secs... (Press ESC to cancel){config.RESET}"
+            )
+            # Increment retry attempt counter for exponential backoff
+            self.retry_attempt_count += 1
+            # Use cancellable sleep to allow user to cancel retries
+            if not cancellable_sleep(retry_sleep_secs, self.animator):
+                self.animator.stop_animation()
+                print(f"\n{config.RED}Retry cancelled by user (ESC).{config.RESET}")
+                return False  # Don't retry, user cancelled
+            return True  # Retry the request
+
+        return False  # Don't retry other errors

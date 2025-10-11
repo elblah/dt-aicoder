@@ -283,7 +283,7 @@ When running inside tmux, AI Coder can automatically open editors in tmux popups
 
 ### Environment Variables:
 ```bash
-TMUX_POPUP_EDITOR=1              # Enable tmux popup editor (default: 1)
+TMUX_POPUP_EDITOR=1              # Enable tmux popup editor (default: 0)
 TMUX_POPUP_WIDTH_PERCENT=80      # Popup width as % of terminal (default: 80)
 TMUX_POPUP_HEIGHT_PERCENT=80     # Popup height as % of terminal (default: 80)
 ```
@@ -303,15 +303,49 @@ export TMUX_POPUP_HEIGHT_PERCENT=90
 export TMUX_POPUP_EDITOR=0
 ```
 
-## /prompts Command
+## /prompt Command
 
-AI Coder includes a built-in `/prompts` command to inspect your current prompt configuration:
+AI Coder includes a built-in `/prompt` command to inspect and manage your prompt configuration:
 
 ```bash
-/prompts           Show current prompts (truncated view)
-/prompts full     Show current prompts (full content)
-/prompts help     Show detailed help for prompt system
+/prompt           Show current prompt (truncated view)
+/prompt full     Show current prompt (full content)
+/prompt list     List available prompts from ~/.config/aicoder/prompts
+/prompt set <n>  Set prompt <n> as active main prompt
+/prompt edit     Edit current main prompt in $EDITOR
+/prompt help     Show detailed help for prompt system
 ```
+
+### Dynamic Prompt Switching
+
+The enhanced `/prompt` command supports dynamic prompt switching from a user-managed directory:
+
+1. **Create prompt files** in `~/.config/aicoder/prompts/` (supports `.txt` and `.md` files)
+2. **List available prompts** with `/prompt list` - shows numbered list
+3. **Switch between prompts** instantly with `/prompt set <number>`
+4. **Template variables** like `{current_directory}`, `{current_user}` are automatically replaced
+
+Example:
+```bash
+# Create a Python expert prompt
+mkdir -p ~/.config/aicoder/prompts
+cat > ~/.config/aicoder/prompts/python-expert.md << 'EOF'
+You are a Python expert working in {current_directory}.
+Current user: {current_user}
+Time: {current_datetime}
+
+Focus on clean, idiomatic Python code.
+EOF
+
+# List and switch prompts
+/prompt list
+/prompt set 1
+
+# Edit the current prompt
+/prompt edit
+```
+
+For detailed documentation, see [docs/prompts_command.md](prompts_command.md).
 
 The command displays:
 - **Main System Prompt**: Current source, length, and content preview

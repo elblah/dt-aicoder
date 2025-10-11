@@ -20,6 +20,7 @@ from typing import List, Dict, Any, Optional
 from . import config
 from .animator import Animator
 from .api_client import APIClient
+from .retry_utils import ConnectionDroppedException, ConnectionResetException, ReadTimeoutException
 
 
 class StreamingAdapter(APIClient):
@@ -118,7 +119,7 @@ class StreamingAdapter(APIClient):
             tool_manager=getattr(self.api_handler, "tool_manager", None),
         )
 
-        self.animator.start_animation("Making API request...")
+        self.animator.start_animation("Working...")
 
         # Track API call time
         api_start_time = time.time()
@@ -230,7 +231,7 @@ class StreamingAdapter(APIClient):
                             self.stats.prompt_tokens += usage["prompt_tokens"]
                         if "completion_tokens" in usage and self.stats:
                             self.stats.completion_tokens += usage["completion_tokens"]
-                    
+
                     return processed_response
                 else:
                     # Record time spent even on failed API calls
@@ -276,6 +277,12 @@ class StreamingAdapter(APIClient):
                     if self._handle_http_error(e):
                         continue
                     return None
+                # Handle connection dropped exceptions
+                elif isinstance(e, ConnectionDroppedException):
+                    if self.retry_handler.handle_connection_drop_error(str(e)):
+                        # Retry the request by continuing the loop
+                        continue
+                    return None
                 # Handle connection errors (Broken pipe, etc.)
                 elif isinstance(e, urllib.error.URLError):
                     self._handle_connection_error(e)
@@ -315,7 +322,7 @@ class StreamingAdapter(APIClient):
                 if config.DEBUG:
                     print(f"{config.RED}Error logging request data: {e}{config.RESET}")
 
-        self.animator.start_animation("Making API request...")
+        self.animator.start_animation("Working...")
 
         # Track API call time
         api_start_time = time.time()
@@ -450,12 +457,12 @@ class StreamingAdapter(APIClient):
                         # This can happen with some API providers that don't include token usage
                         estimated_input_tokens = 0
                         estimated_output_tokens = 0
-                        
+
                         # For input tokens, we need to access the message history
                         if hasattr(self.api_handler, 'message_history') and self.api_handler.message_history:
                             from .utils import estimate_messages_tokens
                             estimated_input_tokens = estimate_messages_tokens(self.api_handler.message_history.messages)
-                        
+
                         # Estimate output tokens from the response content
                         if processed_response and "choices" in processed_response and len(processed_response["choices"]) > 0:
                             choice = processed_response["choices"][0]
@@ -464,7 +471,7 @@ class StreamingAdapter(APIClient):
                                 if content:
                                     from .utils import estimate_tokens
                                     estimated_output_tokens = estimate_tokens(content)
-                        
+
                         # Update stats with estimated values
                         self.stats.prompt_tokens += estimated_input_tokens
                         self.stats.completion_tokens += estimated_output_tokens
@@ -515,6 +522,12 @@ class StreamingAdapter(APIClient):
                 # Handle HTTP errors specifically
                 if isinstance(e, urllib.error.HTTPError):
                     if self._handle_http_error(e):
+                        continue
+                    return None
+                # Handle connection dropped exceptions
+                elif isinstance(e, ConnectionDroppedException):
+                    if self.retry_handler.handle_connection_drop_error(str(e)):
+                        # Retry the request by continuing the loop
                         continue
                     return None
                 # Handle connection errors (Broken pipe, etc.)
@@ -614,7 +627,7 @@ class StreamingAdapter(APIClient):
                                     print(
                                         f"{config.YELLOW}Please try your request again - the connection may work next time.{config.RESET}"
                                     )
-                                    return None
+                                    raise ConnectionDroppedException("Connection dropped by server (detected by select)")
 
                                 # If socket is not ready to read and no timeout yet, continue waiting
                                 if not ready_to_read:
@@ -661,7 +674,7 @@ class StreamingAdapter(APIClient):
                                         print(
                                             f"{config.YELLOW}Please try your request again - the connection may work next time.{config.RESET}"
                                         )
-                                        return None
+                                        raise ConnectionDroppedException("Connection dropped by server (EOF detected)")
                                 except socket.timeout:
                                     # Read timeout - this could mean either:
                                     # 1. Connection is hanging/dead
@@ -691,7 +704,7 @@ class StreamingAdapter(APIClient):
                                         print(
                                             f"{config.YELLOW}Please try your request again - the connection may work next time.{config.RESET}"
                                         )
-                                        return None
+                                        raise ConnectionDroppedException("Connection dropped by server (multiple read timeouts)")
 
                                     # If we've been waiting too long overall (more than 2 minutes), give up
                                     if (
@@ -709,7 +722,7 @@ class StreamingAdapter(APIClient):
                                         print(
                                             f"{config.YELLOW}Please try your request again with a faster model.{config.RESET}"
                                         )
-                                        return None
+                                        raise ConnectionDroppedException("Connection dropped by server (excessive wait time)")
 
                                     # Show progress warning for slow models
                                     if self._read_timeout_count == 1:
@@ -762,7 +775,7 @@ class StreamingAdapter(APIClient):
                                 print(
                                     f"{config.YELLOW}Please try your request again - the connection may work next time.{config.RESET}"
                                 )
-                                return None
+                                raise ConnectionResetException("Connection reset by server (ConnectionResetError or BrokenPipeError)")
                             except socket.error as e:
                                 if e.errno in [10054, 104]:  # Connection reset by peer
                                     print(
@@ -774,14 +787,14 @@ class StreamingAdapter(APIClient):
                                     print(
                                         f"{config.YELLOW}Please try your request again - the connection may work next time.{config.RESET}"
                                     )
-                                    return None
+                                    raise ConnectionResetException(f"Connection reset by peer (errno {e.errno})")
                                 else:
                                     # Other socket errors
                                     if config.DEBUG:
                                         print(
                                             f"{config.RED}Socket error: {e}{config.RESET}"
                                         )
-                                    return None
+                                    raise ConnectionDroppedException(f"Socket error: {e}")
                         else:
                             # Fallback: read with small timeout
                             line = response.readline()
@@ -795,7 +808,7 @@ class StreamingAdapter(APIClient):
                                 print(
                                     f"{config.YELLOW}Please try your request again - the connection may work next time.{config.RESET}"
                                 )
-                                return None
+                                raise ConnectionDroppedException("Connection dropped by server (EOF detected)")
 
                     except socket.timeout:
                         # Socket timeout occurred, check if we've exceeded read timeout
@@ -862,7 +875,7 @@ class StreamingAdapter(APIClient):
                     if hasattr(self.api_handler, 'loaded_plugins'):
                         from .plugin_system.loader import notify_plugins_before_ai_prompt
                         notify_plugins_before_ai_prompt(self.api_handler.loaded_plugins)
-                    
+
                     # Display token information before AI response if enabled
                     if config.ENABLE_TOKEN_INFO_DISPLAY and hasattr(self, 'stats'):
                         from .utils import display_token_info
@@ -976,7 +989,7 @@ class StreamingAdapter(APIClient):
                         continue
 
                     # Check if we received a completion signal (for providers that don't send [DONE])
-                    if (full_response["choices"][0].get("_completion_received") and 
+                    if (full_response["choices"][0].get("_completion_received") and
                         current_finish_reason in ["stop", "length", "content_filter", "function_call", "tool_calls"]):
                         # Some providers close the connection after sending finish_reason
                         # instead of sending [DONE]. We should break gracefully here.

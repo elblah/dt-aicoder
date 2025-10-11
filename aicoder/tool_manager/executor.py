@@ -738,13 +738,13 @@ class ToolExecutor:
                         return formatted_result, tool_config, None, False
                     # Special handling for run_shell_command to pass tool_index and total_tools
                     if tool_name == "run_shell_command":
-                        # Only show command info if we're not showing an approval prompt (to avoid duplicates)
-                        if not needs_approval:
-                            self._print_command_info_once(
-                                    arguments.get("command", ""),
-                                    arguments.get("timeout", 30),
-                                    auto_approved=auto_approved,
-                                    allow_session=False)
+                        # Only show command info if we're not showing an approval  
+                        if not needs_approval:                                     
+                            self._print_command_info_once(                        
+                                    arguments.get("command", ""),                
+                                    arguments.get("timeout", 30),               
+                                    auto_approved=auto_approved,                  
+                                    allow_session=False)                          
                         
                         result = func(
                             **arguments,
