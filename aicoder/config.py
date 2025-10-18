@@ -15,6 +15,9 @@ TEMPERATURE = float(os.environ.get("TEMPERATURE", "0.0"))
 # Top-P configuration
 TOP_P = float(os.environ.get("TOP_P", "1.0"))
 
+# Top-K configuration
+TOP_K = int(os.environ.get("TOP_K", "0"))  # 0 means disabled/not set
+
 # Max tokens configuration
 MAX_TOKENS = (
     int(os.environ.get("MAX_TOKENS", "")) if os.environ.get("MAX_TOKENS", "") else None
@@ -64,6 +67,10 @@ if "TEMPERATURE" in os.environ:
 # Print top_p if set as environment variable
 if "TOP_P" in os.environ:
     print(f"{GREEN}*** Top-P is {TOP_P}{RESET}")
+
+# Print top_k if set as environment variable
+if "TOP_K" in os.environ and TOP_K != 0:
+    print(f"{GREEN}*** Top-K is {TOP_K}{RESET}")
 
 # Print max_tokens if set as environment variable
 if "MAX_TOKENS" in os.environ:

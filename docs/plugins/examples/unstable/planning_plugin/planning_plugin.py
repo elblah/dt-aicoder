@@ -3,11 +3,8 @@ Planning Plugin for AI Coder - Adds Goose-style planning capabilities.
 This plugin provides a two-phase approach: plan then execute.
 """
 
-import json
-import os
-import tempfile
-from typing import List, Dict, Any, Tuple, Optional
-from dataclasses import dataclass, asdict
+from typing import List, Tuple, Optional
+from dataclasses import dataclass
 
 # Plugin metadata
 __version__ = "1.0.0"

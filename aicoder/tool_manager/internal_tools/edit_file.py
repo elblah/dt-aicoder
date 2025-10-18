@@ -5,8 +5,7 @@ Edit file internal tool implementation - Production-ready version with safety ch
 import os
 import difflib
 from typing import Dict, Any
-from ...utils import colorize_diff_lines
-from ..file_tracker import record_file_read, check_file_modification_strict, track_file_edit
+from ..file_tracker import record_file_read, check_file_modification_strict
 
 # Environment variable to control write_file suggestions
 ENABLE_WRITEFILE_SUGGESTIONS = os.getenv("ENABLE_WRITEFILE_SUGGESTIONS", "true").lower() == "true"

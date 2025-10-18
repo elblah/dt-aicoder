@@ -4,19 +4,11 @@ Animator for AI Coder - handles animated status messages and cursor management.
 
 import sys
 import time
-import select
 import threading
 from datetime import timedelta
 
 from . import config
-
-# termios is imported conditionally for Unix systems
-try:
-    import termios
-
-    HAS_TERMIOS = True
-except ImportError:
-    HAS_TERMIOS = False
+from .terminal_manager import is_esc_pressed
 
 
 class Animator:
@@ -128,42 +120,9 @@ class Animator:
 
     def check_user_cancel(self):
         """Check if user has pressed ESC to cancel during animation."""
-        # Save original terminal settings if available
-        old_settings = None
-        if HAS_TERMIOS:
-            try:
-                old_settings = termios.tcgetattr(sys.stdin)
-                # Set terminal to non-canonical mode to read single characters
-                new_settings = termios.tcgetattr(sys.stdin)
-                new_settings[3] = (
-                    new_settings[3] & ~termios.ICANON
-                )  # Disable canonical mode
-                new_settings[6][termios.VMIN] = b"\x00"  # Non-blocking read
-                new_settings[6][termios.VTIME] = b"\x00"
-                termios.tcsetattr(sys.stdin, termios.TCSADRAIN, new_settings)
-            except Exception:
-                # Fall back to regular method if terminal manipulation fails
-                old_settings = None
-
-        try:
-            # Use a non-blocking check with a very short timeout
-            if select.select([sys.stdin], [], [], 0.01) == ([sys.stdin], [], []):
-                ch = sys.stdin.read(1)
-                # Check for ESC key (ASCII 27)
-                if ord(ch) == 27:
-                    self._user_cancelled = True
-                    return True
-        except Exception:
-            # Handle any exceptions that might prevent ESC from working
-            pass
-        finally:
-            # Restore original terminal settings if we changed them
-            if old_settings is not None:
-                try:
-                    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
-                except Exception:
-                    pass
-
+        if is_esc_pressed():
+            self._user_cancelled = True
+            return True
         return self._user_cancelled
 
     def user_cancelled(self):

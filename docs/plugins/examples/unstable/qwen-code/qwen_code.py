@@ -3,7 +3,6 @@ Qwen Code Plugin for AI Coder.
 Provides a /qwen-code refresh command to load Qwen API key from oauth credentials file.
 """
 
-import os
 import json
 from pathlib import Path
 

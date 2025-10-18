@@ -3,9 +3,7 @@ Write file internal tool implementation.
 """
 
 import os
-import difflib
-from ...utils import colorize_diff_lines
-from ..file_tracker import check_file_modification
+from ..file_tracker import check_file_modification, record_file_read
 
 # Tool metadata
 TOOL_DEFINITION = {
@@ -76,6 +74,9 @@ def execute_write_file(path: str, content: str, stats) -> str:
 
         with open(abs_path, "w", encoding="utf-8") as f:
             f.write(content)
+
+        # Mark the file as read since the user who wrote it knows its contents
+        record_file_read(abs_path)
 
         # Generate appropriate response based on whether file existed
         if not file_existed:

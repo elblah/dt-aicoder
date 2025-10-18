@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from datetime import timedelta
 
 from . import config
+from .utils import imsg
 
 
 @dataclass
@@ -39,7 +40,7 @@ class Stats:
         if self.api_time_spent > 0:
             tps = self.completion_tokens / self.api_time_spent
 
-        print(f"\n{config.GREEN}=== Session Statistics ==={config.RESET}")
+        imsg(f"\n=== Session Statistics ===")
         print(f"Session duration: {timedelta(seconds=int(elapsed_time))}")
 
         # Show message history count and size if available

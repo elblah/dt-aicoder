@@ -5,7 +5,7 @@ Tool parameter validation for AI Coder.
 import json
 from typing import Dict, Any, Tuple
 
-from ..utils import parse_json_arguments
+from ..utils import parse_json_arguments, emsg
 from .. import config
 
 
@@ -81,7 +81,7 @@ def validate_tool_parameters(
 
     except Exception as e:
         if config.DEBUG:
-            print(f"{config.RED} *** Error during tool parameter validation: {e}{config.RESET}")
+            emsg(f" *** Error during tool parameter validation: {e}")
         return True, ""  # Allow the tool to run if validation fails
 
 
@@ -145,7 +145,7 @@ def validate_function_signature(
 
     except Exception as e:
         if config.DEBUG:
-            print(f"{config.RED} *** Error during function signature validation: {e}{config.RESET}")
+            emsg(f" *** Error during function signature validation: {e}")
         # Don't fail validation on inspection errors
         return True, ""
 
@@ -238,7 +238,7 @@ def format_validation_error(
 
     except Exception as e:
         if config.DEBUG:
-            print(f"{config.RED} *** Error formatting validation error: {e}{config.RESET}")
+            emsg(f" *** Error formatting validation error: {e}")
         return f"ERROR: Invalid parameters for tool '{tool_name}': {error_message}"
 
 

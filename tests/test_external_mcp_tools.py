@@ -856,23 +856,23 @@ def test_tool_registry_handles_malformed_json():
     os.chdir(temp_dir.name)
 
     # Create mcp_tools.json with tools that don't make external requests
-    mcp_tools_content = f"""{{
-  "sample_command_tool": {{
+    mcp_tools_content = """{
+  "sample_command_tool": {
     "type": "command",
     "description": "A sample command tool for testing",
-    "command": "echo 'Hello from command tool: {{message}}'",
-    "parameters": {{
+    "command": "echo 'Hello from command tool: {message}'",
+    "parameters": {
       "type": "object",
-      "properties": {{
-        "message": {{
+      "properties": {
+        "message": {
           "type": "string",
           "description": "Message to echo"
-        }}
-      }},
+        }
+      },
       "required": ["message"]
-    }}
-  }}
-}}"""
+    }
+  }
+}"""
 
     # Write the config file to the current directory
     config_file_path = os.path.join(temp_dir.name, "mcp_tools.json")
@@ -914,23 +914,23 @@ def test_tool_registry_handles_invalid_tool_config():
     os.chdir(temp_dir.name)
 
     # Create mcp_tools.json with tools that don't make external requests
-    mcp_tools_content = f"""{{
-  "sample_command_tool": {{
+    mcp_tools_content = """{
+  "sample_command_tool": {
     "type": "command",
     "description": "A sample command tool for testing",
-    "command": "echo 'Hello from command tool: {{message}}'",
-    "parameters": {{
+    "command": "echo 'Hello from command tool: {message}'",
+    "parameters": {
       "type": "object",
-      "properties": {{
-        "message": {{
+      "properties": {
+        "message": {
           "type": "string",
           "description": "Message to echo"
-        }}
-      }},
+        }
+      },
       "required": ["message"]
-    }}
-  }}
-}}"""
+    }
+  }
+}"""
 
     # Write the config file to the current directory
     config_file_path = os.path.join(temp_dir.name, "mcp_tools.json")

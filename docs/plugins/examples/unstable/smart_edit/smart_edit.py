@@ -6,8 +6,6 @@ Advanced safe file editing with rich diff preview and conflict detection.
 
 import os
 import re
-import json
-import time
 import difflib
 import shutil
 import tempfile
@@ -31,7 +29,7 @@ def on_aicoder_init(aicoder_instance):
     global _aicoder_ref
     try:
         _aicoder_ref = aicoder_instance
-        print(f"🔧 DEBUG: Smart Edit plugin on_aicoder_init called")
+        print("🔧 DEBUG: Smart Edit plugin on_aicoder_init called")
         
         # Register the smart_edit tool
         tool_definition = {
@@ -100,7 +98,7 @@ smart_edit(path="example.py", changes=[{
             "validate_function": "validate_smart_edit"
         }
         
-        print(f"🔧 DEBUG: About to register smart_edit tool")
+        print("🔧 DEBUG: About to register smart_edit tool")
         
         # Register the tool
         aicoder_instance.tool_manager.registry.mcp_tools["smart_edit"] = tool_definition
@@ -109,7 +107,7 @@ smart_edit(path="example.py", changes=[{
         try:
             from aicoder.tool_manager.executor import INTERNAL_TOOL_FUNCTIONS
             INTERNAL_TOOL_FUNCTIONS["smart_edit"] = execute_smart_edit
-            print(f"🔧 DEBUG: Implementation function registered in INTERNAL_TOOL_FUNCTIONS")
+            print("🔧 DEBUG: Implementation function registered in INTERNAL_TOOL_FUNCTIONS")
         except ImportError as e:
             print(f"🔧 DEBUG: Failed to import INTERNAL_TOOL_FUNCTIONS: {e}")
             return False
@@ -217,7 +215,7 @@ class BackupManager:
             shutil.copy2(file_path, backup_path)
             self.backups[file_path] = backup_path
             return backup_path
-        except Exception as e:
+        except Exception:
             return None
     
     def rollback(self, file_path: str) -> bool:
@@ -554,13 +552,13 @@ def execute_smart_edit(
             for change_result in change_results:
                 result += f"   • {change_result}\n"
 
-            print(f"🔧 DEBUG: smart_edit completed successfully")
+            print("🔧 DEBUG: smart_edit completed successfully")
             return result
 
         except Exception as e:
             # Attempt rollback if we have a backup
             if backup_path:
-                print(f"⚠️  Write failed, attempting rollback...")
+                print("⚠️  Write failed, attempting rollback...")
                 if backup_manager.rollback(path):
                     return f"❌ Error writing file '{path}': {e}\n✅ Successfully rolled back from backup"
                 else:

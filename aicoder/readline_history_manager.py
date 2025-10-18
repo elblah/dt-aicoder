@@ -1,7 +1,6 @@
 """Readline history management for different input contexts."""
 
-import os
-from typing import List, Optional
+from typing import List
 
 try:
     import readline

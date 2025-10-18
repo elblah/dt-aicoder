@@ -9,6 +9,7 @@ import importlib
 from typing import Any, Dict, List
 
 from .. import config
+from ..utils import emsg, wmsg
 
 
 class ToolRegistry:
@@ -46,13 +47,11 @@ class ToolRegistry:
                             )
                 except Exception as e:
                     if config.DEBUG:
-                        print(
-                            f"{config.YELLOW}*** Skipping {attr_name} during internal tool loading: {e}{config.RESET}"
-                        )
+                        wmsg(f"*** Skipping {attr_name} during internal tool loading: {e}")
                     continue
 
         except Exception as e:
-            print(f"{config.RED}*** Error loading internal tools: {e}{config.RESET}")
+            emsg(f"*** Error loading internal tools: {e}")
 
     def _load_external_tools(self):
         """Load external tools from configuration files."""
@@ -78,9 +77,7 @@ class ToolRegistry:
                     # Check if the tool/server is disabled
                     if tool_config.get("disabled", False):
                         if config.DEBUG:
-                            print(
-                                f"{config.YELLOW}*** Skipping disabled tool/server: {name}{config.RESET}"
-                            )
+                            wmsg(f"*** Skipping disabled tool/server: {name}")
                         continue
 
                     # Merge external tools, overriding defaults if there are conflicts
@@ -221,7 +218,7 @@ class ToolRegistry:
                     f"{config.GREEN}*** Loaded {len(self.mcp_tools)} tools ({len([t for t in self.mcp_tools.values() if t.get('type') == 'internal'])} internal, {external_tools_count} external) and {mcp_servers_count} external MCP servers.{config.RESET}"
                 )
                 if config.DEBUG:
-                    print(f"{config.YELLOW}*** Tool configurations: {self.mcp_tools}{config.RESET}")
+                    wmsg(f"*** Tool configurations: {self.mcp_tools}")
         except FileNotFoundError:
             # This is not an error, it's expected if the user wants a simple setup
             print(

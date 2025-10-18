@@ -6,6 +6,7 @@ import subprocess
 import os
 import shlex
 import re
+import signal
 
 # Get default timeout from environment variable, fallback to 30 if not set
 DEFAULT_TIMEOUT_SECS = int(os.environ.get("SHELL_COMMAND_TIMEOUT", 30))
@@ -262,28 +263,68 @@ def execute_run_shell_command(
         timeout: Timeout in seconds (default: from SHELL_COMMAND_TIMEOUT env var or 30)
         **kwargs: Additional arguments (tool_index, total_tools, etc.) that may be passed but are not used
     """
+    process = None
     try:
         shell_cmd = ["bash", "-c", command]
 
-        # Execute the command
-        result = subprocess.run(
+        # Use Popen to have more control over the process
+        process = subprocess.Popen(
             shell_cmd,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=timeout,  # Use the provided timeout
+            preexec_fn=os.setsid  # Create a new process group
         )
 
+        try:
+            stdout, stderr = process.communicate(timeout=timeout)
+            return_code = process.returncode
+        except subprocess.TimeoutExpired:
+            # Kill the entire process group to ensure all child processes are terminated
+            try:
+                os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+                # Wait a short time for graceful termination
+                try:
+                    process.wait(timeout=1)
+                except subprocess.TimeoutExpired:
+                    # Force kill if graceful termination didn't work
+                    os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+            except ProcessLookupError:
+                # Process already terminated
+                pass
+            except OSError:
+                # Handle case where process group doesn't exist
+                try:
+                    process.kill()
+                except ProcessLookupError:
+                    pass
+
+            stats.tool_errors += 1
+            return f"Error: Command '{command}' timed out after {timeout} seconds.\nTo retry with a longer timeout, use: run_shell_command(command=\"{command}\", timeout=60)"
+
         # Format the output - only include return code, stdout, and stderr
-        output = f"Return code: {result.returncode}\n"
-        if result.stdout:
-            output += f"Stdout: {result.stdout}\n"
-        if result.stderr:
-            output += f"Stderr: {result.stderr}\n"
+        output = f"Return code: {return_code}\n"
+        if stdout:
+            output += f"Stdout: {stdout}\n"
+        if stderr:
+            output += f"Stderr: {stderr}\n"
 
         return output
-    except subprocess.TimeoutExpired:
-        stats.tool_errors += 1
-        return f"Error: Command '{command}' timed out after {timeout} seconds.\nTo retry with a longer timeout, use: run_shell_command(command=\"{command}\", timeout=60)"
     except Exception as e:
         stats.tool_errors += 1
         return f"Error executing command '{command}': {e}"
+    finally:
+        # Ensure process is cleaned up in the finally block
+        if process and process.poll() is None:
+            try:
+                os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+                try:
+                    process.wait(timeout=1)
+                except subprocess.TimeoutExpired:
+                    os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+            except (ProcessLookupError, OSError):
+                # Process already terminated or process group doesn't exist
+                try:
+                    process.kill()
+                except (ProcessLookupError, OSError):
+                    pass

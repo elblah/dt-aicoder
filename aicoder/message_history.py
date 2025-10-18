@@ -8,6 +8,7 @@ from typing import List, Dict, Any
 
 from .stats import Stats
 from . import config
+from .utils import emsg, wmsg, imsg
 
 # Global constants for message compaction to ensure single source of truth
 SUMMARY_MESSAGE_PREFIX = "Summary of earlier conversation:"
@@ -145,9 +146,7 @@ def clean_message_for_api(message: Dict[str, Any]) -> Dict[str, Any]:
                     del clean_msg["tool_calls"]
         except Exception as e:
             if config.DEBUG:
-                print(
-                    f"{config.RED} *** Error cleaning tool_calls in message: {e}{config.RESET}"
-                )
+                emsg(f" *** Error cleaning tool_calls in message: {e}")
             # If cleaning fails, remove tool_calls to avoid API errors
             if "tool_calls" in clean_msg:
                 del clean_msg["tool_calls"]
@@ -200,7 +199,7 @@ class MessageHistory:
         # Check if project-specific context file exists and append its content
         from .prompt_loader import get_project_filename
         project_file = get_project_filename()
-        
+
         # Also try lowercase version for compatibility
         project_files = [project_file, project_file.lower()]
         agents_content = ""
@@ -215,9 +214,7 @@ class MessageHistory:
                         break  # Found and processed the first available file
                 except Exception as e:
                     if config.DEBUG:
-                        print(
-                            f"{config.RED} *** Error reading {proj_file}: {e}{config.RESET}"
-                        )
+                        emsg(f" *** Error reading {proj_file}: {e}")
                 break  # Try only the first file that exists
 
         return [{"role": "system", "content": INITIAL_PROMPT}]
@@ -302,23 +299,12 @@ class MessageHistory:
 
         # Don't compact if we don't have enough chat messages
         if chat_message_count < config.COMPACT_MIN_MESSAGES:
-            print(
-                f"{config.YELLOW} *** Auto-compaction: Not enough messages to compact (chat messages: {chat_message_count}, minimum: {config.COMPACT_MIN_MESSAGES}){config.RESET}"
+            wmsg(
+                f" *** Auto-compaction: Not enough messages to compact (chat messages: {chat_message_count}, minimum: {config.COMPACT_MIN_MESSAGES})"
             )
             return self.messages
 
-        print(f"{config.GREEN} *** Compacting memory... {config.RESET}")
-
-        if config.DEBUG:
-            try:
-                import subprocess
-
-                subprocess.run(["dunstify", "-t", "3000", "COMPACTION"], check=False)
-            except Exception as e:
-                # Silently ignore if dunstify is not available or fails
-                print(
-                    f"{config.YELLOW} *** Could not execute dunstify: {e}{config.RESET}"
-                )
+        imsg(" *** Compacting memory... ")
 
         # Update stats
         self.stats.compactions += 1
@@ -335,8 +321,8 @@ class MessageHistory:
         # without doing AI summarization
         if tokens_after_pruning < config.AUTO_COMPACT_THRESHOLD:
             if actual_pruning_occurred:
-                print(
-                    f"{config.GREEN} *** Pruning was sufficient (tokens: {tokens_after_pruning}, threshold: {config.AUTO_COMPACT_THRESHOLD}){config.RESET}"
+                imsg(
+                    f" *** Pruning was sufficient (tokens: {tokens_after_pruning}, threshold: {config.AUTO_COMPACT_THRESHOLD})"
                 )
             self.messages = pruned_messages
             # Set the flag to True to indicate compaction has been attempted
@@ -350,8 +336,8 @@ class MessageHistory:
                     self.messages
                 )
                 if config.DEBUG:
-                    print(
-                        f"{config.GREEN} *** Token count recalculated after compaction: {self.api_handler.stats.current_prompt_size} tokens{config.RESET}"
+                    imsg(
+                        f" *** Token count recalculated after compaction: {self.api_handler.stats.current_prompt_size} tokens"
                     )
 
             return self.messages
@@ -373,7 +359,7 @@ class MessageHistory:
         older_messages = [
             msg for msg in older_messages
             if not (
-                msg.get("role") == "system" and 
+                msg.get("role") == "system" and
                 msg.get("content", "").startswith(SUMMARY_MESSAGE_PREFIX)
             )
         ]
@@ -395,7 +381,7 @@ class MessageHistory:
         # Find the insertion point - it's the first chat message index
         # All messages before this are system messages (including previous summaries)
         first_chat_index = self._get_first_chat_message_index()
-        
+
         # Reconstruct the messages list:
         # 1. All system messages (initial prompt + previous summaries)
         # 2. The new summary (inserted at the correct position)
@@ -421,12 +407,8 @@ class MessageHistory:
                 recent_messages                         # Recent messages
             )
             if config.DEBUG:
-                print(
-                    f"{config.YELLOW} *** Inserted neutral user message for z.ai GLM model compatibility{config.RESET}"
-                )
-                print(
-                    f"{config.YELLOW} *** This prevents error 1214: 'The messages parameter is illegal' (OpenAI API doesn't require this){config.RESET}"
-                )
+                wmsg(" *** Inserted neutral user message for z.ai GLM model compatibility")
+                wmsg(" *** This prevents error 1214: 'The messages parameter is illegal' (OpenAI API doesn't require this)")
 
         self.messages = new_messages
         # Set the flag to True to indicate compaction has been attempted
@@ -440,8 +422,8 @@ class MessageHistory:
                 self.messages
             )
             if config.DEBUG:
-                print(
-                    f"{config.GREEN} *** Token count recalculated after compaction: {self.api_handler.stats.current_prompt_size} tokens{config.RESET}"
+                imsg(
+                    f" *** Token count recalculated after compaction: {self.api_handler.stats.current_prompt_size} tokens"
                 )
 
         return self.messages
@@ -455,7 +437,6 @@ class MessageHistory:
         if "DISABLE_PRUNING" in os.environ:
             return self.messages, False
 
-        from .utils import estimate_messages_tokens
 
         # Make a copy of messages to work with
         messages = [msg.copy() for msg in self.messages]
@@ -502,8 +483,8 @@ class MessageHistory:
         # Check if pruning meets minimum threshold before applying
         if total_pruned_tokens < config.PRUNE_MINIMUM_TOKENS:
             if config.DEBUG:
-                print(
-                    f"{config.YELLOW} *** Pruning savings ({total_pruned_tokens}) below minimum ({config.PRUNE_MINIMUM_TOKENS}), skipping pruning{config.RESET}"
+                wmsg(
+                    f" *** Pruning savings ({total_pruned_tokens}) below minimum ({config.PRUNE_MINIMUM_TOKENS}), skipping pruning"
                 )
             return [msg.copy() for msg in self.messages], False
 
@@ -513,13 +494,13 @@ class MessageHistory:
             messages[msg_index]["content"] = COMPACTED_TOOL_RESULT_CONTENT
             pruned_count += 1
             if config.DEBUG:
-                print(
-                    f"{config.YELLOW} *** Pruned tool result: ~{original_tokens} tokens -> [compacted]{config.RESET}"
+                wmsg(
+                    f" *** Pruned tool result: ~{original_tokens} tokens -> [compacted]"
                 )
 
         if config.DEBUG:
-            print(
-                f"{config.GREEN} *** Applied pruning of {pruned_count} tool results, saving approximately {total_pruned_tokens} tokens{config.RESET}"
+            imsg(
+                f" *** Applied pruning of {pruned_count} tool results, saving approximately {total_pruned_tokens} tokens"
             )
 
         return messages, True  # Pruning occurred
@@ -608,7 +589,7 @@ class MessageHistory:
             # Apply environment variable override for compaction prompt
             from .prompt_loader import get_compaction_prompt
             compaction_prompt = get_compaction_prompt()
-            
+
             # If no prompt found, use hardcoded fallback
             if not compaction_prompt:
                 compaction_prompt = """You are a helpful AI assistant tasked with summarizing conversations.
@@ -623,8 +604,8 @@ Focus on information that would be helpful for continuing the conversation, incl
 
 Your summary should be comprehensive enough to provide context but concise enough to be quickly understood."""
                 if config.DEBUG:
-                    print(f"{config.YELLOW} *** Using hardcoded compaction prompt fallback{config.RESET}")
-            
+                    wmsg(" *** Using hardcoded compaction prompt fallback")
+
             # Create a structured technical handover report summary prompt (WINNING PROMPT TEST 3)
             summary_messages = [
                 {
@@ -646,7 +627,7 @@ Provide a detailed but concise summary of our conversation above. Focus on infor
 
             # Make API request for summary with temperature=0 to stop GLM randomness
             # Force temperature=0 by temporarily setting config.TEMPERATURE
-            original_temp = getattr(config, "TEMPPERATURE", None)
+            original_temp = getattr(config, "TEMPERATURE", None)
             config.TEMPERATURE = 0
             try:
                 response = self.api_handler._make_api_request(
@@ -669,8 +650,8 @@ Provide a detailed but concise summary of our conversation above. Focus on infor
 
         except Exception as e:
             # CRITICAL: Don't continue compaction - raise the exception to preserve user data
+            emsg(f" *** Compaction API error: {e}")
             if config.DEBUG:
-                print(f"{config.RED} *** Compaction API error: {e}{config.RESET}")
                 import traceback
 
                 traceback.print_exc()
@@ -742,8 +723,8 @@ Provide a detailed but concise summary of our conversation above. Focus on infor
                 self.messages
             )
             if config.DEBUG:
-                print(
-                    f"{config.GREEN} *** Token count recalculated after reset: {self.api_handler.stats.current_prompt_size} tokens{config.RESET}"
+                imsg(
+                    f" *** Token count recalculated after reset: {self.api_handler.stats.current_prompt_size} tokens"
                 )
 
     def save_session(self, filename: str = "session.json"):
@@ -751,8 +732,8 @@ Provide a detailed but concise summary of our conversation above. Focus on infor
         try:
             with open(filename, "w") as f:
                 json.dump(self.messages, f, indent=4)
-            print(f"\n{config.GREEN} *** Session saved: {filename}{config.RESET}")
-            
+            imsg(f"\n *** Session saved: {filename}")
+
             # Check if autosave should be enabled/disabled based on filename
             if "autosave" in filename.lower():
                 self.autosave_filename = filename
@@ -760,12 +741,42 @@ Provide a detailed but concise summary of our conversation above. Focus on infor
                 print(f"{config.CYAN} *** Session will auto-save before each prompt{config.RESET}")
             else:
                 if self.autosave_filename:
-                    print(f"{config.YELLOW} *** Autosave DISABLED (filename does not contain 'autosave'){config.RESET}")
+                    wmsg(" *** Autosave DISABLED (filename does not contain 'autosave')")
                 self.autosave_filename = None
         except Exception as e:
-            print(
-                f"\n{config.RED} *** Error saving session to {filename}: {e}{config.RESET}"
+            emsg(
+                f"\n *** Error saving session to {filename}: {e}"
             )
+
+    def detect_planning_mode_from_session(self, messages: List[Dict]) -> bool:
+        """Detect if the last session was in planning mode by analyzing messages."""
+        if not messages:
+            return False
+        
+        # Look at the last few messages to find mode markers
+        for message in reversed(messages[-5:]):  # Check last 5 messages
+            content = message.get("content", "")
+            
+            # Check for the mode marker - most reliable way to detect
+            if "<aicoder_active_mode>plan</aicoder_active_mode>" in content:
+                return True
+            elif "<aicoder_active_mode>build</aicoder_active_mode>" in content:
+                return False
+            
+            # Fallback to older detection methods for backward compatibility
+            if "PLANNING MODE - READ-ONLY ACCESS ONLY" in content:
+                return True
+            
+            # Check for planning mode user instructions
+            if "Read-only tools only" in content and message.get("role") == "user":
+                return True
+                
+            # Check for plan mode indicators in assistant responses
+            if message.get("role") == "assistant":
+                if "I'm in planning mode" in content or "read-only access" in content:
+                    return True
+        
+        return False
 
     def load_session(self, filename: str = "session.json"):
         """Load a session from a file."""
@@ -779,15 +790,36 @@ Provide a detailed but concise summary of our conversation above. Focus on infor
             self.messages = clean_messages
             # Reset the compaction flag since we loaded a new session
             self._compaction_performed = False
-            
+
+            # Detect and restore planning mode state
+            planning_mode_detected = self.detect_planning_mode_from_session(clean_messages)
+            try:
+                from .planning_mode import get_planning_mode
+                planning_mode = get_planning_mode()
+                current_mode = planning_mode.is_plan_mode_active()
+                
+                if planning_mode_detected and not current_mode:
+                    # Session was in plan mode but we're in build mode - switch to plan mode
+                    planning_mode.set_plan_mode(True)
+                    imsg(" 🔄 Planning mode detected and restored from session")
+                elif not planning_mode_detected and current_mode:
+                    # Session was in build mode but we're in plan mode - switch to build mode
+                    planning_mode.set_plan_mode(False)
+                    imsg(" 🔄 Build mode restored from session")
+                
+                # After setting the mode, mark message as sent to avoid duplicate mode messages on first user input
+                planning_mode._mode_message_sent = True
+            except ImportError:
+                pass  # Planning mode not available
+
             # Check if this is an autosave session (contains "autosave" in filename)
             if "autosave" in filename.lower():
                 self.autosave_filename = filename
-                print(f"\n{config.GREEN} *** Session loaded with autosave enabled: {filename}{config.RESET}")
+                imsg(f"\n *** Session loaded with autosave enabled: {filename}")
                 print(f"{config.CYAN} *** Auto-saving session before each prompt...{config.RESET}")
             else:
                 self.autosave_filename = None
-                print(f"\n{config.GREEN} *** Session loaded: {filename}{config.RESET}")
+                imsg(f"\n *** Session loaded: {filename}")
 
             # Recalculate token count after loading session
             from .utils import estimate_messages_tokens
@@ -797,12 +829,12 @@ Provide a detailed but concise summary of our conversation above. Focus on infor
                     self.messages
                 )
                 if config.DEBUG:
-                    print(
-                        f"{config.GREEN} *** Token count recalculated: {self.api_handler.stats.current_prompt_size} tokens{config.RESET}"
+                    imsg(
+                        f" *** Token count recalculated: {self.api_handler.stats.current_prompt_size} tokens"
                     )
         except Exception as e:
-            print(
-                f"\n{config.RED} *** Error loading session from {filename}: {e}{config.RESET}"
+            emsg(
+                f"\n *** Error loading session from {filename}: {e}"
             )
 
     def autosave_if_enabled(self):
@@ -816,9 +848,9 @@ Provide a detailed but concise summary of our conversation above. Focus on infor
                     print(f"{config.CYAN} *** Session auto-saved to: {self.autosave_filename}{config.RESET}")
             except Exception as e:
                 # Always warn the user if autosave fails - this is about data safety!
-                print(f"{config.RED} *** ⚠️  AUTOSAVE FAILED: Could not save to {self.autosave_filename}{config.RESET}")
-                print(f"{config.RED} *** Error: {e}{config.RESET}")
-                print(f"{config.YELLOW} *** Your session may not be saved if the application crashes!{config.RESET}")
+                emsg(f" *** ⚠️  AUTOSAVE FAILED: Could not save to {self.autosave_filename}")
+                emsg(f" *** Error: {e}")
+                wmsg(" *** Your session may not be saved if the application crashes!")
 
     def summarize_context(self):
         """Summarize the conversation context to manage token usage."""
@@ -865,15 +897,11 @@ Provide a detailed but concise summary of our conversation above. Focus on infor
                         content = f.read().strip()
                         if content:
                             if config.DEBUG:
-                                print(
-                                    f"{config.GREEN} *** Found AICODER.md at: {normalized_path}{config.RESET}"
-                                )
+                                imsg(f" *** Found AICODER.md at: {normalized_path}")
                             return content
             except Exception as e:
                 if config.DEBUG:
-                    print(
-                        f"{config.RED} *** Error reading AICODER.md from {path}: {e}{config.RESET}"
-                    )
+                    emsg(f" *** Error reading AICODER.md from {path}: {e}")
                 continue
 
         # Special handling for zipapp - try to read from the package directly
@@ -890,17 +918,13 @@ Provide a detailed but concise summary of our conversation above. Focus on infor
                         content = data.decode("utf-8").strip()
                         if content:
                             if config.DEBUG:
-                                print(
-                                    f"{config.GREEN} *** Found AICODER.md in package data ({package_name}){config.RESET}"
-                                )
+                                imsg(f" *** Found AICODER.md in package data ({package_name})")
                             return content
                 except Exception:
                     continue
         except Exception as e:
             if config.DEBUG:
-                print(
-                    f"{config.RED} *** Error reading AICODER.md from package data: {e}{config.RESET}"
-                )
+                emsg(f" *** Error reading AICODER.md from package data: {e}")
 
         # Additional zipapp handling - try to read from sys.path
         try:
@@ -925,9 +949,7 @@ Provide a detailed but concise summary of our conversation above. Focus on infor
                                             content = f.read().decode("utf-8").strip()
                                             if content:
                                                 if config.DEBUG:
-                                                    print(
-                                                        f"{config.GREEN} *** Found AICODER.md in zipapp ({path_entry}/{zip_path}){config.RESET}"
-                                                    )
+                                                    imsg(f" *** Found AICODER.md in zipapp ({path_entry}/{zip_path})")
                                                 return content
                                     except Exception:
                                         continue
@@ -935,14 +957,10 @@ Provide a detailed but concise summary of our conversation above. Focus on infor
                             continue
         except Exception as e:
             if config.DEBUG:
-                print(
-                    f"{config.RED} *** Error reading AICODER.md from zipapp: {e}{config.RESET}"
-                )
+                emsg(f" *** Error reading AICODER.md from zipapp: {e}")
 
         # If we get here, we couldn't find AICODER.md
         if config.DEBUG:
-            print(
-                f"{config.YELLOW} *** AICODER.md not found in any expected location{config.RESET}"
-            )
-            print(f"{config.YELLOW} *** Searched paths: {possible_paths}{config.RESET}")
+            wmsg(" *** AICODER.md not found in any expected location")
+            wmsg(f" *** Searched paths: {possible_paths}")
         return None

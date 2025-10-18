@@ -10,8 +10,6 @@ import socketserver
 import json
 import threading
 import time
-import sys
-import os
 import socket
 from urllib.parse import urlparse, parse_qs
 
@@ -360,7 +358,7 @@ def main():
                 f.write(str(server.port))
             print(f"Port {server.port} written to {args.write_port_file}")
         
-        print(f"\nServer running. Press Ctrl+C to stop.")
+        print("\nServer running. Press Ctrl+C to stop.")
         print(f"Test with: curl {base_url}/health")
         
         # Keep the server running

@@ -4,14 +4,14 @@ API request handling for AI Coder.
 
 import json
 import time
-import tty
-import sys
 import urllib.request
 import urllib.error
 import threading
+from .terminal_manager import is_esc_pressed
 from typing import List, Dict, Any
 
 from . import config
+from .utils import emsg
 from .streaming_adapter import StreamingAdapter
 from .api_client import APIClient
 
@@ -69,7 +69,7 @@ class APIHandlerMixin(APIClient):
                 # Check for user cancellation during animation
                 if self.animator.check_user_cancel():
                     self.animator.stop_animation()
-                    print(f"\n{config.RED}Request cancelled by user.{config.RESET}")
+                    emsg(f"\nRequest cancelled by user.")
                     raise Exception("REQUEST_CANCELLED_BY_USER")
 
                 # Validate tool definitions using shared functionality
@@ -77,7 +77,7 @@ class APIHandlerMixin(APIClient):
                 request_body = json.dumps(api_data).encode("utf-8")
             except TypeError as e:
                 self.animator.stop_animation()
-                print(f"\n{config.RED}Error serializing data for API request: {e}{config.RESET}")
+                emsg(f"\nError serializing data for API request: {e}")
                 return None
             except Exception as e:
                 if str(e) == "REQUEST_CANCELLED_BY_USER":
@@ -126,18 +126,15 @@ class APIHandlerMixin(APIClient):
             api_thread.start()
 
             # Monitor for ESC key press while waiting for API response
-            old_settings = self._setup_terminal_for_input()
             try:
-                tty.setcbreak(sys.stdin.fileno())
-
                 # Wait for the thread to complete or for user cancellation
                 while api_thread.is_alive():
                     time.sleep(0.1)  # Small delay to prevent busy-waiting
 
-                    # Check for ESC keypress (non-blocking)
-                    if self._handle_user_cancellation():
+                    # Check for ESC keypress via centralized manager
+                    if is_esc_pressed():
                         self.animator.stop_animation()
-                        print(f"\n{config.RED}Request cancelled by user (ESC).{config.RESET}")
+                        emsg(f"\nRequest cancelled by user (ESC).")
                         # Note: We can't actually terminate the API request thread,
                         # but we can ignore its result
                         return None
@@ -223,6 +220,4 @@ class APIHandlerMixin(APIClient):
                     return None
                 else:
                     raise
-            finally:
-                # Restore terminal settings
-                self._restore_terminal(old_settings)
+

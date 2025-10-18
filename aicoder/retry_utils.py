@@ -4,7 +4,7 @@ Retry utilities for API requests with common retry logic.
 
 import urllib.error
 
-from .utils import cancellable_sleep
+from .utils import cancellable_sleep, wmsg, emsg
 
 # Import config module for dynamic access to config values
 from . import config
@@ -27,10 +27,10 @@ class ReadTimeoutException(Exception):
 
 class _APIRetryHandlerSingleton:
     """Singleton implementation for API retry handler."""
-    
+
     _instance = None
     _initialized = False
-    
+
     def __new__(cls, *args, **kwargs):
         # Allow bypassing singleton for testing by checking environment
         import os
@@ -39,11 +39,11 @@ class _APIRetryHandlerSingleton:
             # In test mode, create new instances instead of singleton
             print(f"DEBUG: APIRetryHandler.__new__ - Creating new instance (test_mode={test_mode})")
             return super().__new__(cls)
-            
+
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
-    
+
     def __init__(self, animator, stats=None):
         # Allow bypassing singleton initialization for testing
         import os
@@ -57,11 +57,11 @@ class _APIRetryHandlerSingleton:
 
 class APIRetryHandler(_APIRetryHandlerSingleton):
     """Common retry handler for API requests.
-    
+
     This is implemented as a singleton to ensure all parts of the application
     use the same retry handler instance, preventing multiple instances from
     having different retry counter states.
-    
+
     In test mode (AICODER_TEST_MODE=1), the singleton behavior is disabled.
     """
     pass
@@ -78,7 +78,7 @@ class APIRetryHandler(_APIRetryHandlerSingleton):
         """
         exponential_enabled = config.ENABLE_EXPONENTIAL_WAIT_RETRY
         fixed_delay_value = config.RETRY_FIXED_DELAY
-        
+
         if exponential_enabled:
             # Exponential backoff: 2, 4, 8, 16, 32, 64, 64, 64, ...
             if base_delay is None:
@@ -181,37 +181,35 @@ class APIRetryHandler(_APIRetryHandlerSingleton):
         error_content = ""
         try:
             error_content = e.read().decode()
-            print(f"\n{config.RED}API Error: {e.code} {e.reason}\n{error_content}{config.RESET}")
+            emsg(f"\nAPI Error: {e.code} {e.reason}\n{error_content}")
         except Exception:
-            print(f"\n{config.RED}API Error: {e.code} {e.reason}{config.RESET}")
+            emsg(f"\nAPI Error: {e.code} {e.reason}")
 
         should_retry, retry_sleep_secs, error_type = self.should_retry_error(e, error_content)
 
         if should_retry:
             # Check if we've exceeded maximum retry attempts (if configured)
             if config.RETRY_MAX_ATTEMPTS > 0 and self.retry_attempt_count >= config.RETRY_MAX_ATTEMPTS:
-                print(
-                    f"{config.RED}    --- Maximum retry attempts ({config.RETRY_MAX_ATTEMPTS}) exceeded. Giving up.{config.RESET}"
+                emsg(
+                    f"    --- Maximum retry attempts ({config.RETRY_MAX_ATTEMPTS}) exceeded. Giving up."
                 )
                 return False  # Don't retry, max attempts reached
-            
-            print(
-                f"{config.YELLOW}    --- {error_type} error detected. Retrying in {retry_sleep_secs} secs... (Press ESC to cancel){config.RESET}"
+
+            wmsg(
+                f"    --- {error_type} error detected. Retrying in {retry_sleep_secs} secs..."
             )
             # Increment retry attempt counter for exponential backoff
             self.retry_attempt_count += 1
             # Use cancellable sleep to allow user to cancel retries
             if not cancellable_sleep(retry_sleep_secs, self.animator):
                 self.animator.stop_animation()
-                print(f"\n{config.RED}Retry cancelled by user (ESC).{config.RESET}")
+                emsg("\nRetry cancelled by user (ESC).")
                 return False  # Don't retry, user cancelled
             return True  # Retry the request
         elif e.code == 401:
             # 401 - Unauthorized (likely expired token)
-            print(
-                f"{config.RED}Authentication failed. Please check your API key/token.{config.RESET}"
-            )
-            print(f"{config.YELLOW}If using OAuth, you may need to refresh your token.{config.RESET}")
+            emsg("Authentication failed. Please check your API key/token.")
+            wmsg("If using OAuth, you may need to refresh your token.")
             return False  # Don't retry authentication errors
 
         return False  # Don't retry other errors
@@ -229,14 +227,14 @@ class APIRetryHandler(_APIRetryHandlerSingleton):
         """
         if self.stats:
             self.stats.api_errors += 1
-        print(
-            f"\n{config.RED}Connection Error: {str(e.reason) if hasattr(e, 'reason') else str(e)}{config.RESET}"
+        emsg(
+            f"\nConnection Error: {str(e.reason) if hasattr(e, 'reason') else str(e)}"
         )
-        print(
-            f"{config.YELLOW}This may be due to network issues or an expired authentication token.{config.RESET}"
+        wmsg(
+            "This may be due to network issues or an expired authentication token."
         )
-        print(
-            f"{config.YELLOW}Please check your connection and authentication credentials.{config.RESET}"
+        wmsg(
+            "Please check your connection and authentication credentials."
         )
 
 
@@ -270,26 +268,26 @@ class APIRetryHandler(_APIRetryHandlerSingleton):
         if should_retry:
             error_type = "Connection dropped"
             base_delay = 5  # Base delay for connection drops
-            
+
             # Calculate the actual retry delay using exponential backoff or fixed delay
             retry_sleep_secs = self._calculate_retry_delay(base_delay)
 
             # Check if we've exceeded maximum retry attempts (if configured)
             if config.RETRY_MAX_ATTEMPTS > 0 and self.retry_attempt_count >= config.RETRY_MAX_ATTEMPTS:
-                print(
-                    f"{config.RED}    --- Maximum retry attempts ({config.RETRY_MAX_ATTEMPTS}) exceeded. Giving up.{config.RESET}"
+                emsg(
+                    f"    --- Maximum retry attempts ({config.RETRY_MAX_ATTEMPTS}) exceeded. Giving up."
                 )
                 return False  # Don't retry, max attempts reached
 
-            print(
-                f"{config.YELLOW}    --- {error_type} detected. Retrying in {retry_sleep_secs} secs... (Press ESC to cancel){config.RESET}"
+            wmsg(
+                f"    --- {error_type} detected. Retrying in {retry_sleep_secs} secs... (Press ESC to cancel)"
             )
             # Increment retry attempt counter for exponential backoff
             self.retry_attempt_count += 1
             # Use cancellable sleep to allow user to cancel retries
             if not cancellable_sleep(retry_sleep_secs, self.animator):
                 self.animator.stop_animation()
-                print(f"\n{config.RED}Retry cancelled by user (ESC).{config.RESET}")
+                emsg("\nRetry cancelled by user (ESC).")
                 return False  # Don't retry, user cancelled
             return True  # Retry the request
 

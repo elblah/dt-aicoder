@@ -182,17 +182,11 @@ def test_setup_and_restore_terminal():
     """Test setting up and restoring terminal settings."""
     client = APIClient()
     
-    # Test the methods that actually exist
-    # These might not do anything without a real terminal, but they shouldn't crash
+    # Test that we can call the ESC detection method
+    # This should work in test mode without any terminal operations
     try:
-        client._setup_terminal_for_input()
-    except Exception:
-        # Might fail in test environment, that's okay
-        pass
-    
-    try:
-        old_settings = (1, 2, 3, 4, 5)  # Mock terminal settings
-        client._restore_terminal(old_settings)
+        result = client._handle_user_cancellation()
+        assert isinstance(result, bool)
     except Exception:
         # Might fail in test environment, that's okay
         pass

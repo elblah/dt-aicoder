@@ -19,6 +19,7 @@ from typing import Optional, List, Tuple
 from pathlib import Path
 
 from . import config
+from .utils import wmsg, imsg, emsg
 
 
 def _load_default_prompt(prompt_name: str) -> Optional[str]:
@@ -76,14 +77,14 @@ def _load_default_prompt(prompt_name: str) -> Optional[str]:
                     content = f.read().strip()
                     if content:
                         if config.DEBUG:
-                            print(
-                                f"{config.GREEN} *** Found {prompt_filename} at: {normalized_path}{config.RESET}"
+                            imsg(
+                                f" *** Found {prompt_filename} at: {normalized_path}"
                             )
                         return content
         except Exception as e:
             if config.DEBUG:
-                print(
-                    f"{config.RED} *** Error reading {prompt_filename} from {path}: {e}{config.RESET}"
+                emsg(
+                    f" *** Error reading {prompt_filename} from {path}: {e}"
                 )
             continue
 
@@ -101,16 +102,16 @@ def _load_default_prompt(prompt_name: str) -> Optional[str]:
                     content = data.decode("utf-8").strip()
                     if content:
                         if config.DEBUG:
-                            print(
-                                f"{config.GREEN} *** Found {prompt_filename} in package data ({package_name}){config.RESET}"
+                            imsg(
+                                f" *** Found {prompt_filename} in package data ({package_name})"
                             )
                         return content
             except Exception:
                 continue
     except Exception as e:
         if config.DEBUG:
-            print(
-                f"{config.RED} *** Error reading {prompt_filename} from package data: {e}{config.RESET}"
+            emsg(
+                f" *** Error reading {prompt_filename} from package data: {e}"
             )
 
     # Additional zipapp handling - try to read from sys.path
@@ -134,8 +135,8 @@ def _load_default_prompt(prompt_name: str) -> Optional[str]:
                                         content = f.read().decode("utf-8").strip()
                                         if content:
                                             if config.DEBUG:
-                                                print(
-                                                    f"{config.GREEN} *** Found {prompt_filename} in zipapp ({path_entry}/{zip_path}){config.RESET}"
+                                                imsg(
+                                                    f" *** Found {prompt_filename} in zipapp ({path_entry}/{zip_path})"
                                                 )
                                             return content
                                 except Exception:
@@ -144,16 +145,16 @@ def _load_default_prompt(prompt_name: str) -> Optional[str]:
                         continue
     except Exception as e:
         if config.DEBUG:
-            print(
-                f"{config.RED} *** Error reading {prompt_filename} from zipapp: {e}{config.RESET}"
+            emsg(
+                f" *** Error reading {prompt_filename} from zipapp: {e}"
             )
 
     # If we get here, we couldn't find the prompt file
     if config.DEBUG:
-        print(
-            f"{config.YELLOW} *** {prompt_filename} not found in any expected location{config.RESET}"
+        wmsg(
+            f" *** {prompt_filename} not found in any expected location"
         )
-        print(f"{config.YELLOW} *** Searched paths: {possible_paths}{config.RESET}")
+        wmsg(f" *** Searched paths: {possible_paths}")
     return None
 
 
@@ -174,11 +175,11 @@ def load_prompt_from_env(env_var_name: str, prompt_name: str) -> str:
         default_content = _load_default_prompt(prompt_name)
         if default_content:
             if config.DEBUG:
-                print(f"{config.GREEN} *** Loaded {prompt_name} from default prompt file{config.RESET}")
+                imsg(f" *** Loaded {prompt_name} from default prompt file")
             return default_content
         else:
             if config.DEBUG:
-                print(f"{config.YELLOW} *** {prompt_name} default file not found{config.RESET}")
+                wmsg(f" *** {prompt_name} default file not found")
             return None
 
     # Simple heuristic: if it looks like a file path, try reading as file
@@ -186,19 +187,19 @@ def load_prompt_from_env(env_var_name: str, prompt_name: str) -> str:
     if not ('/' in env_value or env_value.startswith(('.', '~'))):
         # Treat as literal prompt content
         if config.DEBUG:
-            print(f"{config.GREEN} *** Loaded {prompt_name} from environment variable content{config.RESET}")
+            imsg(f" *** Loaded {prompt_name} from environment variable content")
         return env_value
 
     # Try to read as file
     expanded_path = os.path.expanduser(env_value)
     if not os.path.exists(expanded_path):
         if config.DEBUG:
-            print(f"{config.YELLOW} *** {env_var_name} file not found: {expanded_path}, treating as literal content{config.RESET}")
+            wmsg(f" *** {env_var_name} file not found: {expanded_path}, treating as literal content")
         return env_value
 
     if not os.path.isfile(expanded_path):
         if config.DEBUG:
-            print(f"{config.RED} *** {env_var_name} path exists but is not a file: {expanded_path}{config.RESET}")
+            emsg(f" *** {env_var_name} path exists but is not a file: {expanded_path}")
         # Fall back to default prompt file
         default_content = _load_default_prompt(prompt_name)
         return default_content
@@ -208,17 +209,17 @@ def load_prompt_from_env(env_var_name: str, prompt_name: str) -> str:
             content = f.read().strip()
             if content:
                 if config.DEBUG:
-                    print(f"{config.GREEN} *** Loaded {prompt_name} from file: {expanded_path}{config.RESET}")
+                    imsg(f" *** Loaded {prompt_name} from file: {expanded_path}")
                 return content
             else:
                 if config.DEBUG:
-                    print(f"{config.YELLOW} *** {env_var_name} file is empty, using default{config.RESET}")
+                    wmsg(f" *** {env_var_name} file is empty, using default")
                 # Fall back to default prompt file
                 default_content = _load_default_prompt(prompt_name)
                 return default_content
     except Exception as e:
         if config.DEBUG:
-            print(f"{config.RED} *** Error reading {env_var_name} file {expanded_path}: {e}, treating as literal content{config.RESET}")
+            emsg(f" *** Error reading {env_var_name} file {expanded_path}: {e}, treating as literal content")
         return env_value
 
 
@@ -292,7 +293,6 @@ def _apply_prompt_variables(base_prompt: str) -> str:
         Prompt content with variables replaced
     """
     import os
-    import sys
     from datetime import datetime
     import platform
     import shutil
@@ -366,7 +366,6 @@ def get_main_prompt() -> str:
     Raises:
         SystemExit: If no valid system prompt can be found (fatal error)
     """
-    import os
     import sys
 
     # Get the base prompt content
@@ -374,12 +373,12 @@ def get_main_prompt() -> str:
 
     # If no prompt was found, this is a fatal error
     if not base_prompt:
-        print(f"{config.RED} *** FATAL ERROR: No system prompt found!{config.RESET}", file=sys.stderr)
-        print(f"{config.RED} *** AI Coder cannot function without a system prompt.{config.RESET}", file=sys.stderr)
-        print(f"{config.RED} *** Please ensure one of the following exists:{config.RESET}", file=sys.stderr)
-        print(f"{config.RED} ***   - Set AICODER_PROMPT_MAIN environment variable{config.RESET}", file=sys.stderr)
-        print(f"{config.RED} ***   - Place a prompt file at aicoder/prompts/main.md{config.RESET}", file=sys.stderr)
-        print(f"{config.RED} ***   - Ensure AICODER.md is available{config.RESET}", file=sys.stderr)
+        emsg(f" *** FATAL ERROR: No system prompt found!", file=sys.stderr)
+        emsg(f" *** AI Coder cannot function without a system prompt.", file=sys.stderr)
+        emsg(f" *** Please ensure one of the following exists:", file=sys.stderr)
+        emsg(f" ***   - Set AICODER_PROMPT_MAIN environment variable", file=sys.stderr)
+        emsg(f" ***   - Place a prompt file at aicoder/prompts/main.md", file=sys.stderr)
+        emsg(f" ***   - Ensure AICODER.md is available", file=sys.stderr)
         sys.exit(1)
 
     # Apply template variables using the helper function
@@ -430,7 +429,7 @@ def get_project_filename() -> str:
         project_file += '.md'
 
     if config.DEBUG:
-        print(f"{config.GREEN} *** Using project prompt file: {project_file}{config.RESET}")
+        imsg(f" *** Using project prompt file: {project_file}")
 
     return project_file
 
@@ -471,6 +470,6 @@ def print_prompt_override_info():
 
     # Print all overrides if any exist
     if prompt_overrides:
-        print(f"{config.GREEN}*** Prompt overrides detected:{config.RESET}")
+        imsg(f"*** Prompt overrides detected:")
         for override in prompt_overrides:
-            print(f"{config.GREEN}  - {override}{config.RESET}")
+            imsg(f"  - {override}")

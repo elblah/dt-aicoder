@@ -2,9 +2,7 @@
 """Working file tracking tests."""
 
 import pytest
-import time
 import sys
-import os
 sys.path.insert(0, '/home/blah/poc/aicoder/v2')
 
 from aicoder.tool_manager.file_tracker import track_file_read, track_file_edit, file_read_counts, file_edit_counts

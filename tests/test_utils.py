@@ -2,7 +2,6 @@
 Tests for the utils module - converted to pytest format.
 """
 
-import pytest
 
 from aicoder.utils import safe_strip, colorize_diff_lines, parse_markdown
 import aicoder.config as config

@@ -8,7 +8,6 @@ import unittest
 from unittest.mock import patch, mock_open
 
 import aicoder.prompt_loader as prompt_loader
-from tests.test_helpers import temp_config
 
 
 class TestPromptLoader(unittest.TestCase):

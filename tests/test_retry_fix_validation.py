@@ -10,7 +10,6 @@ from unittest.mock import Mock, patch
 import os
 
 from aicoder.retry_utils import APIRetryHandler
-from aicoder.streaming_adapter import StreamingAdapter
 
 
 @pytest.fixture

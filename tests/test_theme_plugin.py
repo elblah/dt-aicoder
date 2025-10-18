@@ -5,8 +5,7 @@ Unit tests for the theme plugin functionality.
 
 import unittest
 import sys
-import os
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 # Add the project root to the path
 sys.path.insert(0, '/home/blah/poc/aicoder/v2')

@@ -13,27 +13,31 @@ from . import config
 
 def make_readline_safe(text: str) -> str:
     """Make color codes safe for readline by wrapping them with RL_PROMPT_START_IGNORE and RL_PROMPT_END_IGNORE.
-    
+
     These are \001 and \002 characters that tell readline to ignore cursor positioning
     for the enclosed characters.
-    
+
     Args:
         text: Text containing color codes
-        
+
     Returns:
         Text with color codes wrapped for readline safety
     """
     if not text:
         return text
-    
+
     result = text
     # Replace all available color codes with readline-safe versions
     for color_code in [
-        config.RESET, config.BOLD, config.RED, config.GREEN, config.YELLOW, 
-        config.BLUE
+        config.RESET,
+        config.BOLD,
+        config.RED,
+        config.GREEN,
+        config.YELLOW,
+        config.BLUE,
     ]:
         result = result.replace(color_code, f"\001{color_code}\002")
-    
+
     return result
 
 
@@ -69,7 +73,10 @@ def colorize_diff_lines(text):
         elif line.startswith("@@") and stripped_line:
             # Diff header lines (yellow) - preserve original line ending
             colored_lines.append(
-                config.YELLOW + stripped_line + config.RESET + line[len(stripped_line) :]
+                config.YELLOW
+                + stripped_line
+                + config.RESET
+                + line[len(stripped_line) :]
             )
         else:
             # Unchanged lines (default color) - preserve original line exactly
@@ -101,6 +108,7 @@ def format_tool_prompt(
             # In non-debug mode, still show raw JSON if it's clearly malformed
             try:
                 import json
+
                 json.loads(raw_arguments)
             except json.JSONDecodeError:
                 prompt_lines.append(f"   Raw JSON (malformed): {raw_arguments}")
@@ -209,7 +217,7 @@ def format_tool_prompt(
                 # For new file creation (old_string is empty), show a diff with all lines as additions
                 old_content = ""
                 new_content = new_string
-                
+
                 # Generate diff for new file (empty old content vs new content)
                 old_lines = old_content.splitlines(keepends=True)
                 new_lines = new_content.splitlines(keepends=True)
@@ -264,7 +272,9 @@ def format_tool_prompt(
             if hide_command:
                 prompt_lines.append(f"{config.BOLD}    Command: [HIDDEN]{config.RESET}")
             else:
-                prompt_lines.append(f"{config.BOLD}    Command: {command}{config.RESET}")
+                prompt_lines.append(
+                    f"{config.BOLD}    Command: {command}{config.RESET}"
+                )
             if reason and not hide_reason:
                 prompt_lines.append(f"    Reason: {reason}")
             elif hide_reason and reason:
@@ -303,7 +313,7 @@ def format_tool_prompt(
                     and isinstance(value, str)
                     and len(value) > config.DEFAULT_TRUNCATION_LIMIT
                 ):
-                    value = value[:config.DEFAULT_TRUNCATION_LIMIT] + "... [truncated]"
+                    value = value[: config.DEFAULT_TRUNCATION_LIMIT] + "... [truncated]"
 
                 prompt_lines.append(f"    {key}: {value}")
 
@@ -499,67 +509,71 @@ def estimate_messages_tokens(messages: List[Dict]) -> int:
     total = 0
     for msg in messages:
         # Estimate content
-        content = msg.get('content', '')
+        content = msg.get("content", "")
         total += estimate_tokens(content)
-        
+
         # Estimate tool calls if present
-        if 'tool_calls' in msg and msg['tool_calls']:
-            for tool_call in msg['tool_calls']:
-                if isinstance(tool_call, dict) and 'function' in tool_call:
-                    func_name = tool_call['function'].get('name', '')
-                    func_args = tool_call['function'].get('arguments', '')
+        if "tool_calls" in msg and msg["tool_calls"]:
+            for tool_call in msg["tool_calls"]:
+                if isinstance(tool_call, dict) and "function" in tool_call:
+                    func_name = tool_call["function"].get("name", "")
+                    func_args = tool_call["function"].get("arguments", "")
                     total += estimate_tokens(func_name)
                     total += estimate_tokens(func_args)
-        
+
         # Estimate tool results
-        if msg.get('role') == 'tool':
-            tool_call_id = msg.get('tool_call_id', '')
+        if msg.get("role") == "tool":
+            tool_call_id = msg.get("tool_call_id", "")
             total += estimate_tokens(tool_call_id)
-    
+
     return total
 
 
 def display_token_info(stats, auto_compact_threshold=None):
     """Display token information in the requested format.
-    
+
     Args:
         stats: Stats object containing token information
         auto_compact_threshold: Threshold value for calculating percentage (defaults to config.AUTO_COMPACT_THRESHOLD if not provided)
     """
     if not stats:
         return
-    
+
     # Import config at the beginning
     import aicoder.config as config
-    
+
     # Use provided threshold or fall back to config
     if auto_compact_threshold is None:
         threshold = config.AUTO_COMPACT_THRESHOLD
     else:
         threshold = auto_compact_threshold
-    
+
     # Calculate usage percentage based on context size or threshold
     usage_percentage = 0
     display_threshold = threshold  # Default to the threshold for display
-    
+
     if config.AUTO_COMPACT_ENABLED:
         # If auto-compaction is enabled, show percentage of context size and trigger point
-        usage_percentage = min(100, (stats.current_prompt_size / config.CONTEXT_SIZE) * 100)
+        usage_percentage = min(
+            100, (stats.current_prompt_size / config.CONTEXT_SIZE) * 100
+        )
         display_threshold = config.CONTEXT_SIZE
     elif threshold > 0:
         # If using old-style threshold, calculate against that
         usage_percentage = min(100, (stats.current_prompt_size / threshold) * 100)
     else:
         # If no threshold, calculate against context size
-        usage_percentage = min(100, (stats.current_prompt_size / config.CONTEXT_SIZE) * 100)
+        usage_percentage = min(
+            100, (stats.current_prompt_size / config.CONTEXT_SIZE) * 100
+        )
         display_threshold = config.CONTEXT_SIZE
-    
+
     # Create visual representation (10 segments wide) with half-based rounding
     # Fill n-th segment if usage >= 5 + 10*(n-1) %, i.e., (usage + 5) // 10
     filled_bars = int((usage_percentage + 5) // 10)
     filled_bars = min(10, filled_bars)  # Cap at 10 for 100%
     empty_bars = 10 - filled_bars
-    
+
     # Choose color based on usage percentage
     if usage_percentage <= 50:
         bar_color = config.GREEN
@@ -567,10 +581,10 @@ def display_token_info(stats, auto_compact_threshold=None):
         bar_color = config.YELLOW
     else:
         bar_color = config.RED
-    
+
     # Add color to filled balls based on usage level
     bars = f"{bar_color}{config.TOKEN_INFO_FILLED_CHAR * filled_bars}{config.TOKEN_INFO_EMPTY_CHAR * empty_bars}{config.RESET}"
-    
+
     # Format numbers for display - use abbreviated format for cleaner output
     def format_token_count(count):
         if count >= 1000000:
@@ -579,12 +593,16 @@ def display_token_info(stats, auto_compact_threshold=None):
             return f"{count / 1000:.1f}k"
         else:
             return str(count)
-    
+
     current_size_formatted = format_token_count(stats.current_prompt_size)
     threshold_formatted = format_token_count(display_threshold)
-    
+
     # Display token info in the abbreviated format
-    print(f"\nContext: {bars} {usage_percentage:.0f}% ({current_size_formatted}/{threshold_formatted})", end="", flush=True)
+    print(
+        f"\nContext: {bars} {usage_percentage:.0f}% ({current_size_formatted}/{threshold_formatted} @{config.API_MODEL})",
+        end="",
+        flush=True,
+    )
 
 
 def cancellable_sleep(seconds: float, animator=None) -> bool:
@@ -598,51 +616,23 @@ def cancellable_sleep(seconds: float, animator=None) -> bool:
         bool: True if sleep completed normally, False if cancelled
     """
     import time
-    import select
-    import sys
+    from .terminal_manager import is_esc_pressed, setup_for_non_prompt_input
 
-    # Try to import termios for Unix systems
-    try:
-        import termios
-
-        HAS_TERMIOS = True
-    except ImportError:
-        HAS_TERMIOS = False
+    # Setup terminal for ESC detection
+    setup_for_non_prompt_input()
 
     start_time = time.time()
     check_interval = 0.1  # Check for ESC every 100ms
 
-    # Save original terminal settings if available
-    old_settings = None
-    if HAS_TERMIOS:
-        try:
-            old_settings = termios.tcgetattr(sys.stdin)
-            # Set terminal to non-canonical mode to read single characters
-            new_settings = termios.tcgetattr(sys.stdin)
-            new_settings[3] = (
-                new_settings[3] & ~termios.ICANON
-            )  # Disable canonical mode
-            new_settings[6][termios.VMIN] = b"\x00"  # Non-blocking read
-            new_settings[6][termios.VTIME] = b"\x00"
-            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, new_settings)
-        except Exception:
-            old_settings = None
-
     try:
         while time.time() - start_time < seconds:
-            # Check for user cancellation
-            if animator and animator.check_user_cancel():
+            # Check for user cancellation via centralized terminal manager
+            if is_esc_pressed():
                 return False
 
-            # Use a non-blocking check for ESC key
-            try:
-                if select.select([sys.stdin], [], [], 0) == ([sys.stdin], [], []):
-                    ch = sys.stdin.read(1)
-                    # Check for ESC key (ASCII 27)
-                    if ord(ch) == 27:
-                        return False
-            except Exception:
-                pass
+            # Check via animator if provided (for backwards compatibility)
+            if animator and animator.check_user_cancel():
+                return False
 
             # Sleep for check interval
             time.sleep(check_interval)
@@ -650,27 +640,23 @@ def cancellable_sleep(seconds: float, animator=None) -> bool:
         # Sleep completed normally
         return True
     finally:
-        # Restore original terminal settings if we changed them
-        if old_settings is not None and HAS_TERMIOS:
-            try:
-                termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
-            except Exception:
-                pass
+        # No cleanup needed - terminal manager handles state
+        pass
 
 
 def parse_json_arguments(arguments: Union[str, dict, list]) -> Union[dict, list]:
     """
     Parse JSON arguments that may be double/triple encoded.
-    
+
     Handles the case where AI models send JSON as a string, which may itself
     be encoded multiple times (e.g., '{"arg": "value"}' vs '"{\\"arg\\": \\"value\\"}"')
-    
+
     Args:
         arguments: Either a dict/list (already parsed) or a JSON string that needs parsing
-        
+
     Returns:
         Parsed dict or list
-        
+
     Raises:
         json.JSONDecodeError: If JSON is malformed
         ValueError: If after max attempts we still have a string
@@ -678,14 +664,14 @@ def parse_json_arguments(arguments: Union[str, dict, list]) -> Union[dict, list]
     # If already a dict or list, return as-is
     if not isinstance(arguments, str):
         return arguments
-    
+
     current_value = arguments
     max_attempts = 5
-    
+
     for attempt in range(max_attempts):
         try:
             parsed = json.loads(current_value)
-            
+
             # If we got a dict or list, this is what we want
             if isinstance(parsed, (dict, list)):
                 return parsed
@@ -696,14 +682,54 @@ def parse_json_arguments(arguments: Union[str, dict, list]) -> Union[dict, list]
             else:
                 # Unexpected type (int, float, bool, None) - return as-is
                 return parsed
-                
+
         except json.JSONDecodeError:
             # If we can't parse and this is the first attempt, the original was malformed
             if attempt == 0:
                 raise
             else:
                 # We parsed some levels but then hit malformed JSON
-                raise ValueError(f"Arguments still a string after {attempt} parse attempts: {current_value}")
-    
+                raise ValueError(
+                    f"Arguments still a string after {attempt} parse attempts: {current_value}"
+                )
+
     # If we get here, we maxed out attempts and still have a string
-    raise ValueError(f"Arguments still a string after {max_attempts} parse attempts: {current_value}")
+    raise ValueError(
+        f"Arguments still a string after {max_attempts} parse attempts: {current_value}"
+    )
+
+
+def colorize(msg: str, color: str) -> str:
+    return f"{color}{msg}{config.RESET}"
+
+
+# Print variants
+def wmsg(msg: str, file=None) -> None:
+    """Print a yellow message."""
+    print(colorize(msg, config.YELLOW), file=file)
+
+
+def emsg(msg: str, file=None) -> None:
+    """Print a red error message."""
+    print(colorize(msg, config.RED), file=file)
+
+
+def imsg(msg: str, file=None) -> None:
+    """Print a green info message."""
+    print(colorize(msg, config.GREEN), file=file)
+
+
+# String-return variants
+def wmsg_str(msg: str) -> str:
+    """Return a colorized yellow string."""
+    return colorize(msg, config.YELLOW)
+
+
+def emsg_str(msg: str) -> str:
+    """Return a colorized red string."""
+    return colorize(msg, config.RED)
+
+
+def imsg_str(msg: str) -> str:
+    """Return a colorized green string."""
+    return colorize(msg, config.GREEN)

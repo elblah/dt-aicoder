@@ -5,7 +5,6 @@ Simplified shell command execution flow tests - converted to pytest format.
 import sys
 import os
 from unittest.mock import Mock, patch, MagicMock
-import pytest
 
 # Add the parent directory to the path to import aicoder modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

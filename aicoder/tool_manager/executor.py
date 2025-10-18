@@ -11,11 +11,11 @@ import subprocess
 import shlex
 from typing import Dict, Any, List, Tuple
 
-from ..utils import parse_json_arguments
+from ..utils import parse_json_arguments, emsg, wmsg, imsg
 from datetime import datetime
 from .. import config
 from ..utils import colorize_diff_lines, make_readline_safe
-from ..prompt_history_manager import prompt_history_manager
+from ..readline_history_manager import prompt_history_manager
 from .internal_tools import INTERNAL_TOOL_FUNCTIONS
 from .validator import (
     validate_tool_parameters,
@@ -24,12 +24,7 @@ from .validator import (
 )
 from .approval_system import ApprovalSystem
 
-# Import readline to enable readline functionality
-try:
-    import readline
-except ImportError:
-    # readline is not available on this platform
-    pass
+# readline functionality is handled by utils.make_readline_safe()
 
 DENIED_MESSAGE = "EXECUTION DENIED BY THE USER"
 
@@ -118,7 +113,7 @@ def _check_rule_file(rule_file: str, command: str, file_type: str) -> tuple[bool
                         # Ensure pattern is not empty before searching
                         if line and re.search(line, command):
                             return True, line, file_type
-                except re.error as e:
+                except re.error:
                     # Invalid regex, skip it
                     continue
     except (IOError, OSError):
@@ -159,9 +154,9 @@ class ToolExecutor:
             with open(log_filename, "w") as f:
                 json.dump(log_entry, f, indent=2)
 
-            print(f"{config.YELLOW} * Malformed tool call logged to {log_filename}{config.RESET}")
+            wmsg(f" * Malformed tool call logged to {log_filename}")
         except Exception as e:
-            print(f"{config.RED} * Failed to log malformed tool call: {e}{config.RESET}")
+            emsg(f" * Failed to log malformed tool call: {e}")
 
     def _improved_json_parse(self, json_string):
         """
@@ -240,7 +235,7 @@ class ToolExecutor:
             function_info = tool_call["function"]
             func_name = function_info["name"]
 
-            print(f"\n{config.YELLOW}└─ AI wants to call tool: {func_name}{config.RESET}")
+            wmsg(f"\n└─ AI wants to call tool: {func_name}")
 
             # Handle arguments - parse once at the beginning, use parsed version throughout
             arguments_raw = function_info["arguments"]
@@ -252,10 +247,10 @@ class ToolExecutor:
             except (json.JSONDecodeError, ValueError) as e:
                 # Reject immediately if JSON is invalid
                 error_msg = f"Error: Malformed JSON in tool call arguments for '{func_name}'. The AI generated invalid JSON that cannot be parsed. Please ensure your JSON is properly formatted with double quotes and correct syntax. Error details: {str(e)}"
-                print(f"{config.RED} * {error_msg}{config.RESET}")
-                print(f"{config.RED} * Raw arguments: {arguments_raw}{config.RESET}")
-                print(
-                    f"{config.YELLOW} * This tool call has been rejected and will not be added to the message history to prevent session corruption.{config.RESET}"
+                emsg(f" * {error_msg}")
+                emsg(f" * Raw arguments: {arguments_raw}")
+                wmsg(
+                    " * This tool call has been rejected and will not be added to the message history to prevent session corruption."
                 )
 
                 # Log the malformed tool call to a file for debugging
@@ -325,7 +320,7 @@ class ToolExecutor:
 
             # If cancel all is active, skip execution and mark as cancelled
             if cancel_all_active:
-                print(f"{config.RED} * Skipping tool call (cancel all active)...{config.RESET}")
+                emsg(" * Skipping tool call (cancel all active)...")
                 result = "CANCELLED_BY_USER"
                 tool_config_for_display = None
                 guidance_content = None
@@ -386,7 +381,7 @@ class ToolExecutor:
 
             # Verify that the tool_call_id is not None or empty
             if not tool_call["id"]:
-                print(f"{config.RED} * Warning: Empty tool_call_id for {func_name}{config.RESET}")
+                emsg(f" * Warning: Empty tool_call_id for {func_name}")
 
             tool_results.append(tool_result_entry)
 
@@ -435,7 +430,15 @@ class ToolExecutor:
                 
                 guidance_prompt = f"{config.BOLD}{config.GREEN}Guidance: {config.RESET}"
                 safe_guidance_prompt = make_readline_safe(guidance_prompt)
-                guidance_content = input(safe_guidance_prompt).strip()
+                
+                # Enter prompt mode to ensure echo and canonical mode
+                from ..terminal_manager import enter_prompt_mode, exit_prompt_mode
+                enter_prompt_mode()
+                
+                try:
+                    guidance_content = input(safe_guidance_prompt).strip()
+                finally:
+                    exit_prompt_mode()
                 
                 # Save guidance to user input history
                 if guidance_content:
@@ -472,7 +475,9 @@ class ToolExecutor:
             if has_dangerous:
                 print(f"   - ⚠️  {reason} - requires manual approval")
             
-            print(f"\n   {config.YELLOW}AI wants to run a command:{config.RESET} {mode_msg}\n    {config.BOLD}Command: {command}{config.RESET}\n    Timeout: {timeout} seconds")
+            wmsg(f"\n   AI wants to run a command: {mode_msg}")
+            print(f"    {config.BOLD}Command: {command}{config.RESET}")
+            print(f"    Timeout: {timeout} seconds")
             self._command_info_printed = True
 
     def _validate_internal_tool_call(
@@ -524,7 +529,7 @@ class ToolExecutor:
             from ..planning_mode import get_planning_mode
             planning_mode = get_planning_mode()
             if planning_mode.should_disable_tool(tool_name):
-                return f"Error: Tool '{tool_name}' is disabled in planning mode. Planning mode only allows read-only operations. Use '/plan off' to disable planning mode.", {}, None, False
+                return f"Error: Tool '{tool_name}' is disabled in planning mode. Planning mode only allows read-only operations. You **MUST** respect planning mode and **NOT** even **TRY ANY** write operation.", {}, None, False
         except ImportError:
             pass  # Planning mode not available
             
@@ -642,6 +647,7 @@ class ToolExecutor:
                             has_deny_match, deny_rule, _ = _check_rule_file(auto_deny_file, command, "deny")
                             if has_deny_match:
                                 print(f"   - 🚫 Command auto denied: {deny_rule}")
+                                print(f"   - Command was: {command}")
                                 return DENIED_MESSAGE, tool_config, None, False
                             has_dangerous, reason = has_dangerous_patterns(command)
                             if has_dangerous:
@@ -709,8 +715,8 @@ class ToolExecutor:
                                 guidance_content = self._handle_guidance_prompt(with_guidance)
                                 return DENIED_MESSAGE, tool_config, guidance_content, False
                             else:
-                                print(f"\n{config.YELLOW}{prompt_message}{config.RESET}")
-                                print(f"{config.GREEN}Auto approving... running YOLO MODE!{config.RESET}")
+                                wmsg(f"\n{prompt_message}")
+                                imsg("Auto approving... running YOLO MODE!")
                     # If auto_approved is True, no approval needed - skip approval logic
 
                     # Normalize arguments to ensure they are in dictionary format
@@ -724,7 +730,7 @@ class ToolExecutor:
                             f"Please ensure your JSON arguments are properly formatted with correct syntax, "
                             f"double quotes for strings, and proper escaping."
                         )
-                        print(f"{config.RED} * {error_msg}{config.RESET}")
+                        emsg(f" * {error_msg}")
                         return error_msg, tool_config, None, False
                     # Check if user used diff-edit to modify the file
                     if hasattr(self.approval_system, '_diff_edit_result') and self.approval_system._diff_edit_result:
@@ -926,13 +932,13 @@ class ToolExecutor:
                                         output = colorize_diff_lines(output)
                                     print(output)
                                 if preview_result.stderr.strip():
-                                    print(f"{config.RED}--- PREVIEW STDERR ---{config.RESET}")
+                                    emsg("--- PREVIEW STDERR ---")
                                     output = preview_result.stderr.rstrip()
                                     if should_colorize_diff:
                                         output = colorize_diff_lines(output)
                                     print(output)
                             except Exception as e:
-                                print(f"{config.RED}Error running preview command: {e}{config.RESET}")
+                                emsg(f"Error running preview command: {e}")
 
                         prompt_message = self.approval_system.format_tool_prompt(
                             tool_name, arguments, tool_config

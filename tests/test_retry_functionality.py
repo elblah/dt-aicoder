@@ -575,7 +575,6 @@ def test_retry_handler_reset_counter():
 # Integration test functions
 def test_request_success_endpoint():
     """Test that successful requests work."""
-    import json
     from unittest.mock import patch
     import aicoder.config
     
@@ -611,7 +610,6 @@ def test_request_success_endpoint():
 
 def test_request_502_error():
     """Test handling of 502 error (should raise HTTPError)."""
-    import json
     from unittest.mock import patch
     import aicoder.config
     
@@ -647,7 +645,6 @@ def test_request_502_error():
 
 def test_request_500_error():
     """Test handling of 500 error (should raise HTTPError)."""
-    import json
     from unittest.mock import patch
     import aicoder.config
     
@@ -683,7 +680,6 @@ def test_request_500_error():
 
 def test_request_429_error():
     """Test handling of 429 error (should raise HTTPError)."""
-    import json
     from unittest.mock import patch
     import aicoder.config
     
@@ -719,7 +715,6 @@ def test_request_429_error():
 
 def test_request_500_with_429_content():
     """Test handling of 500 error with 429 content."""
-    import json
     from unittest.mock import patch
     import aicoder.config
     

@@ -6,7 +6,6 @@ import os
 import sys
 import importlib
 from unittest.mock import patch
-import pytest
 
 # Add the parent directory to the path to import aicoder modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))

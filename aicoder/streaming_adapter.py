@@ -7,9 +7,6 @@ and regular API responses without breaking existing functionality.
 import json
 import re
 import time
-import select
-import tty
-import sys
 import socket
 import urllib.request
 import urllib.error
@@ -20,7 +17,12 @@ from typing import List, Dict, Any, Optional
 from . import config
 from .animator import Animator
 from .api_client import APIClient
-from .retry_utils import ConnectionDroppedException, ConnectionResetException, ReadTimeoutException
+from .retry_utils import (
+    ConnectionDroppedException,
+    ConnectionResetException,
+)
+from .terminal_manager import is_esc_pressed
+from .utils import estimate_messages_tokens, wmsg, emsg, imsg
 
 
 class StreamingAdapter(APIClient):
@@ -34,9 +36,7 @@ class StreamingAdapter(APIClient):
         # Get the log file path from environment variable
         self.stream_log_file = os.environ.get("STREAM_LOG_FILE", None)
         if self.stream_log_file:
-            print(
-                f"{config.GREEN}*** Streaming log enabled: {self.stream_log_file}{config.RESET}"
-            )
+            imsg(f"*** Streaming log enabled: {self.stream_log_file}")
 
         # State for markdown colorization across streaming chunks
         self._reset_colorization_state()
@@ -49,7 +49,7 @@ class StreamingAdapter(APIClient):
                     f.write(data + "\n")
             except Exception as e:
                 if config.DEBUG:
-                    print(f"{config.RED}Error writing to stream log: {e}{config.RESET}")
+                    wmsg(f"Error writing to stream log: {e}")
 
     def _reset_colorization_state(self):
         """Reset markdown colorization state for a new streaming response."""
@@ -131,9 +131,7 @@ class StreamingAdapter(APIClient):
                 request_body = json.dumps(api_data).encode("utf-8")
             except TypeError as e:
                 self.animator.stop_animation()
-                print(
-                    f"\n{config.RED}Error serializing data for API request: {e}{config.RESET}"
-                )
+                emsg(f"\nError serializing data for API request: {e}")
                 return None
             except Exception:
                 self.animator.stop_animation()
@@ -189,21 +187,15 @@ class StreamingAdapter(APIClient):
             api_thread.start()
 
             # Monitor for ESC key press while waiting for API response
-            old_settings = None
             try:
-                old_settings = self._setup_terminal_for_input()
-                tty.setcbreak(sys.stdin.fileno())
-
                 # Wait for the thread to complete or for user cancellation
                 while api_thread.is_alive():
                     time.sleep(0.1)  # Small delay to prevent busy-waiting
 
-                    # Check for ESC keypress (non-blocking)
-                    if self._handle_user_cancellation():
+                    # Check for ESC keypress via centralized manager
+                    if is_esc_pressed():
                         self.animator.stop_animation()
-                        print(
-                            f"\n{config.RED}Request cancelled by user (ESC).{config.RESET}"
-                        )
+                        emsg("\nRequest cancelled by user (ESC).")
                         # Note: We can't actually terminate the API request thread,
                         # but we can ignore its result
                         return None
@@ -216,9 +208,7 @@ class StreamingAdapter(APIClient):
 
                 if result_dict.get("success"):
                     processed_response = result_dict["response"]
-                    self._update_stats_on_success(
-                        api_start_time, processed_response
-                    )
+                    self._update_stats_on_success(api_start_time, processed_response)
 
                     # Extract token usage information from the response if not handled by _update_stats_on_success
                     if processed_response and "usage" in processed_response:
@@ -243,17 +233,17 @@ class StreamingAdapter(APIClient):
 
                     if error_type == "http_timeout":
                         http_timeout = int(os.environ.get("HTTP_TIMEOUT", "300"))
-                        print(
-                            f"\n{config.RED}HTTP connection timeout reached ({http_timeout} seconds).{config.RESET}"
+                        emsg(
+                            f"\nHTTP connection timeout reached ({http_timeout} seconds)."
                         )
-                        print(
-                            f"{config.YELLOW}The connection to the AI model timed out. This can happen with slow models.{config.RESET}"
+                        wmsg(
+                            "The connection to the AI model timed out. This can happen with slow models."
                         )
-                        print(
-                            f"{config.YELLOW}Tip: Set HTTP_TIMEOUT=X to increase timeout (e.g., HTTP_TIMEOUT=600 for 10 minutes){config.RESET}"
+                        wmsg(
+                            "Tip: Set HTTP_TIMEOUT=X to increase timeout (e.g., HTTP_TIMEOUT=600 for 10 minutes)"
                         )
-                        print(
-                            f"{config.YELLOW}Tip: You can also press ESC to cancel if you think it's taking too long{config.RESET}"
+                        wmsg(
+                            "Tip: You can also press ESC to cancel if you think it's taking too long."
                         )
                         return None
                     elif error_type == "http_error":
@@ -261,10 +251,8 @@ class StreamingAdapter(APIClient):
                         # which will route them to the retry logic
                         raise error
                     elif error_type == "connection_error":
-                        print(f"\n{config.RED}Connection error: {error}{config.RESET}")
-                        print(
-                            f"{config.YELLOW}Check your internet connection and API endpoint.{config.RESET}"
-                        )
+                        emsg(f"\nConnection error: {error}")
+                        wmsg("Check your internet connection and API endpoint.")
                         return None
                     else:
                         # For general errors, re-raise to let existing error handling deal with it
@@ -290,9 +278,8 @@ class StreamingAdapter(APIClient):
                 else:
                     raise
             finally:
-                # Restore terminal settings only if we successfully saved them
-                if old_settings is not None:
-                    self._restore_terminal(old_settings)
+                # No cleanup needed - terminal manager handles state
+                pass
 
     def _streaming_request(
         self,
@@ -320,7 +307,7 @@ class StreamingAdapter(APIClient):
                 self._log_stream_data(json.dumps(api_data, indent=2))
             except Exception as e:
                 if config.DEBUG:
-                    print(f"{config.RED}Error logging request data: {e}{config.RESET}")
+                    emsg(f"Error logging request data: {e}")
 
         self.animator.start_animation("Working...")
 
@@ -334,9 +321,7 @@ class StreamingAdapter(APIClient):
                 request_body = json.dumps(api_data).encode("utf-8")
             except TypeError as e:
                 self.animator.stop_animation()
-                print(
-                    f"\n{config.RED}Error serializing data for API request: {e}{config.RESET}"
-                )
+                emsg(f"\nError serializing data for API request: {e}")
                 return None
             except Exception:
                 self.animator.stop_animation()
@@ -407,21 +392,15 @@ class StreamingAdapter(APIClient):
             api_thread.start()
 
             # Monitor for ESC key press while waiting for API response
-            old_settings = None
             try:
-                old_settings = self._setup_terminal_for_input()
-                tty.setcbreak(sys.stdin.fileno())
-
                 # Wait for the thread to complete or for user cancellation
                 while api_thread.is_alive():
                     time.sleep(0.1)  # Small delay to prevent busy-waiting
 
-                    # Check for ESC keypress (non-blocking)
-                    if self._handle_user_cancellation():
+                    # Check for ESC keypress via centralized manager
+                    if is_esc_pressed():
                         self.animator.stop_animation()
-                        print(
-                            f"\n{config.RED}Request cancelled by user (ESC).{config.RESET}"
-                        )
+                        emsg("\nRequest cancelled by user (ESC).")
                         # Note: We can't actually terminate the API request thread,
                         # but we can ignore its result
                         return None
@@ -459,17 +438,26 @@ class StreamingAdapter(APIClient):
                         estimated_output_tokens = 0
 
                         # For input tokens, we need to access the message history
-                        if hasattr(self.api_handler, 'message_history') and self.api_handler.message_history:
-                            from .utils import estimate_messages_tokens
-                            estimated_input_tokens = estimate_messages_tokens(self.api_handler.message_history.messages)
+                        if (
+                            hasattr(self.api_handler, "message_history")
+                            and self.api_handler.message_history
+                        ):
+                            estimated_input_tokens = estimate_messages_tokens(
+                                self.api_handler.message_history.messages
+                            )
 
                         # Estimate output tokens from the response content
-                        if processed_response and "choices" in processed_response and len(processed_response["choices"]) > 0:
+                        if (
+                            processed_response
+                            and "choices" in processed_response
+                            and len(processed_response["choices"]) > 0
+                        ):
                             choice = processed_response["choices"][0]
                             if "message" in choice and "content" in choice["message"]:
                                 content = choice["message"]["content"]
                                 if content:
                                     from .utils import estimate_tokens
+
                                     estimated_output_tokens = estimate_tokens(content)
 
                         # Update stats with estimated values
@@ -490,17 +478,17 @@ class StreamingAdapter(APIClient):
 
                     if error_type == "http_timeout":
                         http_timeout = int(os.environ.get("HTTP_TIMEOUT", "300"))
-                        print(
-                            f"\n{config.RED}HTTP connection timeout reached ({http_timeout} seconds).{config.RESET}"
+                        emsg(
+                            f"\nHTTP connection timeout reached ({http_timeout} seconds)."
                         )
-                        print(
-                            f"{config.YELLOW}The connection to the AI model timed out. This can happen with slow models.{config.RESET}"
+                        wmsg(
+                            "The connection to the AI model timed out. This can happen with slow models."
                         )
-                        print(
-                            f"{config.YELLOW}Tip: Set HTTP_TIMEOUT=X to increase timeout (e.g., HTTP_TIMEOUT=600 for 10 minutes){config.RESET}"
+                        wmsg(
+                            "Tip: Set HTTP_TIMEOUT=X to increase timeout (e.g., HTTP_TIMEOUT=600 for 10 minutes)"
                         )
-                        print(
-                            f"{config.YELLOW}Tip: You can also press ESC to cancel if you think it's taking too long{config.RESET}"
+                        wmsg(
+                            "Tip: You can also press ESC to cancel if you think it's taking too long."
                         )
                         return None
                     elif error_type == "http_error":
@@ -508,10 +496,8 @@ class StreamingAdapter(APIClient):
                         # which will route them to the retry logic
                         raise error
                     elif error_type == "connection_error":
-                        print(f"\n{config.RED}Connection error: {error}{config.RESET}")
-                        print(
-                            f"{config.YELLOW}Check your internet connection and API endpoint.{config.RESET}"
-                        )
+                        emsg(f"\nConnection error: {error}")
+                        wmsg("Check your internet connection and API endpoint.")
                         return None
                     else:
                         # For general errors, re-raise to let existing error handling deal with it
@@ -537,9 +523,8 @@ class StreamingAdapter(APIClient):
                 else:
                     raise
             finally:
-                # Restore terminal settings only if we successfully saved them
-                if old_settings is not None:
-                    self._restore_terminal(old_settings)
+                # No cleanup needed - terminal manager handles state
+                pass
 
     def _process_streaming_response(self, response) -> Optional[Dict[str, Any]]:
         """Process streaming response and return final message."""
@@ -586,14 +571,14 @@ class StreamingAdapter(APIClient):
                 # Check for overall timeout first
                 current_time = time.time()
                 if current_time - last_data_time > timeout_seconds:
-                    print(
-                        f"\n{config.RED}Streaming timeout reached ({timeout_seconds} seconds with no SSE data).{config.RESET}"
+                    emsg(
+                        f"\nStreaming timeout reached ({timeout_seconds} seconds with no SSE data)."
                     )
                     print(
-                        f"{config.YELLOW}Tip: Set STREAMING_TIMEOUT=X to adjust (e.g., STREAMING_TIMEOUT=600 for 10 minutes){config.RESET}"
+                        "Tip: Set STREAMING_TIMEOUT=X to adjust (e.g., STREAMING_TIMEOUT=600 for 10 minutes)"
                     )
                     print(
-                        f"{config.YELLOW}Tip: For HTTP connection timeouts, set HTTP_TIMEOUT=X (e.g., HTTP_TIMEOUT=600){config.RESET}"
+                        "Tip: For HTTP connection timeouts, set HTTP_TIMEOUT=X (e.g., HTTP_TIMEOUT=600)"
                     )
                     return None
 
@@ -605,253 +590,56 @@ class StreamingAdapter(APIClient):
                 timeout_reminder_shown = False
                 while line is None:
                     try:
-                        # Check if socket is still connected first
-                        if hasattr(response, "fp") and hasattr(response.fp, "_sock"):
-                            sock = response.fp._sock
-
-                            # Check if socket is still connected using select
-                            # This will detect if the connection was closed by the server
-                            try:
-                                ready_to_read, _, exceptional_conditions = (
-                                    select.select([sock], [], [sock], 0.1)
-                                )
-
-                                # If socket is in exceptional conditions, connection was dropped
-                                if exceptional_conditions:
-                                    print(
-                                        f"\n{config.RED}🚫 Connection dropped by server (detected by select).{config.RESET}"
-                                    )
-                                    print(
-                                        f"{config.YELLOW}The AI model server closed the connection unexpectedly.{config.RESET}"
-                                    )
-                                    print(
-                                        f"{config.YELLOW}Please try your request again - the connection may work next time.{config.RESET}"
-                                    )
-                                    raise ConnectionDroppedException("Connection dropped by server (detected by select)")
-
-                                # If socket is not ready to read and no timeout yet, continue waiting
-                                if not ready_to_read:
-                                    # Check if we've exceeded read timeout
-                                    if (
-                                        time.time() - read_start_time
-                                        > read_timeout_seconds
-                                    ):
-                                        if not timeout_reminder_shown:
-                                            print(f"\r{' ' * 80}", end="", flush=True)
-                                            print(
-                                                f"\n{config.YELLOW}⚠️  It's been {read_timeout_seconds} seconds with no new data.{config.RESET}"
-                                            )
-                                            print(
-                                                f"{config.YELLOW}   Press ESC to cancel the request, or wait for more data...{config.RESET}"
-                                            )
-                                            timeout_reminder_shown = True
-
-                                        if self._check_user_cancel_during_streaming():
-                                            print(
-                                                f"\n{config.RED}Request cancelled by user (ESC).{config.RESET}"
-                                            )
-                                            return None
-                                        continue
-                                    time.sleep(0.1)  # Small delay before checking again
-                                    continue
-
-                                # Socket is ready to read, try to read data
-                                original_timeout = sock.gettimeout()
-                                # Use a patient read timeout - very slow models can take 30+ seconds per line
-                                read_timeout = min(
-                                    30.0, read_timeout_seconds
-                                )  # Cap at 30 seconds per read for very slow models
-                                sock.settimeout(read_timeout)
-                                try:
-                                    line = response.fp.readline()
-                                    if not line:  # EOF - connection closed
-                                        print(
-                                            f"\n{config.RED}🚫 Connection dropped by server (EOF detected).{config.RESET}"
-                                        )
-                                        print(
-                                            f"{config.YELLOW}The AI model server closed the connection unexpectedly.{config.RESET}"
-                                        )
-                                        print(
-                                            f"{config.YELLOW}Please try your request again - the connection may work next time.{config.RESET}"
-                                        )
-                                        raise ConnectionDroppedException("Connection dropped by server (EOF detected)")
-                                except socket.timeout:
-                                    # Read timeout - this could mean either:
-                                    # 1. Connection is hanging/dead
-                                    # 2. Model is extremely slow (2 tokens/second can take 30+ seconds per line)
-
-                                    # Check if this is the first timeout or if we've had multiple
-                                    current_time = time.time()
-                                    if not hasattr(self, "_read_timeout_count"):
-                                        self._read_timeout_count = 0
-                                        self._first_timeout_time = current_time
-
-                                    self._read_timeout_count += 1
-
-                                    # If we've had multiple timeouts over a longer period, connection is likely dead
-                                    # Be very patient - allow up to 3 timeouts over 60 seconds for extremely slow models
-                                    if (
-                                        self._read_timeout_count >= 3
-                                        and (current_time - self._first_timeout_time)
-                                        < 60.0
-                                    ):
-                                        print(
-                                            f"\n{config.RED}🚫 Connection dropped by server (multiple read timeouts).{config.RESET}"
-                                        )
-                                        print(
-                                            f"{config.YELLOW}The AI model server stopped responding mid-stream.{config.RESET}"
-                                        )
-                                        print(
-                                            f"{config.YELLOW}Please try your request again - the connection may work next time.{config.RESET}"
-                                        )
-                                        raise ConnectionDroppedException("Connection dropped by server (multiple read timeouts)")
-
-                                    # If we've been waiting too long overall (more than 2 minutes), give up
-                                    if (
-                                        current_time - self._first_timeout_time
-                                    ) > 120.0:
-                                        print(
-                                            f"\n{config.RED}🚫 Connection dropped by server (excessive wait time).{config.RESET}"
-                                        )
-                                        print(
-                                            f"{config.YELLOW}Waited over 2 minutes with incomplete response.{config.RESET}"
-                                        )
-                                        print(
-                                            f"{config.YELLOW}The AI model server is too slow or connection is unstable.{config.RESET}"
-                                        )
-                                        print(
-                                            f"{config.YELLOW}Please try your request again with a faster model.{config.RESET}"
-                                        )
-                                        raise ConnectionDroppedException("Connection dropped by server (excessive wait time)")
-
-                                    # Show progress warning for slow models
-                                    if self._read_timeout_count == 1:
-                                        print(
-                                            f"\n{config.YELLOW}⏳ Very slow model detected (no data for {read_timeout}s).{config.RESET}"
-                                        )
-                                        print(
-                                            f"{config.YELLOW}   Some models take 30+ seconds per line when generating complex responses.{config.RESET}"
-                                        )
-                                        print(
-                                            f"{config.YELLOW}   Waiting patiently... Press ESC to cancel if needed.{config.RESET}"
-                                        )
-                                    elif (
-                                        self._read_timeout_count % 5 == 0
-                                    ):  # Every 5th timeout
-                                        minutes_waited = (
-                                            int(current_time - self._first_timeout_time)
-                                            // 60
-                                        )
-                                        seconds_waited = (
-                                            int(current_time - self._first_timeout_time)
-                                            % 60
-                                        )
-                                        print(
-                                            f"\n{config.YELLOW}⏳ Still waiting for slow model... ({minutes_waited}m {seconds_waited}s elapsed).{config.RESET}"
-                                        )
-                                        print(
-                                            f"{config.YELLOW}   Press ESC to cancel if you think it's stuck.{config.RESET}"
-                                        )
-
-                                    # Check for ESC key press while waiting
-                                    if self._check_user_cancel_during_streaming():
-                                        print(
-                                            f"\n{config.RED}Request cancelled by user (ESC).{config.RESET}"
-                                        )
-                                        return None
-
-                                    # Continue the loop to try reading again
-                                    continue
-                                finally:
-                                    sock.settimeout(original_timeout)
-
-                            except (ConnectionResetError, BrokenPipeError):
-                                print(
-                                    f"\n{config.RED}🚫 Connection dropped by server (connection reset).{config.RESET}"
-                                )
-                                print(
-                                    f"{config.YELLOW}The AI model server closed the connection unexpectedly.{config.RESET}"
-                                )
-                                print(
-                                    f"{config.YELLOW}Please try your request again - the connection may work next time.{config.RESET}"
-                                )
-                                raise ConnectionResetException("Connection reset by server (ConnectionResetError or BrokenPipeError)")
-                            except socket.error as e:
-                                if e.errno in [10054, 104]:  # Connection reset by peer
-                                    print(
-                                        f"\n{config.RED}🚫 Connection dropped by server (connection reset).{config.RESET}"
-                                    )
-                                    print(
-                                        f"{config.YELLOW}The AI model server closed the connection unexpectedly.{config.RESET}"
-                                    )
-                                    print(
-                                        f"{config.YELLOW}Please try your request again - the connection may work next time.{config.RESET}"
-                                    )
-                                    raise ConnectionResetException(f"Connection reset by peer (errno {e.errno})")
-                                else:
-                                    # Other socket errors
-                                    if config.DEBUG:
-                                        print(
-                                            f"{config.RED}Socket error: {e}{config.RESET}"
-                                        )
-                                    raise ConnectionDroppedException(f"Socket error: {e}")
-                        else:
-                            # Fallback: read with small timeout
-                            line = response.readline()
-                            if not line:  # EOF
-                                print(
-                                    f"\n{config.RED}🚫 Connection dropped by server (EOF detected).{config.RESET}"
-                                )
-                                print(
-                                    f"{config.YELLOW}The AI model server closed the connection unexpectedly.{config.RESET}"
-                                )
-                                print(
-                                    f"{config.YELLOW}Please try your request again - the connection may work next time.{config.RESET}"
-                                )
-                                raise ConnectionDroppedException("Connection dropped by server (EOF detected)")
+                        # Fallback: read with small timeout
+                        line = response.readline()
+                        if not line:  # EOF
+                            emsg(
+                                "\n🚫 Connection dropped by server (EOF detected)."
+                            )
+                            wmsg(
+                                "The AI model server closed the connection unexpectedly."
+                            )
+                            wmsg(
+                                "Please try your request again - the connection may work next time."
+                            )
+                            raise ConnectionDroppedException(
+                                "Connection dropped by server (EOF detected)"
+                            )
 
                     except socket.timeout:
                         # Socket timeout occurred, check if we've exceeded read timeout
                         if time.time() - read_start_time > read_timeout_seconds:
                             if not timeout_reminder_shown:
                                 print(f"\r{' ' * 80}", end="", flush=True)
-                                print(
-                                    f"\n{config.YELLOW}⚠️  It's been {read_timeout_seconds} seconds with no new data.{config.RESET}"
+                                wmsg(
+                                    f"\n⚠️  It's been {read_timeout_seconds} seconds with no new data."
                                 )
-                                print(
-                                    f"{config.YELLOW}   Press ESC to cancel the request, or wait for more data...{config.RESET}"
+                                wmsg(
+                                    "   Press ESC to cancel the request, or wait for more data..."
                                 )
                                 timeout_reminder_shown = True
 
                             if self._check_user_cancel_during_streaming():
-                                print(
-                                    f"\n{config.RED}Request cancelled by user (ESC).{config.RESET}"
-                                )
+                                emsg("\nRequest cancelled by user (ESC).")
                                 return None
                             continue
                         continue
                     except (ConnectionResetError, BrokenPipeError):
-                        print(
-                            f"\n{config.RED}🚫 Connection dropped by server (connection reset).{config.RESET}"
-                        )
-                        print(
-                            f"{config.YELLOW}The AI model server closed the connection unexpectedly.{config.RESET}"
-                        )
-                        print(
-                            f"{config.YELLOW}Please try your request again - the connection may work next time.{config.RESET}"
+                        emsg("\n🚫 Connection dropped by server (connection reset).")
+                        wmsg("The AI model server closed the connection unexpectedly.")
+                        wmsg(
+                            "Please try your request again - the connection may work next time."
                         )
                         return None
                     except Exception as e:
                         if config.DEBUG:
-                            print(
-                                f"{config.RED}Error reading from stream: {e}{config.RESET}"
-                            )
+                            emsg(f"Error reading from stream: {e}")
                         return None
 
                     # Check overall timeout during read attempt
                     if time.time() - last_data_time > timeout_seconds:
-                        print(
-                            f"\n{config.RED}Streaming timeout reached ({timeout_seconds} seconds with no SSE data).{config.RESET}"
+                        emsg(
+                            f"\nStreaming timeout reached ({timeout_seconds} seconds with no SSE data)."
                         )
                         return None
 
@@ -862,23 +650,27 @@ class StreamingAdapter(APIClient):
                 # Check for timeout - only if no SSE data received in the last X seconds
                 current_time = time.time()
                 if current_time - last_data_time > timeout_seconds:
-                    print(
-                        f"\n{config.RED}Streaming timeout reached ({timeout_seconds} seconds with no SSE data).{config.RESET}"
+                    emsg(
+                        f"\nStreaming timeout reached ({timeout_seconds} seconds with no SSE data)."
                     )
-                    print(
-                        f"{config.YELLOW}Tip: Set STREAMING_TIMEOUT=X to adjust (e.g., STREAMING_TIMEOUT=600 for 10 minutes){config.RESET}"
+                    wmsg(
+                        "Tip: Set STREAMING_TIMEOUT=X to adjust (e.g., STREAMING_TIMEOUT=600 for 10 minutes)"
                     )
                     return None
 
                 if not first_token_received:
                     # Notify plugins before AI response
-                    if hasattr(self.api_handler, 'loaded_plugins'):
-                        from .plugin_system.loader import notify_plugins_before_ai_prompt
+                    if hasattr(self.api_handler, "loaded_plugins"):
+                        from .plugin_system.loader import (
+                            notify_plugins_before_ai_prompt,
+                        )
+
                         notify_plugins_before_ai_prompt(self.api_handler.loaded_plugins)
 
                     # Display token information before AI response if enabled
-                    if config.ENABLE_TOKEN_INFO_DISPLAY and hasattr(self, 'stats'):
+                    if config.ENABLE_TOKEN_INFO_DISPLAY and hasattr(self, "stats"):
                         from .utils import display_token_info
+
                         display_token_info(self.stats, config.AUTO_COMPACT_THRESHOLD)
                         print()  # Add newline after token info
 
@@ -887,8 +679,11 @@ class StreamingAdapter(APIClient):
                     self.animator.start_cursor_blinking()
                     # Add [PLAN] prefix if planning mode is active
                     from .planning_mode import get_planning_mode
+
                     planning_mode = get_planning_mode()
-                    plan_prefix = "[PLAN] " if planning_mode.is_plan_mode_active() else ""
+                    plan_prefix = (
+                        "[PLAN] " if planning_mode.is_plan_mode_active() else ""
+                    )
                     print(
                         f"{config.BOLD}{config.GREEN}{plan_prefix}AI:{config.RESET} ",
                         end="",
@@ -897,7 +692,7 @@ class StreamingAdapter(APIClient):
 
                 # Check for user cancellation during streaming (more frequently)
                 if self._check_user_cancel_during_streaming():
-                    print(f"\n{config.RED}Streaming cancelled by user.{config.RESET}")
+                    emsg("\nStreaming cancelled by user.")
                     self.animator.stop_cursor_blinking()
                     return None
 
@@ -912,8 +707,13 @@ class StreamingAdapter(APIClient):
                     print(f"\r{' ' * 80}", end="", flush=True)  # Clear current line
                     print(f"\r{' ' * 80}", end="", flush=True)  # Clear reminder lines
                     timeout_reminder_shown = False
-                if line.startswith("data: "):
-                    data_str = line[6:]  # Remove "data: " prefix
+
+                # Skip lines that are not SSE data
+                if not line.startswith("data:"):
+                    continue
+
+                if line.startswith("data:"):
+                    data_str = line[5:]  # Remove "data:" prefix
 
                     # Log the raw SSE data if logging is enabled
                     self._log_stream_data(data_str)
@@ -953,16 +753,12 @@ class StreamingAdapter(APIClient):
                                 # Handle the case where tool_calls is null (DeepSeek issue)
                                 if tool_calls is None:
                                     if config.DEBUG:
-                                        print(
-                                            f"{config.YELLOW} * Debug: Received null tool_calls from API, treating as empty array{config.RESET}"
-                                        )
+                                        wmsg(f" * Debug: Received null tool_calls from API, treating as empty array")
                                     tool_calls = []
                                 # Ensure tool_calls is iterable
                                 if not isinstance(tool_calls, list):
                                     if config.DEBUG:
-                                        print(
-                                            f"{config.YELLOW} * Debug: tool_calls is not a list ({type(tool_calls)}), treating as empty array{config.RESET}"
-                                        )
+                                        wmsg(f" * Debug: tool_calls is not a list ({type(tool_calls)}), treating as empty array")
                                     tool_calls = []
 
                                 for tool_call in tool_calls:
@@ -979,18 +775,33 @@ class StreamingAdapter(APIClient):
                                 # Check if this is a final completion (stop, length, etc.)
                                 # Some providers close the connection after sending finish_reason
                                 # instead of sending a [DONE] message. We should recognize this as normal completion.
-                                if choice["finish_reason"] in ["stop", "length", "content_filter", "function_call", "tool_calls"]:
+                                if choice["finish_reason"] in [
+                                    "stop",
+                                    "length",
+                                    "content_filter",
+                                    "function_call",
+                                    "tool_calls",
+                                ]:
                                     # Mark that we've received a completion signal
                                     # We'll break after processing this chunk
-                                    full_response["choices"][0]["_completion_received"] = True
+                                    full_response["choices"][0][
+                                        "_completion_received"
+                                    ] = True
 
                     except json.JSONDecodeError:
                         # Skip invalid JSON lines
                         continue
 
                     # Check if we received a completion signal (for providers that don't send [DONE])
-                    if (full_response["choices"][0].get("_completion_received") and
-                        current_finish_reason in ["stop", "length", "content_filter", "function_call", "tool_calls"]):
+                    if full_response["choices"][0].get(
+                        "_completion_received"
+                    ) and current_finish_reason in [
+                        "stop",
+                        "length",
+                        "content_filter",
+                        "function_call",
+                        "tool_calls",
+                    ]:
                         # Some providers close the connection after sending finish_reason
                         # instead of sending [DONE]. We should break gracefully here.
                         self._flush_print_buffers()
@@ -1011,11 +822,11 @@ class StreamingAdapter(APIClient):
                         valid_tool_calls.append(tool_call)
                     else:
                         if config.DEBUG:
-                            print(
-                                f"{config.RED} * Debug: Skipping incomplete tool call at index {index}:{config.RESET}"
+                            emsg(
+                                f" * Debug: Skipping incomplete tool call at index {index}:"
                             )
-                            print(
-                                f"{config.RED} * Debug: Tool call data: {json.dumps(tool_call, indent=2)}{config.RESET}"
+                            emsg(
+                                f" * Debug: Tool call data: {json.dumps(tool_call, indent=2)}"
                             )
                         # Log to stream file if enabled
                         if self.stream_log_file:
@@ -1033,18 +844,10 @@ class StreamingAdapter(APIClient):
 
             # Log tool call summary if debug enabled
             if config.DEBUG:
-                print(
-                    f"{config.YELLOW} * Debug: Tool call processing summary:{config.RESET}"
-                )
-                print(
-                    f"{config.YELLOW} * Debug: Total tool call buffers: {len(tool_call_buffers)}{config.RESET}"
-                )
-                print(
-                    f"{config.YELLOW} * Debug: Valid tool calls: {len(valid_tool_calls)}{config.RESET}"
-                )
-                print(
-                    f"{config.YELLOW} * Debug: Content buffer length: {len(content_buffer)}{config.RESET}"
-                )
+                wmsg(f" * Debug: Tool call processing summary:")
+                wmsg(f" * Debug: Total tool call buffers: {len(tool_call_buffers)}")
+                wmsg(f" * Debug: Valid tool calls: {len(valid_tool_calls)}")
+                wmsg(f" * Debug: Content buffer length: {len(content_buffer)}")
 
                 # Log the valid tool call names
                 if valid_tool_calls:
@@ -1052,9 +855,7 @@ class StreamingAdapter(APIClient):
                         tc.get("function", {}).get("name", "unknown")
                         for tc in valid_tool_calls
                     ]
-                    print(
-                        f"{config.YELLOW} * Debug: Valid tool call names: {tool_names}{config.RESET}"
-                    )
+                    wmsg(f" * Debug: Valid tool call names: {tool_names}")
 
             # Log to stream file if enabled
             if self.stream_log_file:
@@ -1095,9 +896,7 @@ class StreamingAdapter(APIClient):
                     self._log_stream_data(json.dumps(full_response, indent=2))
                 except Exception as e:
                     if config.DEBUG:
-                        print(
-                            f"{config.RED}Error logging final response: {e}{config.RESET}"
-                        )
+                        emsg(f"Error logging final response: {e}")
 
             return full_response
 
@@ -1114,20 +913,18 @@ class StreamingAdapter(APIClient):
                 self.trailing_whitespace_buffer = ""
 
             # ENHANCED ERROR HANDLING: Always show errors to the user so they know what happened
-            print(
-                f"\n{config.RED}Error processing streaming response: {e}{config.RESET}"
+            emsg(f"\nError processing streaming response: {e}")
+            wmsg(
+                "This appears to be an API compatibility issue. The streaming was interrupted."
             )
-            print(
-                f"{config.YELLOW}This appears to be an API compatibility issue. The streaming was interrupted.{config.RESET}"
-            )
-            print(
-                f"{config.YELLOW}You can try running with ENABLE_STREAMING=0 to disable streaming mode.{config.RESET}"
+            wmsg(
+                "You can try running with ENABLE_STREAMING=0 to disable streaming mode."
             )
 
             if config.DEBUG:
                 import traceback
 
-                print(f"{config.RED}Full traceback:{config.RESET}")
+                emsg("Full traceback:")
                 traceback.print_exc()
 
             # Stop cursor blinking if there was an error
@@ -1204,9 +1001,7 @@ class StreamingAdapter(APIClient):
                 name_part = func_delta["name"]
                 if name_part is None:
                     if config.DEBUG:
-                        print(
-                            f"{config.YELLOW} * Debug: Received null function name, treating as empty string{config.RESET}"
-                        )
+                        wmsg(f" * Debug: Received null function name, treating as empty string")
                     name_part = ""
                 tool_call["function"]["name"] += name_part
             if "arguments" in func_delta:
@@ -1214,9 +1009,7 @@ class StreamingAdapter(APIClient):
                 args_part = func_delta["arguments"]
                 if args_part is None:
                     if config.DEBUG:
-                        print(
-                            f"{config.YELLOW} * Debug: Received null arguments, treating as empty string{config.RESET}"
-                        )
+                        wmsg(f" * Debug: Received null arguments, treating as empty string")
                     args_part = ""
                 tool_call["function"]["arguments"] += args_part
                 # Debug: Print the arguments as they're being built
@@ -1229,24 +1022,7 @@ class StreamingAdapter(APIClient):
 
     def _check_user_cancel_during_streaming(self) -> bool:
         """Check for user cancellation during streaming (ESC key)."""
-        try:
-            # Use a non-blocking check with a very short timeout
-            if select.select([sys.stdin], [], [], 0.01) == ([sys.stdin], [], []):
-                key = sys.stdin.read(1)
-                # Check for ESC key (ASCII 27)
-                if ord(key) == 27:
-                    return True
-        except IOError:
-            # No input available
-            pass
-        except Exception:
-            # Handle any other exceptions that might prevent ESC from working
-            if config.DEBUG:
-                print(
-                    f"{config.RED} * Debug: Exception in ESC detection: {sys.exc_info()[0]}{config.RESET}"
-                )
-            pass
-        return False
+        return is_esc_pressed()
 
     def _colorize_content(self, content: str) -> str:
         """
@@ -1415,12 +1191,6 @@ class StreamingAdapter(APIClient):
         if not content:
             print(content, end="", flush=True)
             return
-
-        # Color codes
-        # These are now imported from config.py:
-        # RED = "\033[31m"
-        # GREEN = "\033[32m"
-        # RESET = "\033[0m"
 
         i = 0
         while i < len(content):

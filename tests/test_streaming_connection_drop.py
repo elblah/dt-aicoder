@@ -18,11 +18,20 @@ from unittest.mock import patch
 sys.path.insert(0, '/home/blah/poc/aicoder/v2')
 
 
+def find_free_port():
+    """Find and return a free port."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('', 0))
+        s.listen(1)
+        port = s.getsockname()[1]
+    return port
+
+
 @pytest.fixture
 def mock_server():
     """Set up mock Grok server that drops connections mid-stream."""
-    port = 8999
-    
+    port = find_free_port()
+
     class MockGrokHandler(BaseHTTPRequestHandler):
         """Mock Grok server that drops connections mid-stream."""
 
@@ -107,15 +116,15 @@ def mock_server():
 
     # Give server time to start
     time.sleep(2)
-    
+
     # Create tmp directory
     os.makedirs('./tmp', exist_ok=True)
-    
+
     yield server, port
-    
+
     # Stop server
     server.shutdown()
-    
+
     # Clean up log file
     log_file = './tmp/test_connection_drop.log'
     if os.path.exists(log_file):
@@ -125,31 +134,35 @@ def mock_server():
 @pytest.fixture
 def mock_config():
     """Set up mock configuration for testing."""
+    # Find free port for the server
+    port = find_free_port()
+    api_endpoint = f'http://localhost:{port}'
+    
     # Set environment variables
     env_vars = {
-        'API_ENDPOINT': 'http://localhost:8999',
+        'API_ENDPOINT': api_endpoint,
         'API_KEY': 'fake-key',
         'API_MODEL': 'grok-4-fast',
         'STREAM_LOG_FILE': './tmp/test_connection_drop.log',
         'STREAMING_TIMEOUT': '10',  # Short timeout for testing
         'YOLO_MODE': '1',  # Prevent approval prompts
     }
-    
+
     for key, value in env_vars.items():
         os.environ[key] = value
-    
+
     # Import and set config
     import aicoder.config as config
-    config.API_ENDPOINT = 'http://localhost:8999'
+    config.API_ENDPOINT = api_endpoint
     config.API_KEY = 'fake-key'
     config.API_MODEL = 'grok-4-fast'
     config.DEBUG = False  # Disable debug mode for tests
     config.STREAM_LOG_FILE = './tmp/test_connection_drop.log'
     config.STREAMING_TIMEOUT = 10
     config.YOLO_MODE = True
-    
+
     yield config
-    
+
     # Clean up environment
     for key in env_vars:
         if key in os.environ:
@@ -158,15 +171,17 @@ def mock_config():
 
 @patch('select.select')
 @patch('tty.setcbreak')
-@patch('aicoder.api_client.APIClient._setup_terminal_for_input')
+@patch('aicoder.terminal_manager.enter_prompt_mode')
+@patch('aicoder.terminal_manager.exit_prompt_mode')
 @patch('sys.stdin')
-def test_connection_drop_detection(mock_stdin, mock_setup_terminal, mock_setcbreak, mock_select, mock_server, mock_config):
+def test_connection_drop_detection(mock_stdin, mock_exit_prompt, mock_enter_prompt, mock_setcbreak, mock_select, mock_server, mock_config):
     """Test that connection drops are properly detected."""
     # Mock stdin to avoid the fileno error during testing
     mock_stdin.fileno.return_value = 0
     mock_stdin.read.return_value = ''  # Return empty string instead of MagicMock
-    # Mock the terminal setup to avoid terminal access issues during testing
-    mock_setup_terminal.return_value = None
+    # Mock terminal manager to avoid terminal access issues during testing
+    mock_enter_prompt.return_value = None
+    mock_exit_prompt.return_value = None
     # Mock setcbreak to avoid terminal access issues during testing
     mock_setcbreak.return_value = None
     # Mock select to return no input available

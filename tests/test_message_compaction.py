@@ -173,7 +173,7 @@ def test_compaction_ignores_previous_summaries():
         ]
         
         # Mock the API handler
-        from unittest.mock import Mock, call
+        from unittest.mock import Mock
         message_history.api_handler = Mock()
         message_history.api_handler._make_api_request.return_value = {
             "choices": [

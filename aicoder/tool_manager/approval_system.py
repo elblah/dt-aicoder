@@ -5,8 +5,8 @@ Approval system for tool execution.
 import json
 from typing import Dict, Any, List
 from .. import config
-from ..utils import format_tool_prompt, make_readline_safe
-from ..prompt_history_manager import prompt_history_manager
+from ..utils import format_tool_prompt, make_readline_safe, wmsg, imsg, emsg
+from ..readline_history_manager import prompt_history_manager
 
 # Import readline to enable readline functionality
 try:
@@ -49,8 +49,8 @@ class ApprovalSystem:
 
         # YOLO Mode - bypass all approval systems
         if config.YOLO_MODE:
-            print(f"\n{config.YELLOW}{prompt_message}{config.RESET}")
-            print(f"{config.GREEN}Auto approving... running YOLO MODE!{config.RESET}")
+            wmsg(f"\n{prompt_message}")
+            imsg("Auto approving... running YOLO MODE!")
             return (True, False)
 
         try:
@@ -95,14 +95,14 @@ class ApprovalSystem:
 
             # Show prompt with error handling
             try:
-                print(f"\n{config.YELLOW}{prompt_message}{config.RESET}")
+                wmsg(f"\n{prompt_message}")
                 
                 # Show file path for file operations
                 if tool_name in ["edit_file", "write_file"] and "path" in arguments:
                     file_path = arguments["path"]
                     print(f"{config.CYAN}📁 File: {file_path}{config.RESET}")
             except Exception as e:
-                print(f"{config.RED}Error displaying prompt: {e}{config.RESET}")
+                emsg(f"Error displaying prompt: {e}")
                 # Still proceed with approval to maintain security
 
             # Get user input with validation
@@ -116,11 +116,19 @@ class ApprovalSystem:
                     
                     approval_prompt = f"{config.RED}a) Allow once  s) Allow for session  d) Deny  c) Cancel all  YOLO) YOLO  help) Show help\nChoose (a/s/d/c/YOLO/help): {config.RESET}"
                     safe_approval_prompt = make_readline_safe(approval_prompt)
-                    raw_answer = (
-                        input(safe_approval_prompt)
-                        .lower()
-                        .strip()
-                    )
+                    
+                    # Enter prompt mode to ensure echo and canonical mode
+                    from ..terminal_manager import enter_prompt_mode, exit_prompt_mode
+                    enter_prompt_mode()
+                    
+                    try:
+                        raw_answer = (
+                            input(safe_approval_prompt)
+                            .lower()
+                            .strip()
+                        )
+                    finally:
+                        exit_prompt_mode()
                     
                     # Extract just the letter before ")" (e.g., "a) Allow once" -> "a")
                     answer = raw_answer.split(')')[0] if ')' in raw_answer else raw_answer
@@ -152,11 +160,17 @@ class ApprovalSystem:
                         raise Exception("CANCEL_ALL_TOOL_CALLS")
                     elif answer in ["diff"]:
                         if has_diff_option:
+                            # Ensure terminal is in prompt mode for external editor
+                            from ..terminal_manager import enter_prompt_mode
+                            enter_prompt_mode()
                             self._show_external_diff(tool_name, arguments)
                         else:
-                            print(f"{config.YELLOW}External diff not available for this tool{config.RESET}")
+                            wmsg("External diff not available for this tool")
                     elif answer in ["diff-edit"]:
                         if has_diff_option:
+                            # Ensure terminal is in prompt mode for external editor
+                            from ..terminal_manager import enter_prompt_mode
+                            enter_prompt_mode()
                             result = self._show_interactive_diff(tool_name, arguments)
                             if result:  # User modified the diff
                                 # Create a success result to return
@@ -173,23 +187,23 @@ class ApprovalSystem:
                                 # Return APPROVED without guidance
                                 return True, False
                         else:
-                            print(f"{config.YELLOW}Interactive diff not available for this tool{config.RESET}")
+                            wmsg("Interactive diff not available for this tool")
                     elif answer in ["help", "h"]:
                         self._show_approval_help()
                         # Continue the loop to ask for input again
                         continue
                     else:
-                        print(
-                            f"{config.YELLOW}Invalid choice. Please enter a, s, d, c, YOLO, or help.{config.RESET}"
+                        wmsg(
+                            f"Invalid choice. Please enter a, s, d, c, YOLO, or help."
                         )
                 except (EOFError, KeyboardInterrupt):
-                    print(f"\n{config.RED}Input interrupted. Denying tool call.{config.RESET}")
+                    emsg(f"\nInput interrupted. Denying tool call.")
                     return (False, False)
                 except Exception as e:
                     # Check if this is a cancellation request
                     if str(e) == "CANCEL_ALL_TOOL_CALLS":
                         raise  # Re-raise cancellation
-                    print(f"{config.RED}Error reading input: {e}{config.RESET}")
+                    emsg(f"Error reading input: {e}")
 
             # Fallback deny if we somehow get here
             return (False, False)
@@ -198,7 +212,7 @@ class ApprovalSystem:
             # Check if this is a cancellation request
             if str(e) == "CANCEL_ALL_TOOL_CALLS":
                 raise  # Re-raise cancellation
-            print(f"{config.RED}Error in approval system: {e}{config.RESET}")
+            emsg(f"Error in approval system: {e}")
             # For security, deny by default on errors
             return (False, False)
 
@@ -233,9 +247,7 @@ class ApprovalSystem:
             return f"{tool_name}:{args_str}"
         except Exception as e:
             # Fallback to tool name only if key generation fails
-            print(
-                f"{config.RED}Warning: Failed to generate cache key for {tool_name}: {e}{config.RESET}"
-            )
+            emsg(f"Warning: Failed to generate cache key for {tool_name}: {e}")
             return tool_name
 
     def format_tool_prompt(
@@ -270,7 +282,7 @@ class ApprovalSystem:
         # Get file path
         file_path = arguments.get("path", "")
         if not file_path or not os.path.exists(file_path):
-            print(f"{config.YELLOW}Cannot show diff: file not found or path not available{config.RESET}")
+            wmsg("Cannot show diff: file not found or path not available")
             return False
         
         # Determine diff tool
@@ -289,7 +301,7 @@ class ApprovalSystem:
                     break
         
         if not diff_tool:
-            print(f"{config.YELLOW}No diff tool found. Install vimdiff or set AICODER_DIFF_TOOL_BIN{config.RESET}")
+            wmsg("No diff tool found. Install vimdiff or set AICODER_DIFF_TOOL_BIN")
             return False
         
         # Create temporary file with the new content
@@ -323,9 +335,9 @@ class ApprovalSystem:
             
             # Run diff tool
             print(f"\n{config.CYAN}📝 Opening {diff_tool} for interactive diff editing...{config.RESET}")
-            print(f"{config.YELLOW}Original: {file_path}{config.RESET}")
-            print(f"{config.YELLOW}Temp file: {tmp_path}{config.RESET}")
-            print(f"{config.GREEN}💡 Edit the temp file as needed, then save and exit{config.RESET}")
+            wmsg(f"Original: {file_path}")
+            wmsg(f"Temp file: {tmp_path}")
+            imsg("💡 Edit the temp file as needed, then save and exit")
             
             if diff_tool == "vimdiff":
                 subprocess.run([diff_tool, file_path, tmp_path])
@@ -342,13 +354,13 @@ class ApprovalSystem:
             
             if modified_temp_content != original_temp_content:
                 # User modified the file!
-                print(f"\n{config.GREEN}✨ User modifications detected!{config.RESET}")
+                imsg(f"\n✨ User modifications detected!")
                 
                 # Apply user changes to original file
                 with open(file_path, 'w', encoding='utf-8') as f:
                     f.write(modified_temp_content)
                 
-                print(f"{config.GREEN}✅ Applied user modifications to {file_path}{config.RESET}")
+                imsg(f"✅ Applied user modifications to {file_path}")
                 
                 # Notify user
                 print(f"{config.CYAN}🎯 Your changes have been applied successfully!{config.RESET}")
@@ -368,7 +380,7 @@ class ApprovalSystem:
                 return False
             
         except Exception as e:
-            print(f"{config.RED}Error running interactive diff: {e}{config.RESET}")
+            emsg(f"Error running interactive diff: {e}")
             return False
         finally:
             # Clean up temp file
@@ -384,7 +396,7 @@ class ApprovalSystem:
         # Get file path
         file_path = arguments.get("path", "")
         if not file_path or not os.path.exists(file_path):
-            print(f"{config.YELLOW}Cannot show diff: file not found or path not available{config.RESET}")
+            wmsg("Cannot show diff: file not found or path not available")
             return
         
         # Determine diff tool
@@ -403,7 +415,7 @@ class ApprovalSystem:
                     break
         
         if not diff_tool:
-            print(f"{config.YELLOW}No diff tool found. Install meld or set AICODER_DIFF_TOOL_BIN{config.RESET}")
+            wmsg("No diff tool found. Install meld or set AICODER_DIFF_TOOL_BIN")
             return
         
         # Create temporary file with the new content
@@ -433,8 +445,8 @@ class ApprovalSystem:
             
             # Run diff tool
             print(f"\n{config.CYAN}Opening {diff_tool} to show diff...{config.RESET}")
-            print(f"{config.YELLOW}Original: {file_path}{config.RESET}")
-            print(f"{config.YELLOW}Modified: {tmp_path}{config.RESET}")
+            wmsg(f"Original: {file_path}")
+            wmsg(f"Modified: {tmp_path}")
             
             if diff_tool == "meld":
                 subprocess.run([diff_tool, file_path, tmp_path])
@@ -443,10 +455,10 @@ class ApprovalSystem:
             else:
                 subprocess.run([diff_tool, file_path, tmp_path])
             
-            print(f"\n{config.GREEN}Diff viewer closed{config.RESET}")
+            imsg(f"\nDiff viewer closed")
             
         except Exception as e:
-            print(f"{config.RED}Error running diff tool: {e}{config.RESET}")
+            emsg(f"Error running diff tool: {e}")
         finally:
             # Clean up temp file
             if os.path.exists(tmp_path):
@@ -454,32 +466,32 @@ class ApprovalSystem:
 
     def _show_approval_help(self):
         """Display help information for approval options."""
-        print(f"\n{config.GREEN}Approval Options:{config.RESET}")
-        print(
-            f"{config.YELLOW}a) Allow once{config.RESET} - Execute this tool call just this one time"
+        imsg(f"\nApproval Options:")
+        wmsg(
+            f"a) Allow once - Execute this tool call just this one time"
         )
-        print(
-            f"{config.YELLOW}s) Allow for session{config.RESET} - Allow this type of tool call for the rest of this session"
+        wmsg(
+            f"s) Allow for session - Allow this type of tool call for the rest of this session"
         )
-        print(f"{config.YELLOW}d) Deny{config.RESET} - Reject this tool call")
-        print(
-            f"{config.YELLOW}c) Cancel all{config.RESET} - Cancel all pending tool calls and return to user input"
+        wmsg(f"d) Deny - Reject this tool call")
+        wmsg(
+            f"c) Cancel all - Cancel all pending tool calls and return to user input"
         )
         if any(tool_name in ["edit_file", "write_file"] for tool_name in ["edit_file", "write_file"]):
-            print(
-                f"{config.YELLOW}diff) Show external diff{config.RESET} - View diff of proposed changes"
+            wmsg(
+                f"diff) Show external diff - View diff of proposed changes"
             )
-            print(
-                f"{config.YELLOW}diff-edit) Interactive diff edit{config.RESET} - Edit proposed changes in diff tool"
+            wmsg(
+                f"diff-edit) Interactive diff edit - Edit proposed changes in diff tool"
             )
-        print(
-            f"{config.YELLOW}YOLO) YOLO mode{config.RESET} - Automatically approve all tool calls for the rest of the session"
+        wmsg(
+            f"YOLO) YOLO mode - Automatically approve all tool calls for the rest of the session"
         )
-        print(f"{config.YELLOW}help) Show help{config.RESET} - Display this help message")
-        print(f"\n{config.GREEN}Navigation:{config.RESET}")
-        print(f"{config.YELLOW}↑/↓ Arrow keys{config.RESET} - Navigate through approval history and select options")
-        print(f"{config.YELLOW}Type directly{config.RESET} - Or type the option letter directly")
-        print(f"\n{config.GREEN}Guidance Feature:{config.RESET}")
+        wmsg(f"help) Show help - Display this help message")
+        imsg(f"\nNavigation:")
+        wmsg(f"↑/↓ Arrow keys - Navigate through approval history and select options")
+        wmsg(f"Type directly - Or type the option letter directly")
+        imsg(f"\nGuidance Feature:")
         print(
             "You can add a '+' after any option (except help) to provide guidance to the AI."
         )
@@ -493,10 +505,10 @@ class ApprovalSystem:
             "This guidance will be added to the conversation as a user message, helping the AI"
         )
         print("understand your preferences and make better decisions in future steps.")
-        print(f"\n{config.GREEN}Diff Tool:{config.RESET}")
-        print(f"{config.YELLOW}Configure{config.RESET} - Set AICODER_DIFF_TOOL_BIN environment variable")
-        print(f"{config.YELLOW}Auto-detect{config.RESET} - vimdiff, nvim -d, meld, kdiff3, diffuse, or code")
-        print(f"{config.YELLOW}Install{config.RESET} - sudo apt install vim (for vimdiff) or meld")
+        imsg(f"\nDiff Tool:")
+        wmsg(f"Configure - Set AICODER_DIFF_TOOL_BIN environment variable")
+        wmsg(f"Auto-detect - vimdiff, nvim -d, meld, kdiff3, diffuse, or code")
+        wmsg(f"Install - sudo apt install vim (for vimdiff) or meld")
         print(
             "Example: If you type 'a+' and then enter 'Please use more concise responses',"
         )
@@ -542,4 +554,4 @@ class ApprovalSystem:
     def revoke_approvals(self):
         """Clear the session approval cache."""
         self.tool_approvals_session.clear()
-        print(f"\n{config.GREEN} *** All session approvals have been revoked.{config.RESET}")
+        imsg(f"\n *** All session approvals have been revoked.")
