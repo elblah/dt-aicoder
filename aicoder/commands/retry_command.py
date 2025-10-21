@@ -18,10 +18,10 @@ class RetryCommand(BaseCommand):
     def execute(self, args: List[str]) -> Tuple[bool, bool]:
         """Retries the last API call without modifying the conversation history."""
         if len(self.app.message_history.messages) < 2:
-            wmsg(f"\n*** Not enough messages to retry.")
+            wmsg("\n*** Not enough messages to retry.")
             return False, False
 
-        imsg(f"\n*** Retrying last request...")
+        imsg("\n*** Retrying last request...")
 
         # Check if debug mode is enabled and notify user
         if config.DEBUG and config.STREAM_LOG_FILE:

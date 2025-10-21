@@ -72,7 +72,7 @@ def mock_server():
                     self.wfile.write(sse_data.encode('utf-8'))
                     self.wfile.flush()
                     print(f"Mock Grok sent message {i+1}")
-                    time.sleep(0.5)  # Small delay between messages
+                    time.sleep(0.1)  # Smaller delay between messages for faster test
 
                 # Now simulate the connection drop - this is the key part
                 print("Mock Grok: SIMULATING CONNECTION DROP!")
@@ -115,7 +115,7 @@ def mock_server():
     thread.start()
 
     # Give server time to start
-    time.sleep(2)
+    time.sleep(0.5)
 
     # Create tmp directory
     os.makedirs('./tmp', exist_ok=True)
@@ -144,22 +144,21 @@ def mock_config():
         'API_KEY': 'fake-key',
         'API_MODEL': 'grok-4-fast',
         'STREAM_LOG_FILE': './tmp/test_connection_drop.log',
-        'STREAMING_TIMEOUT': '10',  # Short timeout for testing
+        'STREAMING_TIMEOUT': '2',  # Very short timeout for testing
+        'STREAMING_READ_TIMEOUT': '1',  # Even shorter read timeout
         'YOLO_MODE': '1',  # Prevent approval prompts
     }
 
     for key, value in env_vars.items():
         os.environ[key] = value
 
-    # Import and set config
+    # Set environment variables for config
+    os.environ['OPENAI_BASE_URL'] = api_endpoint.replace('/chat/completions', '')
+    os.environ['OPENAI_API_KEY'] = 'fake-key'
+    os.environ['OPENAI_MODEL'] = 'grok-4-fast'
+    
+    # Import config after setting environment variables
     import aicoder.config as config
-    config.API_ENDPOINT = api_endpoint
-    config.API_KEY = 'fake-key'
-    config.API_MODEL = 'grok-4-fast'
-    config.DEBUG = False  # Disable debug mode for tests
-    config.STREAM_LOG_FILE = './tmp/test_connection_drop.log'
-    config.STREAMING_TIMEOUT = 10
-    config.YOLO_MODE = True
 
     yield config
 
@@ -191,7 +190,7 @@ def test_connection_drop_detection(mock_stdin, mock_exit_prompt, mock_enter_prom
     print("=" * 50)
 
     from aicoder.app import AICoder
-
+    
     # Create AICoder instance AFTER setting environment
     app = AICoder()
 

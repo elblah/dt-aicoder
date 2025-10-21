@@ -24,8 +24,8 @@ class PprintMessagesCommand(BaseCommand):
         # Also print the system prompt content if in debug mode
         if config.DEBUG and self.app.message_history.messages:
             system_prompt = self.app.message_history.messages[0].get("content", "")
-            wmsg(f"\n=== SYSTEM PROMPT CONTENT ===")
+            wmsg("\n=== SYSTEM PROMPT CONTENT ===")
             print(system_prompt)
-            wmsg(f"=== END SYSTEM PROMPT ===")
+            wmsg("=== END SYSTEM PROMPT ===")
 
         return False, False

@@ -4,24 +4,81 @@ Configuration module for AI Coder.
 
 import os
 
+# Mode-aware configuration helper
+def _get_mode_config(env_var: str, default_value, value_type=str):
+    """Get config value based on current mode, with PLAN_ prefix fallback."""
+    try:
+        from .planning_mode import get_planning_mode
+        if get_planning_mode().is_plan_mode_active():
+            value = os.environ.get(f"PLAN_{env_var}")
+            if value is not None:
+                if default_value is None and value == "":
+                    return None
+                return value_type(value)
+    except (ImportError, RuntimeError):
+        pass
+    
+    value = os.environ.get(env_var)
+    if value is not None:
+        if default_value is None and value == "":
+            return None
+        return value_type(value)
+    return default_value
+
+# Prompt history configuration
+PROMPT_HISTORY_ENABLED = _get_mode_config("AICODER_PROMPT_HISTORY", True, bool)
+PROMPT_HISTORY_MAX_SIZE = _get_mode_config("AICODER_PROMPT_HISTORY_MAX", 100, int)
+
+# Mode-aware configuration functions
+def get_api_key():
+    """Get API key based on current mode."""
+    return _get_mode_config("OPENAI_API_KEY", "YOUR_API_KEY")
+
+def get_api_endpoint():
+    """Get API endpoint based on current mode."""
+    base_url = _get_mode_config("OPENAI_BASE_URL", "https://api.openai.com/v1")
+    return base_url + "/chat/completions"
+
+def get_api_model():
+    """Get API model based on current mode."""
+    return _get_mode_config("OPENAI_MODEL", "gpt-5-nano")
+
+def get_temperature():
+    """Get temperature based on current mode."""
+    return _get_mode_config("TEMPERATURE", 0.0, float)
+
+def get_top_p():
+    """Get top-p based on current mode."""
+    return _get_mode_config("TOP_P", 1.0, float)
+
+def get_top_k():
+    """Get top-k based on current mode."""
+    return _get_mode_config("TOP_K", 0, int)
+
+def get_max_tokens():
+    """Get max tokens based on current mode."""
+    return _get_mode_config("MAX_TOKENS", None, int)
+
+def get_context_size():
+    """Get context size based on current mode."""
+    return _get_mode_config("CONTEXT_SIZE", 128000, int)
+
 # --- Configuration ---
 DEBUG = os.environ.get("DEBUG", "0") == "1"
 HOME_DIR = os.environ.get("HOME", None)
 APP_NAME = "aicoder"
 
-# Temperature configuration
-TEMPERATURE = float(os.environ.get("TEMPERATURE", "0.0"))
+# Temperature configuration (now uses function for mode-aware values)
+TEMPERATURE = get_temperature()
 
-# Top-P configuration
-TOP_P = float(os.environ.get("TOP_P", "1.0"))
+# Top-P configuration (now uses function for mode-aware values)
+TOP_P = get_top_p()
 
-# Top-K configuration
-TOP_K = int(os.environ.get("TOP_K", "0"))  # 0 means disabled/not set
+# Top-K configuration (now uses function for mode-aware values)
+TOP_K = get_top_k()
 
-# Max tokens configuration
-MAX_TOKENS = (
-    int(os.environ.get("MAX_TOKENS", "")) if os.environ.get("MAX_TOKENS", "") else None
-)
+# Max tokens configuration (now uses function for mode-aware values)
+MAX_TOKENS = get_max_tokens()
 
 # Streaming configuration - ENABLED BY DEFAULT
 # Set DISABLE_STREAMING=1 to disable streaming mode
@@ -61,19 +118,19 @@ if DEBUG:
     print(f"{YELLOW}DEBUG MODE IS ON{RESET}")
 
 # Print temperature if set as environment variable
-if "TEMPERATURE" in os.environ:
+if "TEMPERATURE" in os.environ or "PLAN_TEMPERATURE" in os.environ:
     print(f"{GREEN}*** Temperature is {TEMPERATURE}{RESET}")
 
 # Print top_p if set as environment variable
-if "TOP_P" in os.environ:
+if "TOP_P" in os.environ or "PLAN_TOP_P" in os.environ:
     print(f"{GREEN}*** Top-P is {TOP_P}{RESET}")
 
 # Print top_k if set as environment variable
-if "TOP_K" in os.environ and TOP_K != 0:
+if ("TOP_K" in os.environ and TOP_K != 0) or ("PLAN_TOP_K" in os.environ and TOP_K != 0):
     print(f"{GREEN}*** Top-K is {TOP_K}{RESET}")
 
 # Print max_tokens if set as environment variable
-if "MAX_TOKENS" in os.environ:
+if "MAX_TOKENS" in os.environ or "PLAN_MAX_TOKENS" in os.environ:
     print(f"{GREEN}*** Max tokens is {MAX_TOKENS}{RESET}")
 
 # Print streaming timeout if set as environment variable
@@ -86,14 +143,10 @@ if "STREAMING_READ_TIMEOUT" in os.environ:
         f"{GREEN}*** Streaming read timeout is {STREAMING_READ_TIMEOUT} seconds{RESET}"
     )
 
-# Configuration from environment variables
-API_KEY = os.environ.get("OPENAI_API_KEY", "YOUR_API_KEY")
-API_ENDPOINT = (
-    os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1") + "/chat/completions"
-)
-if "API_ENDPOINT" in os.environ:
-    API_ENDPOINT = os.environ.get("API_ENDPOINT")
-API_MODEL = os.environ.get("OPENAI_MODEL", "gpt-5-nano")
+# Backward compatibility - expose as module-level variables for existing code
+API_KEY = get_api_key()
+API_ENDPOINT = get_api_endpoint()
+API_MODEL = get_api_model()
 
 # Compaction settings (for manual /compact command)
 COMPACT_RECENT_MESSAGES = int(os.environ.get("COMPACT_RECENT_MESSAGES", "2"))
@@ -108,7 +161,7 @@ else:
     COMPACT_MIN_MESSAGES = COMPACT_RECENT_MESSAGES + 1
 
 # Auto-compaction settings - NEW CLEAR NAMING
-CONTEXT_SIZE = int(os.environ.get("CONTEXT_SIZE", "128000"))  # Default to 128k tokens
+CONTEXT_SIZE = get_context_size()  # Mode-aware context size
 CONTEXT_COMPACT_PERCENTAGE = int(
     os.environ.get("CONTEXT_COMPACT_PERCENTAGE", "0")
 )  # 0 means disabled

@@ -151,9 +151,9 @@ def test_animator_with_delay():
         original_endpoint = config_module.API_ENDPOINT
         original_key = config_module.API_KEY
 
-        # Set test values
-        config_module.API_ENDPOINT = f"http://localhost:{port}/chat/completions"
-        config_module.API_KEY = "test-key"
+        # Set environment variables for local server
+        os.environ["OPENAI_BASE_URL"] = f"http://localhost:{port}"
+        os.environ["OPENAI_API_KEY"] = "test-key"
 
         # Capture stdout to verify animation
         old_stdout = sys.stdout
@@ -198,10 +198,8 @@ def test_animator_with_delay():
             has_animation = "Working..." in output
             return has_animation
         finally:
-            # Restore original config values
-            config_module.API_ENDPOINT = original_endpoint
-            config_module.API_KEY = original_key
-
+            # Config restored via environment variables
+            pass
     except ImportError:
         sys.stdout = old_stdout
         print("ERROR: Could not import StreamingAdapter or Animator")
@@ -335,11 +333,9 @@ def test_esc_during_request():
             adapter = StreamingAdapter(api_handler=mock_api_handler, animator=animator)
 
             # Temporarily modify config to point to our test server
-            original_endpoint = config_module.API_ENDPOINT
-            original_key = config_module.API_KEY
-
-            config_module.API_ENDPOINT = f"http://localhost:{port}/chat/completions"
-            config_module.API_KEY = "test-key"
+            # Set environment variables for local server
+            os.environ["OPENAI_BASE_URL"] = f"http://localhost:{port}"
+            os.environ["OPENAI_API_KEY"] = "test-key"
 
             # Prepare test message
             messages = [{"role": "user", "content": "Hello"}]
@@ -351,9 +347,7 @@ def test_esc_during_request():
             # Make the request
             result = adapter.make_request(messages, disable_streaming_mode=True, disable_tools=True)
 
-            # Restore original config values
-            config_module.API_ENDPOINT = original_endpoint
-            config_module.API_KEY = original_key
+            # Config restored via environment variables
 
             print(f"Request completed with result: {result is not None}")
             return result is not None  # Should complete normally since no ESC was pressed

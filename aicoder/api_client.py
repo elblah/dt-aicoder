@@ -32,7 +32,7 @@ class APIClient:
     ) -> Dict[str, Any]:
         """Prepare the API request data with common parameters."""
         api_data = {
-            "model": config.API_MODEL,
+            "model": config.get_api_model(),
             "messages": messages,
         }
 
@@ -42,20 +42,20 @@ class APIClient:
             api_data["stream_options"] = {"include_usage": True}
 
         # Temperature settings
-        if "TEMPERATURE" in os.environ:
-            api_data["temperature"] = config.TEMPERATURE
+        if "TEMPERATURE" in os.environ or "PLAN_TEMPERATURE" in os.environ:
+            api_data["temperature"] = config.get_temperature()
 
         # Top-p settings
-        if "TOP_P" in os.environ and config.TOP_P != 1.0:
-            api_data["top_p"] = config.TOP_P
+        if ("TOP_P" in os.environ or "PLAN_TOP_P" in os.environ) and config.get_top_p() != 1.0:
+            api_data["top_p"] = config.get_top_p()
 
         # Top-k settings
-        if "TOP_K" in os.environ and config.TOP_K != 0:
-            api_data["top_k"] = config.TOP_K
+        if ("TOP_K" in os.environ or "PLAN_TOP_K" in os.environ) and config.get_top_k() != 0:
+            api_data["top_k"] = config.get_top_k()
 
         # Max tokens
-        if config.MAX_TOKENS is not None:
-            api_data["max_tokens"] = config.MAX_TOKENS
+        if config.get_max_tokens() is not None:
+            api_data["max_tokens"] = config.get_max_tokens()
 
         # Tool settings
         if not disable_tools and tool_manager:
@@ -101,19 +101,22 @@ class APIClient:
         """Make the actual HTTP request to the API."""
         request_body = json.dumps(api_data).encode("utf-8")
 
+        api_key = config.get_api_key()
+        api_endpoint = config.get_api_endpoint()
+        
         headers = {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {config.API_KEY}",
+            "Authorization": f"Bearer {api_key}",
             "User-Agent": os.environ.get("HTTP_USER_AGENT", "Mozilla/5.0"),
             "Referrer": "localhost",
         }
 
-        if "openrouter.ai" in config.API_ENDPOINT:
+        if "openrouter.ai" in api_endpoint:
             headers["HTTP-Referer"] = "https://github.com/elblah/dt-aicoder"
             headers["X-Title"] = "dt-aicoder"
 
         req = urllib.request.Request(
-            config.API_ENDPOINT,
+            api_endpoint,
             data=request_body,
             method="POST",
             headers=headers,

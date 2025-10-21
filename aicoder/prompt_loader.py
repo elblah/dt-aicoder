@@ -373,12 +373,12 @@ def get_main_prompt() -> str:
 
     # If no prompt was found, this is a fatal error
     if not base_prompt:
-        emsg(f" *** FATAL ERROR: No system prompt found!", file=sys.stderr)
-        emsg(f" *** AI Coder cannot function without a system prompt.", file=sys.stderr)
-        emsg(f" *** Please ensure one of the following exists:", file=sys.stderr)
-        emsg(f" ***   - Set AICODER_PROMPT_MAIN environment variable", file=sys.stderr)
-        emsg(f" ***   - Place a prompt file at aicoder/prompts/main.md", file=sys.stderr)
-        emsg(f" ***   - Ensure AICODER.md is available", file=sys.stderr)
+        emsg(" *** FATAL ERROR: No system prompt found!", file=sys.stderr)
+        emsg(" *** AI Coder cannot function without a system prompt.", file=sys.stderr)
+        emsg(" *** Please ensure one of the following exists:", file=sys.stderr)
+        emsg(" ***   - Set AICODER_PROMPT_MAIN environment variable", file=sys.stderr)
+        emsg(" ***   - Place a prompt file at aicoder/prompts/main.md", file=sys.stderr)
+        emsg(" ***   - Ensure AICODER.md is available", file=sys.stderr)
         sys.exit(1)
 
     # Apply template variables using the helper function
@@ -470,6 +470,6 @@ def print_prompt_override_info():
 
     # Print all overrides if any exist
     if prompt_overrides:
-        imsg(f"*** Prompt overrides detected:")
+        imsg("*** Prompt overrides detected:")
         for override in prompt_overrides:
             imsg(f"  - {override}")

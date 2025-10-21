@@ -125,7 +125,7 @@ class PromptCommand(BaseCommand):
         wmsg(f"   File: {project_file}")
         wmsg(f"   Source: {project_source}")
         if project_content:
-            wmsg(f"   Status: ✅ Found")
+            wmsg("   Status: ✅ Found")
             wmsg(f"   Length: {len(project_content)} characters")
             print(
                 f"{config.CYAN}   ──────────────────────────────────────────────────────────────{config.RESET}"
@@ -137,7 +137,7 @@ class PromptCommand(BaseCommand):
                     f"{config.WHITE}{project_content[:300]}{'...' if len(project_content) > 300 else ''}{config.RESET}\n"
                 )
         else:
-            wmsg(f"   Status: ❌ Not found\n")
+            wmsg("   Status: ❌ Not found\n")
 
         # Planning Mode Prompts
         from ..planning_mode import get_planning_mode
@@ -289,7 +289,7 @@ class PromptCommand(BaseCommand):
 
         if not available_prompts:
             wmsg(f"   No prompt files found in {prompts_dir}")
-            wmsg(f"   Create prompt files (.txt or .md) to use this feature")
+            wmsg("   Create prompt files (.txt or .md) to use this feature")
             print(f"\n{config.BOLD}{config.GREEN}Example:{config.RESET}")
             print(f"   {config.CYAN}mkdir -p {prompts_dir}{config.RESET}")
             print(
@@ -332,8 +332,8 @@ class PromptCommand(BaseCommand):
                 print(
                     f"{config.RED} *** Error: /prompt set requires a prompt number{config.RESET}"
                 )
-                wmsg(f" *** Usage: /prompt set <number>")
-                wmsg(f" *** Use '/prompt list' to see available prompts")
+                wmsg(" *** Usage: /prompt set <number>")
+                wmsg(" *** Use '/prompt list' to see available prompts")
                 return False, False
 
             prompt_number_str = args[set_index + 1]
@@ -354,7 +354,7 @@ class PromptCommand(BaseCommand):
         # Get available prompts
         available_prompts = list_available_prompts()
         if not available_prompts:
-            emsg(f" *** Error: No prompt files available")
+            emsg(" *** Error: No prompt files available")
             print(
                 f"{config.YELLOW} *** Use '/prompt list' to see available prompts{config.RESET}"
             )
@@ -370,7 +370,7 @@ class PromptCommand(BaseCommand):
         if not selected_prompt:
             emsg(f" *** Error: Prompt #{prompt_number} not found")
             wmsg(f" *** Available prompts: 1-{len(available_prompts)}")
-            wmsg(f" *** Use '/prompt list' to see all prompts")
+            wmsg(" *** Use '/prompt list' to see all prompts")
             return False, False
 
         number, filename, file_path = selected_prompt
@@ -525,7 +525,7 @@ class PromptCommand(BaseCommand):
                 print(
                     f"  {config.YELLOW}2) Apply temporarily (current session only){config.RESET}"
                 )
-                wmsg(f"  3) Discard changes")
+                wmsg("  3) Discard changes")
 
                 while True:
                     try:
@@ -600,7 +600,7 @@ class PromptCommand(BaseCommand):
                                 f"{config.RED} *** Invalid choice. Please enter 1, 2, or 3{config.RESET}"
                             )
                     except (EOFError, KeyboardInterrupt):
-                        wmsg(f"\n *** Edit cancelled")
+                        wmsg("\n *** Edit cancelled")
                         try:
                             edit_file_path.unlink()
                         except FileNotFoundError:
@@ -632,7 +632,7 @@ class PromptCommand(BaseCommand):
                     pass
             return False, False
         except (KeyboardInterrupt, EOFError):
-            wmsg(f"\n *** Edit cancelled")
+            wmsg("\n *** Edit cancelled")
             if not is_user_file:
                 try:
                     edit_file_path.unlink()  # Clean up temp file
@@ -707,7 +707,7 @@ class PromptCommand(BaseCommand):
         print(
             f"  {config.YELLOW}/prompt edit{config.RESET}      Edit current main prompt in $EDITOR"
         )
-        wmsg(f"  /prompt help     Show this help message")
+        wmsg("  /prompt help     Show this help message")
         print()
         print(f"{config.BOLD}{config.GREEN}ENVIRONMENT VARIABLES:{config.RESET}")
         print(
@@ -727,22 +727,22 @@ class PromptCommand(BaseCommand):
         )
         print()
         print(f"{config.BOLD}{config.GREEN}EXAMPLES:{config.RESET}")
-        wmsg(f"  # List available prompts")
+        wmsg("  # List available prompts")
         print("  /prompt list")
         print()
-        wmsg(f"  # Set prompt #1 as active")
+        wmsg("  # Set prompt #1 as active")
         print("  /prompt set 1")
         print()
-        wmsg(f"  # Edit current prompt in $EDITOR")
+        wmsg("  # Edit current prompt in $EDITOR")
         print("  /prompt edit")
         print()
-        wmsg(f"  # Set custom main prompt")
+        wmsg("  # Set custom main prompt")
         print('  export AICODER_PROMPT_MAIN="You are a Go development expert"')
         print()
-        wmsg(f"  # Use custom prompt file")
+        wmsg("  # Use custom prompt file")
         print('  export AICODER_PROMPT_PLAN="./my-custom-plan.md"')
         print()
-        wmsg(f"  # Change project context file")
+        wmsg("  # Change project context file")
         print('  export AICODER_PROMPT_PROJECT="CLAUDE.md"')
         print()
         print(f"{config.BOLD}{config.GREEN}PROMPT FILES:{config.RESET}")

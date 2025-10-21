@@ -4,7 +4,6 @@ Tests for settings command functionality.
 
 import tempfile
 import unittest
-from pathlib import Path
 from unittest.mock import Mock
 from io import StringIO
 import sys

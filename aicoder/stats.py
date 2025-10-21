@@ -40,7 +40,7 @@ class Stats:
         if self.api_time_spent > 0:
             tps = self.completion_tokens / self.api_time_spent
 
-        imsg(f"\n=== Session Statistics ===")
+        imsg("\n=== Session Statistics ===")
         print(f"Session duration: {timedelta(seconds=int(elapsed_time))}")
 
         # Show message history count and size if available

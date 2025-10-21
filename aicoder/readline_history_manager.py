@@ -9,6 +9,14 @@ except ImportError:
     READLINE_AVAILABLE = False
     readline = None
 
+# Import the persistent history manager
+try:
+    from .prompt_history_manager import prompt_history_manager as history
+    PERSISTENT_HISTORY_AVAILABLE = True
+except ImportError:
+    PERSISTENT_HISTORY_AVAILABLE = False
+    history = None
+
 
 class ReadlineHistoryManager:
     """Manages separate readline histories for different input contexts."""
@@ -33,6 +41,7 @@ class ReadlineHistoryManager:
         }
         self.current_context = 'user_input'
         self._max_history = 1000  # Maximum history items per context
+        self._persistent_loaded = False  # Track if persistent history has been loaded
         
     def switch_context(self, context: str):
         """Switch to a different input context, saving current history."""
@@ -92,6 +101,12 @@ class ReadlineHistoryManager:
             self.add_to_current_history(user_input)
             if original_context != 'user_input':
                 self.switch_context(original_context)
+            
+            # Save to persistent history (only for main user prompts, not approval prompts)
+            if PERSISTENT_HISTORY_AVAILABLE and history:
+                # Only save if this is not a tool approval context
+                if original_context != 'tool_approval':
+                    history.save_prompt(user_input)
     
     def setup_user_input_mode(self):
         """Switch to user input mode."""
@@ -100,6 +115,32 @@ class ReadlineHistoryManager:
     def setup_tool_approval_mode(self):
         """Switch to tool approval mode."""
         self.switch_context('tool_approval')
+
+    def load_persistent_history(self):
+        """Load persistent history into the user input history."""
+        if not PERSISTENT_HISTORY_AVAILABLE or not history or self._persistent_loaded:
+            return
+        
+        try:
+            # Load prompts from persistent storage
+            persistent_prompts = history.load_history()
+            
+            # Add them to the user input history (but limit to avoid overwhelming readline)
+            max_load = min(len(persistent_prompts), 500)  # Limit to 500 most recent
+            if persistent_prompts and max_load > 0:
+                # Add the most recent prompts to user input history
+                for prompt in persistent_prompts[-max_load:]:
+                    self.histories['user_input'].append(prompt)
+                
+                # If we're currently in user_input context, update readline
+                if self.current_context == 'user_input' and READLINE_AVAILABLE:
+                    self._load_history(self.histories['user_input'])
+                
+                self._persistent_loaded = True
+                
+        except Exception:
+            # Silently fail to avoid breaking startup
+            pass
 
 
 # Global instance

@@ -354,15 +354,18 @@ print(f'✓ Tool manager working, {len(tools)} tools available')
             "Auto-compaction configuration",
             """
 import os
-# Test default value
-if 'AUTO_COMPACT_THRESHOLD' in os.environ:
-    del os.environ['AUTO_COMPACT_THRESHOLD']
+# Clear all auto-compaction related environment variables
+for var in ['AUTO_COMPACT_THRESHOLD', 'CONTEXT_COMPACT_PERCENTAGE']:
+    if var in os.environ:
+        del os.environ[var]
 # Force reload of config module
 import sys
 if 'aicoder.config' in sys.modules:
     del sys.modules['aicoder.config']
-from aicoder.config import AUTO_COMPACT_THRESHOLD
-assert AUTO_COMPACT_THRESHOLD == 0
+from aicoder.config import AUTO_COMPACT_THRESHOLD, CONTEXT_COMPACT_PERCENTAGE
+# Verify it's disabled when no percentage is set
+assert CONTEXT_COMPACT_PERCENTAGE == 0, f'Expected CONTEXT_COMPACT_PERCENTAGE=0, got {CONTEXT_COMPACT_PERCENTAGE}'
+assert AUTO_COMPACT_THRESHOLD == 0, f'Expected AUTO_COMPACT_THRESHOLD=0, got {AUTO_COMPACT_THRESHOLD}'
 print('✓ Auto-compaction defaults to 0 (disabled)')
 """,
         ),

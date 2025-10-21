@@ -7,16 +7,28 @@ using actual components and local servers (not unit tests).
 
 import subprocess
 import sys
+import os
+import shutil
 
 
 def run_test(name, script, timeout=60):
     """Run a test script and return success/failure."""
     print(f"🧪 Running {name}...")
     try:
+        # Set environment for subprocess
+        env = os.environ.copy()
+        # Clear API-related environment to ensure tests use local servers
+        for key in list(env.keys()):
+            if key.startswith('API_') or key.startswith('OPENAI_') or key in ['ANTHROPIC_API_KEY']:
+                del env[key]
+        # Ensure YOLO_MODE is set for tests
+        env['YOLO_MODE'] = '1'
+        
         result = subprocess.run([sys.executable, script],
                               capture_output=True,
                               text=True,
-                              timeout=timeout)
+                              timeout=timeout,
+                              env=env)
         success = result.returncode == 0
         if success:
             print(f"✅ {name} PASSED")
@@ -75,15 +87,11 @@ def main():
 
     print(f"\\nComprehensive Tests: {comprehensive_passed}/{comprehensive_total}")
 
-    # Ask user if they want to run advanced tests
-    print("\\n🤔 Run advanced TMUX tests? (y/n, default: n): ", end="", flush=True)
-    try:
-        response = sys.stdin.read(1).strip().lower()
-    except:
-        response = 'n'
+    # Check if tmux is available and run advanced tests automatically
+    tmux_available = shutil.which('tmux') is not None
 
-    if response in ['y', 'yes']:
-        print("\\n📋 Running Advanced Tests...")
+    if tmux_available:
+        print("\\n📋 Running Advanced Tests (TMUX available)...")
         print("-" * 30)
 
         advanced_results = []
@@ -104,7 +112,7 @@ def main():
 
         print(f"\\nAdvanced Tests: {advanced_passed}/{advanced_total}")
     else:
-        print("\\n⏭️  Skipping advanced tests")
+        print("\\n⏭️  TMUX not found, skipping advanced tests")
         advanced_passed = 0
         advanced_total = 0
 

@@ -69,7 +69,7 @@ class APIHandlerMixin(APIClient):
                 # Check for user cancellation during animation
                 if self.animator.check_user_cancel():
                     self.animator.stop_animation()
-                    emsg(f"\nRequest cancelled by user.")
+                    emsg("\nRequest cancelled by user.")
                     raise Exception("REQUEST_CANCELLED_BY_USER")
 
                 # Validate tool definitions using shared functionality
@@ -134,7 +134,7 @@ class APIHandlerMixin(APIClient):
                     # Check for ESC keypress via centralized manager
                     if is_esc_pressed():
                         self.animator.stop_animation()
-                        emsg(f"\nRequest cancelled by user (ESC).")
+                        emsg("\nRequest cancelled by user (ESC).")
                         # Note: We can't actually terminate the API request thread,
                         # but we can ignore its result
                         return None

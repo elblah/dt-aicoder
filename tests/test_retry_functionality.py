@@ -598,8 +598,8 @@ def test_request_success_endpoint():
     temp_client = APIClient(mock_animator, mock_stats)
     
     # Use patch to temporarily change the config values just for this request
-    with patch.object(aicoder.config, 'API_ENDPOINT', f"{base_url}/success"), \
-         patch.object(aicoder.config, 'API_KEY', "test-key"):
+    with patch.object(aicoder.config, 'get_api_endpoint', return_value=f"{base_url}/success"), \
+         patch.object(aicoder.config, 'get_api_key', return_value="test-key"):
         try:
             response = temp_client._make_http_request(api_data, timeout=2)
             assert "choices" in response
@@ -633,8 +633,8 @@ def test_request_502_error():
     temp_client = APIClient(mock_animator, mock_stats)
     
     # Use patch to temporarily change the config values just for this request
-    with patch.object(aicoder.config, 'API_ENDPOINT', f"{base_url}/502"), \
-         patch.object(aicoder.config, 'API_KEY', "test-key"):
+    with patch.object(aicoder.config, 'get_api_endpoint', return_value=f"{base_url}/502"), \
+         patch.object(aicoder.config, 'get_api_key', return_value="test-key"):
         try:
             temp_client._make_http_request(api_data, timeout=2)
             # If we reach here, the test failed
@@ -668,8 +668,8 @@ def test_request_500_error():
     temp_client = APIClient(mock_animator, mock_stats)
     
     # Use patch to temporarily change the config values just for this request
-    with patch.object(aicoder.config, 'API_ENDPOINT', f"{base_url}/500"), \
-         patch.object(aicoder.config, 'API_KEY', "test-key"):
+    with patch.object(aicoder.config, 'get_api_endpoint', return_value=f"{base_url}/500"), \
+         patch.object(aicoder.config, 'get_api_key', return_value="test-key"):
         try:
             temp_client._make_http_request(api_data, timeout=2)
             # If we reach here, the test failed
@@ -703,8 +703,8 @@ def test_request_429_error():
     temp_client = APIClient(mock_animator, mock_stats)
     
     # Use patch to temporarily change the config values just for this request
-    with patch.object(aicoder.config, 'API_ENDPOINT', f"{base_url}/429"), \
-         patch.object(aicoder.config, 'API_KEY', "test-key"):
+    with patch.object(aicoder.config, 'get_api_endpoint', return_value=f"{base_url}/429"), \
+         patch.object(aicoder.config, 'get_api_key', return_value="test-key"):
         try:
             temp_client._make_http_request(api_data, timeout=2)
             # If we reach here, the test failed
@@ -738,8 +738,8 @@ def test_request_500_with_429_content():
     temp_client = APIClient(mock_animator, mock_stats)
     
     # Use patch to temporarily change the config values just for this request
-    with patch.object(aicoder.config, 'API_ENDPOINT', f"{base_url}/500_with_429_content"), \
-         patch.object(aicoder.config, 'API_KEY', "test-key"):
+    with patch.object(aicoder.config, 'get_api_endpoint', return_value=f"{base_url}/500_with_429_content"), \
+         patch.object(aicoder.config, 'get_api_key', return_value="test-key"):
         try:
             temp_client._make_http_request(api_data, timeout=2)
             # If we reach here, the test failed

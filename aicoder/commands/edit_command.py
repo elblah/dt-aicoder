@@ -37,12 +37,21 @@ class EditCommand(BaseCommand):
             os.unlink(temp_filename)
 
             if not content.strip():
-                wmsg(f"\n*** Edit cancelled, no content.")
+                wmsg("\n*** Edit cancelled, no content.")
                 return False, False
 
-            imsg(f"\n>>> Using edited prompt...")
+            imsg("\n>>> Using edited prompt...")
             print(content)
             self.app.message_history.add_user_message(content)
+            
+            # Also save the edited content to prompt history
+            try:
+                from ..readline_history_manager import prompt_history_manager
+                prompt_history_manager.save_user_input(content)
+            except Exception:
+                # Silently fail if history saving fails
+                pass
+            
             return False, True
 
         except Exception as e:

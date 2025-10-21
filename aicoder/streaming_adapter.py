@@ -19,7 +19,6 @@ from .animator import Animator
 from .api_client import APIClient
 from .retry_utils import (
     ConnectionDroppedException,
-    ConnectionResetException,
 )
 from .terminal_manager import is_esc_pressed
 from .utils import estimate_messages_tokens, wmsg, emsg, imsg
@@ -335,17 +334,20 @@ class StreamingAdapter(APIClient):
             def streaming_worker(result_dict, stop_event):
                 """Worker function to handle streaming API request."""
                 try:
+                    api_key = config.get_api_key()
+                    api_endpoint = config.get_api_endpoint()
+
                     headers = {
                         "Content-Type": "application/json",
-                        "Authorization": f"Bearer {config.API_KEY}",
+                        "Authorization": f"Bearer {api_key}",
                         "User-Agent": "Mozilla/5.0",
                         "Referrer": "localhost",
                     }
-                    if "openrouter.ai" in config.API_ENDPOINT:
+                    if "openrouter.ai" in api_endpoint:
                         headers["HTTP-Referer"] = "https://github.com/elblah/dt-aicoder"
                         headers["X-Title"] = "dt-aicoder"
                     req = urllib.request.Request(
-                        config.API_ENDPOINT,
+                        api_endpoint,
                         data=request_body,
                         method="POST",
                         headers=headers,
@@ -413,7 +415,65 @@ class StreamingAdapter(APIClient):
 
                 if result_dict.get("success"):
                     response = result_dict["response"]
-                    processed_response = self._process_streaming_response(response)
+
+                    # Process the streaming response in a separate thread to allow ESC monitoring
+                    streaming_result = {}
+                    streaming_error = None
+                    streaming_completed = threading.Event()
+
+                    # Create a flag to signal cancellation
+                    cancellation_event = threading.Event()
+
+                    def streaming_worker():
+                        nonlocal streaming_result, streaming_error
+                        try:
+                            # Pass the cancellation event to the streaming method if possible
+                            # We'll modify _process_streaming_response to be interruptible
+                            streaming_result["response"] = (
+                                self._process_streaming_response(
+                                    response, cancellation_event
+                                )
+                            )
+                        except Exception as e:
+                            streaming_error = e
+                        finally:
+                            streaming_completed.set()
+
+                    streaming_thread = threading.Thread(
+                        target=streaming_worker, daemon=True
+                    )
+                    streaming_thread.start()
+
+                    # Monitor for ESC key press while streaming is processing
+                    esc_pressed = False
+                    while not streaming_completed.is_set():
+                        time.sleep(0.1)  # Small delay to prevent busy-waiting
+
+                        # Check for ESC keypress via centralized manager
+                        if is_esc_pressed():
+                            # self.animator.stop_animation()
+                            emsg("\nRequest cancelled by user (ESC).")
+
+                            # Signal cancellation
+                            cancellation_event.set()
+
+                            # Don't wait for the streaming thread to complete
+                            # Let it run in background and return immediately
+                            esc_pressed = True
+                            break
+
+                    if esc_pressed:
+                        # Return immediately without waiting for streaming thread
+                        return None
+
+                    # Wait for streaming thread to complete if it hasn't already
+                    streaming_thread.join()
+
+                    # Handle any errors from the streaming thread
+                    if streaming_error:
+                        raise streaming_error
+
+                    processed_response = streaming_result.get("response")
 
                     # Update stats using shared functionality
                     self._update_stats_on_success(
@@ -526,7 +586,9 @@ class StreamingAdapter(APIClient):
                 # No cleanup needed - terminal manager handles state
                 pass
 
-    def _process_streaming_response(self, response) -> Optional[Dict[str, Any]]:
+    def _process_streaming_response(
+        self, response, cancellation_event=None
+    ) -> Optional[Dict[str, Any]]:
         """Process streaming response and return final message."""
         # Reset colorization state for new streaming response
         self._reset_colorization_state()
@@ -536,7 +598,7 @@ class StreamingAdapter(APIClient):
             "id": "",
             "object": "chat.completion",
             "created": int(time.time()),
-            "model": config.API_MODEL,
+            "model": config.get_api_model(),
             "choices": [
                 {
                     "index": 0,
@@ -586,16 +648,26 @@ class StreamingAdapter(APIClient):
                 line = None
                 read_start_time = time.time()
 
-                # Non-blocking line read with timeout
+                # Check for cancellation before attempting to read
+                if cancellation_event and cancellation_event.is_set():
+                    emsg("\nRequest cancelled by user (ESC).")
+                    self.animator.stop_cursor_blinking()
+                    return None
+
+                # Non-blocking line read with timeout and cancellation
                 timeout_reminder_shown = False
                 while line is None:
+                    # Check for cancellation during the read attempt
+                    if cancellation_event and cancellation_event.is_set():
+                        emsg("\nRequest cancelled by user (ESC).")
+                        self.animator.stop_cursor_blinking()
+                        return None
+
                     try:
                         # Fallback: read with small timeout
                         line = response.readline()
                         if not line:  # EOF
-                            emsg(
-                                "\n🚫 Connection dropped by server (EOF detected)."
-                            )
+                            emsg("\n🚫 Connection dropped by server (EOF detected).")
                             wmsg(
                                 "The AI model server closed the connection unexpectedly."
                             )
@@ -619,12 +691,18 @@ class StreamingAdapter(APIClient):
                                 )
                                 timeout_reminder_shown = True
 
-                            if self._check_user_cancel_during_streaming():
+                            if cancellation_event and cancellation_event.is_set():
                                 emsg("\nRequest cancelled by user (ESC).")
+                                self.animator.stop_cursor_blinking()
                                 return None
                             continue
                         continue
                     except (ConnectionResetError, BrokenPipeError):
+                        # Check if this is due to cancellation (response.close() called)
+                        if cancellation_event and cancellation_event.is_set():
+                            emsg("\nRequest cancelled by user (ESC).")
+                            self.animator.stop_cursor_blinking()
+                            return None
                         emsg("\n🚫 Connection dropped by server (connection reset).")
                         wmsg("The AI model server closed the connection unexpectedly.")
                         wmsg(
@@ -632,6 +710,11 @@ class StreamingAdapter(APIClient):
                         )
                         return None
                     except Exception as e:
+                        # Check if this is due to cancellation (response.close() called)
+                        if cancellation_event and cancellation_event.is_set():
+                            emsg("\nRequest cancelled by user (ESC).")
+                            self.animator.stop_cursor_blinking()
+                            return None
                         if config.DEBUG:
                             emsg(f"Error reading from stream: {e}")
                         return None
@@ -685,14 +768,17 @@ class StreamingAdapter(APIClient):
                         "[PLAN] " if planning_mode.is_plan_mode_active() else ""
                     )
                     print(
-                        f"{config.BOLD}{config.GREEN}{plan_prefix}AI:{config.RESET} ",
+                        f"{config.RESET}{config.BOLD}{config.GREEN}{plan_prefix}AI:{config.RESET} ",
                         end="",
                         flush=True,
                     )
 
                 # Check for user cancellation during streaming (more frequently)
-                if self._check_user_cancel_during_streaming():
-                    emsg("\nStreaming cancelled by user.")
+                if (cancellation_event and cancellation_event.is_set()) or (
+                    not cancellation_event
+                    and self._check_user_cancel_during_streaming()
+                ):
+                    # emsg("\nStreaming cancelled by user.")
                     self.animator.stop_cursor_blinking()
                     return None
 
@@ -743,9 +829,14 @@ class StreamingAdapter(APIClient):
                             if "delta" in choice and "content" in choice["delta"]:
                                 content = choice["delta"]["content"]
                                 if content:
-                                    content_buffer += content
-                                    # Use new buffering system to handle whitespace
-                                    self._buffer_and_print_content(content)
+                                    # Handle non-string content (API compatibility issue)
+                                    if not isinstance(content, str):
+                                        # Ignore non string deltas, sometimes thinking comes as list
+                                        continue
+                                    else:
+                                        content_buffer += content
+                                        # Use new buffering system to handle whitespace
+                                        self._buffer_and_print_content(content)
 
                             # Process tool calls - handle null or missing tool_calls gracefully
                             if "delta" in choice and "tool_calls" in choice["delta"]:
@@ -753,12 +844,16 @@ class StreamingAdapter(APIClient):
                                 # Handle the case where tool_calls is null (DeepSeek issue)
                                 if tool_calls is None:
                                     if config.DEBUG:
-                                        wmsg(f" * Debug: Received null tool_calls from API, treating as empty array")
+                                        wmsg(
+                                            " * Debug: Received null tool_calls from API, treating as empty array"
+                                        )
                                     tool_calls = []
                                 # Ensure tool_calls is iterable
                                 if not isinstance(tool_calls, list):
                                     if config.DEBUG:
-                                        wmsg(f" * Debug: tool_calls is not a list ({type(tool_calls)}), treating as empty array")
+                                        wmsg(
+                                            f" * Debug: tool_calls is not a list ({type(tool_calls)}), treating as empty array"
+                                        )
                                     tool_calls = []
 
                                 for tool_call in tool_calls:
@@ -844,7 +939,7 @@ class StreamingAdapter(APIClient):
 
             # Log tool call summary if debug enabled
             if config.DEBUG:
-                wmsg(f" * Debug: Tool call processing summary:")
+                wmsg(" * Debug: Tool call processing summary:")
                 wmsg(f" * Debug: Total tool call buffers: {len(tool_call_buffers)}")
                 wmsg(f" * Debug: Valid tool calls: {len(valid_tool_calls)}")
                 wmsg(f" * Debug: Content buffer length: {len(content_buffer)}")
@@ -1001,7 +1096,9 @@ class StreamingAdapter(APIClient):
                 name_part = func_delta["name"]
                 if name_part is None:
                     if config.DEBUG:
-                        wmsg(f" * Debug: Received null function name, treating as empty string")
+                        wmsg(
+                            " * Debug: Received null function name, treating as empty string"
+                        )
                     name_part = ""
                 tool_call["function"]["name"] += name_part
             if "arguments" in func_delta:
@@ -1009,7 +1106,9 @@ class StreamingAdapter(APIClient):
                 args_part = func_delta["arguments"]
                 if args_part is None:
                     if config.DEBUG:
-                        wmsg(f" * Debug: Received null arguments, treating as empty string")
+                        wmsg(
+                            " * Debug: Received null arguments, treating as empty string"
+                        )
                     args_part = ""
                 tool_call["function"]["arguments"] += args_part
                 # Debug: Print the arguments as they're being built

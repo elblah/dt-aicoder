@@ -625,20 +625,10 @@ Provide a detailed but concise summary of our conversation above. Focus on infor
                 },
             ]
 
-            # Make API request for summary with temperature=0 to stop GLM randomness
-            # Force temperature=0 by temporarily setting config.TEMPERATURE
-            original_temp = getattr(config, "TEMPERATURE", None)
-            config.TEMPERATURE = 0
-            try:
-                response = self.api_handler._make_api_request(
-                    summary_messages, disable_streaming_mode=True, disable_tools=True
-                )
-            finally:
-                # Restore original temperature
-                if original_temp is not None:
-                    config.TEMPERATURE = original_temp
-                else:
-                    delattr(config, "TEMPERATURE")
+            # Make API request for summary
+            response = self.api_handler._make_api_request(
+                summary_messages, disable_streaming_mode=True, disable_tools=True
+            )
 
             if response and "choices" in response and response["choices"]:
                 summary = response["choices"][0]["message"].get("content", "").strip()

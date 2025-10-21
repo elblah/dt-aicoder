@@ -83,6 +83,7 @@ class TestHandler(BaseHTTPRequestHandler):
 def main():
     # Set test mode to avoid terminal conflicts
     os.environ["TEST_MODE"] = "1"
+    os.environ["OPENAI_API_KEY"] = "test-key"
     
     # Enable debug to see animation
     import aicoder.config as config_module
@@ -109,11 +110,9 @@ def main():
     animator = Animator()
     adapter = StreamingAdapter(api_handler=mock_api_handler, animator=animator)
 
-    # Modify config temporarily
-    original_endpoint = config_module.API_ENDPOINT
-    original_key = config_module.API_KEY
-    config_module.API_ENDPOINT = f"http://localhost:{port}/chat/completions"
-    config_module.API_KEY = "test-key"
+    # Set environment variables for local server
+    os.environ["OPENAI_BASE_URL"] = f"http://localhost:{port}"
+    os.environ["OPENAI_API_KEY"] = "test-key"
 
     try:
         # Make request that will trigger animation
@@ -132,9 +131,7 @@ def main():
         import traceback
         traceback.print_exc()
     finally:
-        # Restore config
-        config_module.API_ENDPOINT = original_endpoint
-        config_module.API_KEY = original_key
+        # Config restored via environment variables
         server.shutdown()
         print("Server shutdown", file=sys.stderr)
 

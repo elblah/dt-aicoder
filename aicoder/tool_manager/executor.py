@@ -735,7 +735,7 @@ class ToolExecutor:
                     # Check if user used diff-edit to modify the file
                     if hasattr(self.approval_system, '_diff_edit_result') and self.approval_system._diff_edit_result:
                         diff_edit_result = self.approval_system._diff_edit_result
-                        self.approval_system._diff_edit_result = None  # Clear it
+                        # Note: _diff_edit_result will be cleared in app.py after the notification is added
                         
                         # Format the result like a successful tool execution
                         formatted_result = f"✅ SUCCESS: {diff_edit_result['message']}\n\n💡 AI Guidance: {diff_edit_result['ai_guidance']}"

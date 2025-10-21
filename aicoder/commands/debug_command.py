@@ -55,13 +55,13 @@ class DebugCommand(BaseCommand):
                 delattr(self.app, "_streaming_adapter")
                 print("    - Streaming adapter reset to pick up debug settings")
 
-            imsg(f"\n*** Debug logging enabled")
+            imsg("\n*** Debug logging enabled")
             print("    - DEBUG mode: ON")
             print("    - Stream logging: stream_debug.log")
             print("    - Streaming timeout: 600s")
             print("    - Read timeout: 120s")
             print("    - HTTP timeout: 600s")
-            wmsg(f"*** Run /retry or make a request to capture debug data.")
+            wmsg("*** Run /retry or make a request to capture debug data.")
 
         elif arg in ["off", "disable", "0", "false"]:
             if not current_debug:
@@ -82,7 +82,7 @@ class DebugCommand(BaseCommand):
                 delattr(self.app, "_streaming_adapter")
                 print("    - Streaming adapter reset to disable debug settings")
 
-            imsg(f"\n*** Debug logging disabled")
+            imsg("\n*** Debug logging disabled")
             print("    - DEBUG mode: OFF")
             print("    - Stream logging: OFF")
 

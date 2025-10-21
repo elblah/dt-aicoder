@@ -3,7 +3,6 @@ Input handling for AI Coder.
 """
 
 import os
-import readline
 from . import config
 from .utils import make_readline_safe, wmsg, emsg, imsg
 from .readline_history_manager import prompt_history_manager
@@ -119,9 +118,9 @@ class InputHandlerMixin:
             if mode_content:
                 # Print the mode content being added
                 if planning_mode.is_plan_mode_active():
-                    wmsg(f"\nPlanning mode: Read-only tools only")
+                    wmsg("\nPlanning mode: Read-only tools only")
                 else:
-                    imsg(f"\nBuild mode: All tools available")
+                    imsg("\nBuild mode: All tools available")
 
                 # Append the content with a blank line separator
                 return f"{user_input}\n\n{mode_content}"

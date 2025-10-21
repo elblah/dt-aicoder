@@ -6,6 +6,7 @@ import os
 import difflib
 import shutil
 import json
+import datetime
 from typing import Dict, Any, List, Union
 
 from . import config
@@ -596,10 +597,11 @@ def display_token_info(stats, auto_compact_threshold=None):
 
     current_size_formatted = format_token_count(stats.current_prompt_size)
     threshold_formatted = format_token_count(display_threshold)
+    current_time = datetime.datetime.now().strftime("%H:%M:%S")
 
     # Display token info in the abbreviated format
     print(
-        f"\nContext: {bars} {usage_percentage:.0f}% ({current_size_formatted}/{threshold_formatted} @{config.API_MODEL})",
+        f"\nContext: {bars} {usage_percentage:.0f}% ({current_size_formatted}/{threshold_formatted} @{config.get_api_model()}) \033[2m- {current_time}\033[22m",
         end="",
         flush=True,
     )

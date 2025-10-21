@@ -39,10 +39,10 @@ class MemoryCommand(BaseCommand):
             os.unlink(temp_filename)
 
             if not content.strip():
-                wmsg(f"\n*** Edit cancelled, no content.")
+                wmsg("\n*** Edit cancelled, no content.")
                 return False, False
 
-            imsg(f"\n>>> Memory updated...")
+            imsg("\n>>> Memory updated...")
             self.app.message_history.messages = json.loads(content)
 
             # Re-estimate tokens since memory content changed

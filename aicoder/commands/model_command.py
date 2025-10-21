@@ -16,12 +16,6 @@ class ModelCommand(BaseCommand):
         self.aliases = ["/model"]
 
     def execute(self, args: List[str]) -> Tuple[bool, bool]:
-        """Gets or sets the API model."""
-        if args:
-            # Update the model in the config module
-            import aicoder.config
-
-            aicoder.config.API_MODEL = args[0]
-
-        imsg(f"\n *** Model: {config.API_MODEL}")
+        """Gets the current API model."""
+        imsg(f"\n *** Model: {config.get_api_model()}")
         return False, False

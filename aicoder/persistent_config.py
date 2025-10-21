@@ -5,7 +5,6 @@ A basic dict that loads from and saves to .dt-aicoder/settings-local.json
 """
 
 import json
-import os
 from pathlib import Path
 
 

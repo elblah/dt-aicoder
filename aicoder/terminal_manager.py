@@ -84,7 +84,9 @@ class TerminalManager:
 
                 # Only check for ESC when we're not in prompt mode
                 # Use select to check if there's data available without blocking
-                ready, _, _ = select.select([sys.stdin], [], [], 0.001)  # Very short timeout
+                ready, _, _ = select.select(
+                    [sys.stdin], [], [], 0.001
+                )  # Very short timeout
                 if not ready:
                     continue
 
@@ -92,7 +94,7 @@ class TerminalManager:
                 data = sys.stdin.read()
 
                 # Check if we got an ESC character and distinguish from escape sequences
-                if data and data[0] == '\x1b':  # ESC character
+                if data and data[0] == "\x1b":  # ESC character
                     if len(data) == 1:
                         # Lone ESC detected (not an escape sequence)
                         self._esc_pressed = True
@@ -122,7 +124,9 @@ class TerminalManager:
             # Restore normal terminal settings for proper input
             if self._original_settings:
                 try:
-                    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self._original_settings)
+                    termios.tcsetattr(
+                        sys.stdin, termios.TCSADRAIN, self._original_settings
+                    )
                 except (OSError, termios.error):
                     pass  # Best effort
 
@@ -143,8 +147,8 @@ class TerminalManager:
             try:
                 new_settings = termios.tcgetattr(sys.stdin)
                 new_settings[3] &= ~termios.ICANON  # Disable canonical mode
-                new_settings[3] &= ~termios.ECHO    # Disable echo
-                new_settings[6][termios.VMIN] = 0   # Don't require minimum characters
+                new_settings[3] &= ~termios.ECHO  # Disable echo
+                new_settings[6][termios.VMIN] = 0  # Don't require minimum characters
                 new_settings[6][termios.VTIME] = 0  # Don't wait for characters
                 termios.tcsetattr(sys.stdin, termios.TCSADRAIN, new_settings)
             except (OSError, termios.error):
@@ -154,8 +158,8 @@ class TerminalManager:
 
     def is_esc_pressed(self) -> bool:
         """Check if ESC key has been pressed since last reset."""
-        with self._terminal_lock:
-            return self._esc_pressed
+        # with self._terminal_lock:
+        return self._esc_pressed
 
     def reset_esc_state(self):
         """Reset the ESC pressed state."""
@@ -165,36 +169,38 @@ class TerminalManager:
 
     def get_esc_timestamp(self) -> float:
         """Get the timestamp when ESC was last pressed."""
-        with self._terminal_lock:
-            return self._esc_timestamp
+        # with self._terminal_lock:
+        return self._esc_timestamp
 
     def _perform_terminal_reset(self, silent: bool = False):
         """Perform a terminal reset using 'stty sane'."""
         try:
             import subprocess
+
             # Run 'sttx sane' to reset terminal settings
-            result = subprocess.run(['stty', 'sane'],
-                                   capture_output=True,
-                                   timeout=5)
+            result = subprocess.run(["stty", "sane"], capture_output=True, timeout=5)
             if result.returncode == 0:
                 # Only show feedback if not silent
                 if not silent:
                     # Ensure terminal is in a usable state and show feedback
                     import sys
-                    sys.stdout.write('\r[K[Ctrl+G] Terminal reset completed\r\n')
+
+                    sys.stdout.write("\r[K[Ctrl+G] Terminal reset completed\r\n")
                     sys.stdout.flush()
             else:
                 # Only show feedback if not silent
                 if not silent:
                     import sys
-                    sys.stdout.write('\r[K[Ctrl+G] Terminal reset failed\r\n')
+
+                    sys.stdout.write("\r[K[Ctrl+G] Terminal reset failed\r\n")
                     sys.stdout.flush()
         except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
             # Fallback if stty is not available or fails
             # Only show feedback if not silent
             if not silent:
                 import sys
-                sys.stdout.write('\r[K[Ctrl+G] Terminal reset unavailable\r\n')
+
+                sys.stdout.write("\r[K[Ctrl+G] Terminal reset unavailable\r\n")
                 sys.stdout.flush()
 
     def setup_for_non_prompt_input(self):

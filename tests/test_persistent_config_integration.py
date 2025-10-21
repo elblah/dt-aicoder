@@ -5,7 +5,6 @@ Integration tests for persistent config functionality.
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import Mock
 
 from aicoder.app import AICoder
 from aicoder.persistent_config import PersistentConfig

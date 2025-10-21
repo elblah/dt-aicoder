@@ -1,8 +1,7 @@
 """Terminal reset command"""
 
-from typing import Tuple, List
+from typing import Tuple
 from .base import BaseCommand
-from ..utils import wmsg, emsg
 
 
 class ResetCommand(BaseCommand):

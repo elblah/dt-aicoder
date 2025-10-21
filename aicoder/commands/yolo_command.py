@@ -31,12 +31,12 @@ class YoloCommand(BaseCommand):
             # Enable YOLO mode
             os.environ["YOLO_MODE"] = "1"
             aicoder.config.YOLO_MODE = True
-            imsg(f"\n*** YOLO mode enabled")
+            imsg("\n*** YOLO mode enabled")
         elif arg in ["off", "disable", "0", "false"]:
             # Disable YOLO mode
             os.environ["YOLO_MODE"] = "0"
             aicoder.config.YOLO_MODE = False
-            imsg(f"\n*** YOLO mode disabled")
+            imsg("\n*** YOLO mode disabled")
         else:
             print(
                 f"\n{config.RED}*** Invalid argument. Use: /yolo [on|off]{config.RESET}"

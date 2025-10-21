@@ -194,10 +194,10 @@ class ApprovalSystem:
                         continue
                     else:
                         wmsg(
-                            f"Invalid choice. Please enter a, s, d, c, YOLO, or help."
+                            "Invalid choice. Please enter a, s, d, c, YOLO, or help."
                         )
                 except (EOFError, KeyboardInterrupt):
-                    emsg(f"\nInput interrupted. Denying tool call.")
+                    emsg("\nInput interrupted. Denying tool call.")
                     return (False, False)
                 except Exception as e:
                     # Check if this is a cancellation request
@@ -354,7 +354,7 @@ class ApprovalSystem:
             
             if modified_temp_content != original_temp_content:
                 # User modified the file!
-                imsg(f"\n✨ User modifications detected!")
+                imsg("\n✨ User modifications detected!")
                 
                 # Apply user changes to original file
                 with open(file_path, 'w', encoding='utf-8') as f:
@@ -365,14 +365,18 @@ class ApprovalSystem:
                 # Notify user
                 print(f"{config.CYAN}🎯 Your changes have been applied successfully!{config.RESET}")
                 
-                # Notify AI through message history
-                if hasattr(self, 'message_history') and self.message_history:
-                    notification = (
-                        f"USER MODIFICATION: {file_path} was edited by user during interactive diff editing. "
-                        f"The AI's proposed changes were replaced with user modifications. "
-                        f"The file content now reflects the user's edits."
-                    )
-                    self.message_history.messages.append({"role": "system", "content": notification})
+                # Store notification to be added after tool result
+                notification = (
+                    f"USER MODIFICATION: {file_path} was edited by user during interactive diff editing. "
+                    f"The AI's proposed changes were replaced with user modifications. "
+                    f"The file content now reflects the user's edits."
+                )
+
+                # Store the notification in a separate attribute since _diff_edit_result might be reset
+                if not hasattr(self, '_diff_edit_notification'):
+                    self._diff_edit_notification = notification
+                else:
+                    self._diff_edit_notification = notification
                 
                 return True
             else:
@@ -455,7 +459,7 @@ class ApprovalSystem:
             else:
                 subprocess.run([diff_tool, file_path, tmp_path])
             
-            imsg(f"\nDiff viewer closed")
+            imsg("\nDiff viewer closed")
             
         except Exception as e:
             emsg(f"Error running diff tool: {e}")
@@ -466,32 +470,32 @@ class ApprovalSystem:
 
     def _show_approval_help(self):
         """Display help information for approval options."""
-        imsg(f"\nApproval Options:")
+        imsg("\nApproval Options:")
         wmsg(
-            f"a) Allow once - Execute this tool call just this one time"
+            "a) Allow once - Execute this tool call just this one time"
         )
         wmsg(
-            f"s) Allow for session - Allow this type of tool call for the rest of this session"
+            "s) Allow for session - Allow this type of tool call for the rest of this session"
         )
-        wmsg(f"d) Deny - Reject this tool call")
+        wmsg("d) Deny - Reject this tool call")
         wmsg(
-            f"c) Cancel all - Cancel all pending tool calls and return to user input"
+            "c) Cancel all - Cancel all pending tool calls and return to user input"
         )
         if any(tool_name in ["edit_file", "write_file"] for tool_name in ["edit_file", "write_file"]):
             wmsg(
-                f"diff) Show external diff - View diff of proposed changes"
+                "diff) Show external diff - View diff of proposed changes"
             )
             wmsg(
-                f"diff-edit) Interactive diff edit - Edit proposed changes in diff tool"
+                "diff-edit) Interactive diff edit - Edit proposed changes in diff tool"
             )
         wmsg(
-            f"YOLO) YOLO mode - Automatically approve all tool calls for the rest of the session"
+            "YOLO) YOLO mode - Automatically approve all tool calls for the rest of the session"
         )
-        wmsg(f"help) Show help - Display this help message")
-        imsg(f"\nNavigation:")
-        wmsg(f"↑/↓ Arrow keys - Navigate through approval history and select options")
-        wmsg(f"Type directly - Or type the option letter directly")
-        imsg(f"\nGuidance Feature:")
+        wmsg("help) Show help - Display this help message")
+        imsg("\nNavigation:")
+        wmsg("↑/↓ Arrow keys - Navigate through approval history and select options")
+        wmsg("Type directly - Or type the option letter directly")
+        imsg("\nGuidance Feature:")
         print(
             "You can add a '+' after any option (except help) to provide guidance to the AI."
         )
@@ -505,10 +509,10 @@ class ApprovalSystem:
             "This guidance will be added to the conversation as a user message, helping the AI"
         )
         print("understand your preferences and make better decisions in future steps.")
-        imsg(f"\nDiff Tool:")
-        wmsg(f"Configure - Set AICODER_DIFF_TOOL_BIN environment variable")
-        wmsg(f"Auto-detect - vimdiff, nvim -d, meld, kdiff3, diffuse, or code")
-        wmsg(f"Install - sudo apt install vim (for vimdiff) or meld")
+        imsg("\nDiff Tool:")
+        wmsg("Configure - Set AICODER_DIFF_TOOL_BIN environment variable")
+        wmsg("Auto-detect - vimdiff, nvim -d, meld, kdiff3, diffuse, or code")
+        wmsg("Install - sudo apt install vim (for vimdiff) or meld")
         print(
             "Example: If you type 'a+' and then enter 'Please use more concise responses',"
         )
@@ -554,4 +558,4 @@ class ApprovalSystem:
     def revoke_approvals(self):
         """Clear the session approval cache."""
         self.tool_approvals_session.clear()
-        imsg(f"\n *** All session approvals have been revoked.")
+        imsg("\n *** All session approvals have been revoked.")

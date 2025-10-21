@@ -109,6 +109,9 @@ class AICoder(
         )
         self._initialize_mcp_servers()
 
+        # Load prompt history after readline is initialized
+        self._load_prompt_history()
+
         # Set up the API handler reference in message history
         self.message_history.api_handler = self
 
@@ -133,6 +136,22 @@ class AICoder(
         from .prompt_loader import print_prompt_override_info
 
         print_prompt_override_info()
+
+    def _load_prompt_history(self):
+        """Load persistent prompt history into readline."""
+        try:
+            from .readline_history_manager import prompt_history_manager
+            
+            # Load persistent history into readline history manager
+            prompt_history_manager.load_persistent_history()
+            
+        except ImportError:
+            # Prompt history manager not available - skip
+            pass
+        except Exception as e:
+            # Silently fail to avoid breaking startup
+            from .utils import emsg
+            emsg(f"Warning: Could not load prompt history: {e}")
 
     def _signal_handler(self, sig, frame):
         """Handle SIGINT (Ctrl+C) signal gracefully."""
@@ -189,6 +208,30 @@ class AICoder(
                         wmsg(
                             f" *** Tool result from '{tool_name}' replaced due to size ({original_size} chars > {config.MAX_TOOL_RESULT_SIZE} limit)"
                         )
+
+    def _handle_diff_edit_notifications(self, tool_results):
+        """Handle diff-edit notifications by adding them after tool results."""
+        # Check if any tool result was from diff-edit and add notification after the tool result
+        if hasattr(self, 'tool_manager') and hasattr(self.tool_manager.executor, 'approval_system'):
+            approval_system = self.tool_manager.executor.approval_system
+            if hasattr(approval_system, '_diff_edit_result') and approval_system._diff_edit_result:
+                diff_edit_result = approval_system._diff_edit_result
+                approval_system._diff_edit_result = None  # Clear it
+                
+                # Check for diff-edit notification (stored separately from _diff_edit_result)
+                if hasattr(approval_system, '_diff_edit_notification') and approval_system._diff_edit_notification:
+                    notification = approval_system._diff_edit_notification
+                    approval_system._diff_edit_notification = None  # Clear it
+                    
+                    # Add the notification to message history AFTER the tool results
+                    self.message_history.messages.append({
+                        "role": "system", 
+                        "content": notification
+                    })
+            
+            # Also clean up _diff_edit_result if it exists
+            if hasattr(approval_system, '_diff_edit_result') and approval_system._diff_edit_result:
+                approval_system._diff_edit_result = None  # Clear it
 
     def _check_auto_compaction(self):
         """Check if auto-compaction should be triggered based on context percentage."""
@@ -379,6 +422,9 @@ class AICoder(
                                 # Check and handle large tool results for size limiting
                                 self._check_and_handle_large_tool_results(tool_results)
                                 self.message_history.add_tool_results(tool_results)
+                                
+                                # Check if any tool result was from diff-edit and add notification after the tool result
+                                self._handle_diff_edit_notifications(tool_results)
                             else:
                                 emsg(
                                     " * Warning: No tool results to add"
@@ -456,7 +502,7 @@ class AICoder(
                                         else ""
                                     )
                                     print(
-                                        f"{config.BOLD}{config.GREEN}{plan_prefix}AI:{config.RESET} {parse_markdown(message['content'])}"
+                                        f"{config.RESET}{config.BOLD}{config.GREEN}{plan_prefix}AI:{config.RESET} {parse_markdown(message['content'])}"
                                     )
 
                             break
