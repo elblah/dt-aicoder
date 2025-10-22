@@ -896,7 +896,7 @@ class StreamingAdapter(APIClient):
                         tc.get("function", {}).get("name", "unknown")
                         for tc in valid_tool_calls
                     ]
-                    wmsg(f" * Debug: Valid tool call names: {tool_names}")
+                    dmsg(f"Valid tool call names: {tool_names}")
 
             # Log to stream file if enabled
             if self.stream_log_file:
