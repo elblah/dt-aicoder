@@ -54,6 +54,10 @@ def test_exception_in_command_handler():
     class MockApp:
         def __init__(self):
             self.message_history = Mock()
+            # Set up proper mock for api_handler.stats to avoid TypeError
+            self.message_history.api_handler = Mock()
+            self.message_history.api_handler.stats = Mock()
+            self.message_history.api_handler.stats.current_prompt_size = 1000
 
     mock_app = MockApp()
     handler = CompactCommand(mock_app)
@@ -64,6 +68,8 @@ def test_exception_in_command_handler():
         "Test error"
     )
     handler.app.message_history._compaction_performed = False
+    # Mock get_round_count to avoid issues with new logic
+    handler.app.message_history.get_round_count.return_value = 0
 
     # Capture print output
     from io import StringIO
@@ -79,5 +85,7 @@ def test_exception_in_command_handler():
 
     # Check that the appropriate message was printed
     output = f.getvalue()
-    assert "Nothing to compact" in output
-    assert "all messages are recent or already compacted" in output
+    # The new enhanced feedback shows different messages for no messages case
+    assert "No messages available to compact" in output
+    assert "Your conversation is already minimal" in output
+    assert "Start a conversation to enable compaction features" in output

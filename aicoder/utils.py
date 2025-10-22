@@ -721,6 +721,12 @@ def imsg(msg: str, file=None) -> None:
     print(colorize(msg, config.GREEN), file=file)
 
 
+def dmsg(msg: str, file=None) -> None:
+    """Print a debug message (only if DEBUG is enabled)."""
+    if config.DEBUG:
+        print(colorize(f"DEBUG: {msg}", config.CYAN), file=file)
+
+
 # String-return variants
 def wmsg_str(msg: str) -> str:
     """Return a colorized yellow string."""

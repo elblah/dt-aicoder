@@ -6,6 +6,7 @@ formatting to strings that match configurable regex patterns.
 
 Features:
 - Multiple regex patterns (one per line in config files)
+- Case-sensitive regex matching (explicit configuration required)
 - If ANY pattern matches, the entire string is dimmed
 - Hybrid configuration system with priority order:
   1. Project-local config (.aicoder/dimmed.conf) - highest priority
@@ -171,7 +172,8 @@ def compile_patterns(pattern_strings: List[str]) -> List[Pattern]:
     compiled = []
     for pattern_str in pattern_strings:
         try:
-            compiled_pattern = re.compile(pattern_str)
+            # Compile with case-sensitive matching (ASCII mode for consistent behavior)
+            compiled_pattern = re.compile(pattern_str, re.ASCII)
             compiled.append(compiled_pattern)
         except re.error as e:
             print(f"⚠️ Warning: Invalid regex pattern '{pattern_str}': {e}")
@@ -210,7 +212,8 @@ def add_dimmed_pattern(pattern: str) -> bool:
     global _dimmed_patterns
     
     try:
-        compiled_pattern = re.compile(pattern)
+        # Compile with case-sensitive matching (ASCII mode for consistent behavior)
+        compiled_pattern = re.compile(pattern, re.ASCII)
         _dimmed_patterns.append(compiled_pattern)
         return True
     except re.error as e:
@@ -321,12 +324,11 @@ def load_all_patterns() -> List[str]:
             if debug:
                 print(f"🔅 Loaded {len(patterns)} patterns from environment variables")
     
-    # 4. Ultimate fallback to default pattern
+    # 4. No default fallback - require explicit configuration
     if not patterns:
-        patterns = [r'\[.*?\]']  # Default: text in brackets
         debug = os.environ.get("DEBUG", "0") == "1"
         if debug:
-            print(f"🔅 Using default pattern: {patterns[0]}")
+            print(f"🔅 No patterns configured - dimmed output disabled")
     
     return patterns
 
@@ -335,6 +337,10 @@ def initialize_dimmed_plugin():
     """Initialize the dimmed plugin with hybrid configuration system."""
     global _original_print, _dimmed_patterns, _dimmed_enabled
     global _project_config_path, _global_config_path
+
+    # Prevent re-initialization
+    if _original_print is not None:
+        return
     
     # Store original print function
     _original_print = __builtins__.get('print', print)

@@ -22,6 +22,10 @@ def load_plugins(plugin_dir=None):
     Returns:
         list: Names of loaded plugins
     """
+    # Skip plugin loading if disabled
+    if os.environ.get("AICODER_DISABLE_PLUGINS"):
+        return []
+    
     if plugin_dir is None:
         # Check for environment variable to override plugin directory
         plugin_dir = os.environ.get("AICODER_PLUGIN_DIR")

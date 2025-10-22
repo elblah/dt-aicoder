@@ -241,11 +241,18 @@ def list_available_prompts() -> List[Tuple[int, str, Path]]:
 
     Returns:
         List of tuples (number, filename, full_path) sorted by filename
+        Always includes the original startup prompt as #1
     """
     prompts_dir = get_user_prompts_directory()
 
+    numbered_prompts = []
+
+    # Add the original startup prompt as #1
+    original_source = _get_original_prompt_source()
+    numbered_prompts.append((1, f"000-default ({original_source})", None))
+
     if not prompts_dir.exists():
-        return []
+        return numbered_prompts
 
     prompt_files = []
 
@@ -254,9 +261,8 @@ def list_available_prompts() -> List[Tuple[int, str, Path]]:
         for file_path in sorted(prompts_dir.glob(ext)):
             prompt_files.append(file_path)
 
-    # Create numbered list
-    numbered_prompts = []
-    for i, file_path in enumerate(prompt_files, 1):
+    # Create numbered list starting from #2 (since #1 is original)
+    for i, file_path in enumerate(prompt_files, 2):
         numbered_prompts.append((i, file_path.name, file_path))
 
     return numbered_prompts
@@ -354,6 +360,34 @@ def _apply_prompt_variables(base_prompt: str) -> str:
         base_prompt = base_prompt.replace('{system_info}', system_info)
 
     return base_prompt
+
+
+# Global variable to store the original prompt source
+_original_prompt_source = None
+
+
+def _get_original_prompt_source() -> str:
+    """
+    Get the description of the original prompt source from when AI Coder started.
+    
+    Returns:
+        Description of the original source (built-in, env var, or file path)
+    """
+    global _original_prompt_source
+    
+    if _original_prompt_source is not None:
+        return _original_prompt_source
+    
+    # Determine the original source
+    env_value = os.environ.get("AICODER_PROMPT_MAIN")
+    if not env_value:
+        _original_prompt_source = "built-in"
+    elif '/' in env_value or env_value.startswith(('.', '~')):
+        _original_prompt_source = f"file: {env_value}"
+    else:
+        _original_prompt_source = "env var"
+    
+    return _original_prompt_source
 
 
 def get_main_prompt() -> str:

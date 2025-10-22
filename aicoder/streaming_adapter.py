@@ -17,11 +17,12 @@ from typing import List, Dict, Any, Optional
 from . import config
 from .animator import Animator
 from .api_client import APIClient
+from .api.errors import APIErrors
 from .retry_utils import (
     ConnectionDroppedException,
 )
 from .terminal_manager import is_esc_pressed
-from .utils import estimate_messages_tokens, wmsg, emsg, imsg
+from .utils import estimate_messages_tokens, wmsg, emsg, imsg, dmsg
 
 
 class StreamingAdapter(APIClient):
@@ -47,8 +48,7 @@ class StreamingAdapter(APIClient):
                 with open(self.stream_log_file, "a", encoding="utf-8") as f:
                     f.write(data + "\n")
             except Exception as e:
-                if config.DEBUG:
-                    wmsg(f"Error writing to stream log: {e}")
+                dmsg(f"Error writing to stream log: {e}")
 
     def _reset_colorization_state(self):
         """Reset markdown colorization state for a new streaming response."""
@@ -97,8 +97,7 @@ class StreamingAdapter(APIClient):
         try:
             return self._streaming_request(messages, disable_streaming_mode)
         except Exception as e:
-            if config.DEBUG:
-                print(f"DEBUG: Streaming failed, falling back to regular request: {e}")
+            dmsg(f"Streaming failed, falling back to regular request: {e}")
             # Fallback to regular request
             return self._make_non_streaming_request(messages)
 
@@ -136,8 +135,7 @@ class StreamingAdapter(APIClient):
                 self.animator.stop_animation()
                 raise
 
-            if config.DEBUG:
-                print(f"DEBUG: data length = {len(request_body)}")
+            dmsg(f"data length = {len(request_body)}")
 
             # Threading approach for API request with ESC cancellation support
             def api_request_worker(result_dict, stop_event):
@@ -212,8 +210,7 @@ class StreamingAdapter(APIClient):
                     # Extract token usage information from the response if not handled by _update_stats_on_success
                     if processed_response and "usage" in processed_response:
                         usage = processed_response["usage"]
-                        if config.DEBUG:
-                            print(f"DEBUG: Non-streaming usage data: {usage}")
+                        dmsg(f"Non-streaming usage data: {usage}")
                         # Extract prompt tokens (input) and completion tokens (output)
                         if "prompt_tokens" in usage and self.stats:
                             self.stats.current_prompt_size = usage["prompt_tokens"]
@@ -232,18 +229,7 @@ class StreamingAdapter(APIClient):
 
                     if error_type == "http_timeout":
                         http_timeout = int(os.environ.get("HTTP_TIMEOUT", "300"))
-                        emsg(
-                            f"\nHTTP connection timeout reached ({http_timeout} seconds)."
-                        )
-                        wmsg(
-                            "The connection to the AI model timed out. This can happen with slow models."
-                        )
-                        wmsg(
-                            "Tip: Set HTTP_TIMEOUT=X to increase timeout (e.g., HTTP_TIMEOUT=600 for 10 minutes)"
-                        )
-                        wmsg(
-                            "Tip: You can also press ESC to cancel if you think it's taking too long."
-                        )
+                        APIErrors.print(APIErrors.HTTP_TIMEOUT, timeout=http_timeout)
                         return None
                     elif error_type == "http_error":
                         # Re-raise HTTP errors so they can be handled by the outer exception handler
@@ -305,8 +291,7 @@ class StreamingAdapter(APIClient):
                 self._log_stream_data("=== REQUEST ===")
                 self._log_stream_data(json.dumps(api_data, indent=2))
             except Exception as e:
-                if config.DEBUG:
-                    emsg(f"Error logging request data: {e}")
+                dmsg(f"Error logging request data: {e}")
 
         self.animator.start_animation("Working...")
 
@@ -326,9 +311,8 @@ class StreamingAdapter(APIClient):
                 self.animator.stop_animation()
                 raise
 
-            if config.DEBUG:
-                if not disable_streaming_mode:
-                    print(f"DEBUG: data length = {len(request_body)}")
+            if not disable_streaming_mode:
+                dmsg(f"data length = {len(request_body)}")
 
             # Create a generator for streaming response
             def streaming_worker(result_dict, stop_event):
@@ -483,8 +467,7 @@ class StreamingAdapter(APIClient):
                     # Extract token usage information from the response
                     if processed_response and "usage" in processed_response:
                         usage = processed_response["usage"]
-                        if config.DEBUG:
-                            print(f"DEBUG: Streaming usage data: {usage}")
+                        dmsg(f"Streaming usage data: {usage}")
                         # Extract prompt tokens (input) and completion tokens (output)
                         if "prompt_tokens" in usage:
                             self.stats.current_prompt_size = usage["prompt_tokens"]
@@ -538,18 +521,7 @@ class StreamingAdapter(APIClient):
 
                     if error_type == "http_timeout":
                         http_timeout = int(os.environ.get("HTTP_TIMEOUT", "300"))
-                        emsg(
-                            f"\nHTTP connection timeout reached ({http_timeout} seconds)."
-                        )
-                        wmsg(
-                            "The connection to the AI model timed out. This can happen with slow models."
-                        )
-                        wmsg(
-                            "Tip: Set HTTP_TIMEOUT=X to increase timeout (e.g., HTTP_TIMEOUT=600 for 10 minutes)"
-                        )
-                        wmsg(
-                            "Tip: You can also press ESC to cancel if you think it's taking too long."
-                        )
+                        APIErrors.print(APIErrors.HTTP_TIMEOUT, timeout=http_timeout)
                         return None
                     elif error_type == "http_error":
                         # Re-raise HTTP errors so they can be handled by the outer exception handler
@@ -633,14 +605,8 @@ class StreamingAdapter(APIClient):
                 # Check for overall timeout first
                 current_time = time.time()
                 if current_time - last_data_time > timeout_seconds:
-                    emsg(
-                        f"\nStreaming timeout reached ({timeout_seconds} seconds with no SSE data)."
-                    )
-                    print(
-                        "Tip: Set STREAMING_TIMEOUT=X to adjust (e.g., STREAMING_TIMEOUT=600 for 10 minutes)"
-                    )
-                    print(
-                        "Tip: For HTTP connection timeouts, set HTTP_TIMEOUT=X (e.g., HTTP_TIMEOUT=600)"
+                    APIErrors.print(
+                        APIErrors.STREAMING_TIMEOUT, timeout=timeout_seconds
                     )
                     return None
 
@@ -667,12 +633,8 @@ class StreamingAdapter(APIClient):
                         # Fallback: read with small timeout
                         line = response.readline()
                         if not line:  # EOF
-                            emsg("\n🚫 Connection dropped by server (EOF detected).")
-                            wmsg(
-                                "The AI model server closed the connection unexpectedly."
-                            )
-                            wmsg(
-                                "Please try your request again - the connection may work next time."
+                            APIErrors.print(
+                                APIErrors.CONNECTION_DROPPED, reason="EOF detected"
                             )
                             raise ConnectionDroppedException(
                                 "Connection dropped by server (EOF detected)"
@@ -683,11 +645,9 @@ class StreamingAdapter(APIClient):
                         if time.time() - read_start_time > read_timeout_seconds:
                             if not timeout_reminder_shown:
                                 print(f"\r{' ' * 80}", end="", flush=True)
-                                wmsg(
-                                    f"\n⚠️  It's been {read_timeout_seconds} seconds with no new data."
-                                )
-                                wmsg(
-                                    "   Press ESC to cancel the request, or wait for more data..."
+                                APIErrors.print(
+                                    APIErrors.TIMEOUT_REMINDER,
+                                    read_timeout_seconds=read_timeout_seconds,
                                 )
                                 timeout_reminder_shown = True
 
@@ -703,10 +663,8 @@ class StreamingAdapter(APIClient):
                             emsg("\nRequest cancelled by user (ESC).")
                             self.animator.stop_cursor_blinking()
                             return None
-                        emsg("\n🚫 Connection dropped by server (connection reset).")
-                        wmsg("The AI model server closed the connection unexpectedly.")
-                        wmsg(
-                            "Please try your request again - the connection may work next time."
+                        APIErrors.print(
+                            APIErrors.CONNECTION_DROPPED, reason="connection reset"
                         )
                         return None
                     except Exception as e:
@@ -715,8 +673,7 @@ class StreamingAdapter(APIClient):
                             emsg("\nRequest cancelled by user (ESC).")
                             self.animator.stop_cursor_blinking()
                             return None
-                        if config.DEBUG:
-                            emsg(f"Error reading from stream: {e}")
+                        dmsg(f"Error reading from stream: {e}")
                         return None
 
                     # Check overall timeout during read attempt
@@ -733,11 +690,8 @@ class StreamingAdapter(APIClient):
                 # Check for timeout - only if no SSE data received in the last X seconds
                 current_time = time.time()
                 if current_time - last_data_time > timeout_seconds:
-                    emsg(
-                        f"\nStreaming timeout reached ({timeout_seconds} seconds with no SSE data)."
-                    )
-                    wmsg(
-                        "Tip: Set STREAMING_TIMEOUT=X to adjust (e.g., STREAMING_TIMEOUT=600 for 10 minutes)"
+                    APIErrors.print(
+                        APIErrors.STREAMING_TIMEOUT, timeout=timeout_seconds
                     )
                     return None
 
@@ -843,17 +797,15 @@ class StreamingAdapter(APIClient):
                                 tool_calls = choice["delta"]["tool_calls"]
                                 # Handle the case where tool_calls is null (DeepSeek issue)
                                 if tool_calls is None:
-                                    if config.DEBUG:
-                                        wmsg(
-                                            " * Debug: Received null tool_calls from API, treating as empty array"
-                                        )
+                                    dmsg(
+                                        "Received null tool_calls from API, treating as empty array"
+                                    )
                                     tool_calls = []
                                 # Ensure tool_calls is iterable
                                 if not isinstance(tool_calls, list):
-                                    if config.DEBUG:
-                                        wmsg(
-                                            f" * Debug: tool_calls is not a list ({type(tool_calls)}), treating as empty array"
-                                        )
+                                    dmsg(
+                                        f"tool_calls is not a list ({type(tool_calls)}), treating as empty array"
+                                    )
                                     tool_calls = []
 
                                 for tool_call in tool_calls:
@@ -916,13 +868,8 @@ class StreamingAdapter(APIClient):
                     ):
                         valid_tool_calls.append(tool_call)
                     else:
-                        if config.DEBUG:
-                            emsg(
-                                f" * Debug: Skipping incomplete tool call at index {index}:"
-                            )
-                            emsg(
-                                f" * Debug: Tool call data: {json.dumps(tool_call, indent=2)}"
-                            )
+                        dmsg(f"Skipping incomplete tool call at index {index}")
+                        dmsg(f"Tool call data: {json.dumps(tool_call, indent=2)}")
                         # Log to stream file if enabled
                         if self.stream_log_file:
                             try:
@@ -937,12 +884,11 @@ class StreamingAdapter(APIClient):
 
                 full_response["choices"][0]["message"]["tool_calls"] = valid_tool_calls
 
-            # Log tool call summary if debug enabled
-            if config.DEBUG:
-                wmsg(" * Debug: Tool call processing summary:")
-                wmsg(f" * Debug: Total tool call buffers: {len(tool_call_buffers)}")
-                wmsg(f" * Debug: Valid tool calls: {len(valid_tool_calls)}")
-                wmsg(f" * Debug: Content buffer length: {len(content_buffer)}")
+                # Log tool call summary
+                dmsg("Tool call processing summary:")
+                dmsg(f"Total tool call buffers: {len(tool_call_buffers)}")
+                dmsg(f"Valid tool calls: {len(valid_tool_calls)}")
+                dmsg(f"Content buffer length: {len(content_buffer)}")
 
                 # Log the valid tool call names
                 if valid_tool_calls:
@@ -990,8 +936,7 @@ class StreamingAdapter(APIClient):
                     self._log_stream_data("=== FINAL RESPONSE ===")
                     self._log_stream_data(json.dumps(full_response, indent=2))
                 except Exception as e:
-                    if config.DEBUG:
-                        emsg(f"Error logging final response: {e}")
+                    dmsg(f"Error logging final response: {e}")
 
             return full_response
 
@@ -1008,13 +953,7 @@ class StreamingAdapter(APIClient):
                 self.trailing_whitespace_buffer = ""
 
             # ENHANCED ERROR HANDLING: Always show errors to the user so they know what happened
-            emsg(f"\nError processing streaming response: {e}")
-            wmsg(
-                "This appears to be an API compatibility issue. The streaming was interrupted."
-            )
-            wmsg(
-                "You can try running with ENABLE_STREAMING=0 to disable streaming mode."
-            )
+            APIErrors.print(APIErrors.STREAMING_PROCESSING_ERROR, error=e)
 
             if config.DEBUG:
                 import traceback
@@ -1095,20 +1034,14 @@ class StreamingAdapter(APIClient):
                 # Handle null function name (DeepSeek issue)
                 name_part = func_delta["name"]
                 if name_part is None:
-                    if config.DEBUG:
-                        wmsg(
-                            " * Debug: Received null function name, treating as empty string"
-                        )
+                    dmsg("Received null function name, treating as empty string")
                     name_part = ""
                 tool_call["function"]["name"] += name_part
             if "arguments" in func_delta:
                 # Handle null arguments (DeepSeek issue)
                 args_part = func_delta["arguments"]
                 if args_part is None:
-                    if config.DEBUG:
-                        wmsg(
-                            " * Debug: Received null arguments, treating as empty string"
-                        )
+                    dmsg("Received null arguments, treating as empty string")
                     args_part = ""
                 tool_call["function"]["arguments"] += args_part
                 # Debug: Print the arguments as they're being built

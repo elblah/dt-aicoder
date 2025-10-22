@@ -65,16 +65,20 @@ class TestPromptCommand(unittest.TestCase):
         """Test listing available prompts."""
         prompts = list_available_prompts()
 
-        # Should have 3 prompts
-        self.assertEqual(len(prompts), 3)
+        # Should have 4 prompts (original + 3 user prompts)
+        self.assertEqual(len(prompts), 4)
 
         # Check they are sorted and numbered correctly
         self.assertEqual(prompts[0][0], 1)  # number
-        self.assertEqual(prompts[0][1], "001-gemini.txt")  # filename
-        self.assertEqual(prompts[1][0], 2)
-        self.assertEqual(prompts[1][1], "python-helper.md")  # sorted alphabetically
+        self.assertTrue(prompts[0][1].startswith("000-default"))  # original prompt
+        self.assertIsNone(prompts[0][2])  # no file path for original
+        
+        self.assertEqual(prompts[1][0], 2)  # number
+        self.assertEqual(prompts[1][1], "001-gemini.txt")  # filename
         self.assertEqual(prompts[2][0], 3)
-        self.assertEqual(prompts[2][1], "qwen.md")
+        self.assertEqual(prompts[2][1], "python-helper.md")  # sorted alphabetically
+        self.assertEqual(prompts[3][0], 4)
+        self.assertEqual(prompts[3][1], "qwen.md")
 
     def test_load_prompt_from_file(self):
         """Test loading prompt content from file."""
@@ -104,7 +108,11 @@ class TestPromptCommand(unittest.TestCase):
         shutil.rmtree(self.prompts_dir.parent.parent, ignore_errors=True)
 
         prompts = list_available_prompts()
-        self.assertEqual(len(prompts), 0)
+        # Should still have 1 prompt (the original startup prompt)
+        self.assertEqual(len(prompts), 1)
+        self.assertEqual(prompts[0][0], 1)  # number
+        self.assertTrue(prompts[0][1].startswith("000-default"))  # original prompt
+        self.assertIsNone(prompts[0][2])  # no file path for original
 
     def test_handle_prompt_list(self):
         """Test the /prompt list command."""
@@ -144,7 +152,7 @@ class TestPromptCommand(unittest.TestCase):
         mock_app = MockApp()
         handler = PromptCommand(mock_app)
 
-        # Capture print output and environment variable
+        # Test prompt #1 (original) - should NOT set env var
         with patch("builtins.print") as mock_print:
             with patch.dict(os.environ, {}, clear=False):
                 result = handler._handle_prompt_set(["set", "1"])
@@ -152,7 +160,19 @@ class TestPromptCommand(unittest.TestCase):
                 # Should return (False, False) - don't quit, don't run API call
                 self.assertEqual(result, (False, False))
 
-                # Check that environment variable was set
+                # For prompt #1 (original), environment variable should NOT be set
+                # since it removes the override to go back to original
+                self.assertNotIn("AICODER_PROMPT_MAIN", os.environ)
+
+        # Test prompt #2 (user file) - should set env var
+        with patch("builtins.print") as mock_print:
+            with patch.dict(os.environ, {}, clear=False):
+                result = handler._handle_prompt_set(["set", "2"])
+
+                # Should return (False, False) - don't quit, don't run API call
+                self.assertEqual(result, (False, False))
+
+                # For prompt #2 (user file), environment variable SHOULD be set
                 self.assertIn("AICODER_PROMPT_MAIN", os.environ)
 
                 # Check that system message was updated
@@ -189,7 +209,7 @@ class TestPromptCommand(unittest.TestCase):
             )
 
     def test_handle_prompt_set_no_prompts(self):
-        """Test the /prompt set command when no prompts are available."""
+        """Test the /prompt set command when only original prompt is available."""
         # Remove all prompt files
         for file in self.prompts_dir.glob("*"):
             file.unlink()
@@ -207,14 +227,14 @@ class TestPromptCommand(unittest.TestCase):
             # Should return (False, False)
             self.assertEqual(result, (False, False))
 
-            # Should print error about no prompts
-            error_calls = [
+            # Should succeed since prompt #1 (original) is always available
+            success_calls = [
                 call
                 for call in mock_print.call_args_list
-                if "No prompt files available" in str(call)
+                if "Successfully reset to original startup prompt" in str(call)
             ]
             self.assertTrue(
-                len(error_calls) > 0, "Should print error when no prompts available"
+                len(success_calls) > 0, "Should succeed when setting original prompt"
             )
 
     @patch("subprocess.run")

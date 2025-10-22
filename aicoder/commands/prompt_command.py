@@ -46,6 +46,10 @@ class PromptCommand(BaseCommand):
         if "edit" in args:
             return self._handle_prompt_edit(args)
 
+        # Handle reset subcommand
+        if "reset" in args:
+            return self._handle_prompt_reset(args)
+
         # Check if full mode is requested
         full_mode = "full" in args
 
@@ -375,25 +379,46 @@ class PromptCommand(BaseCommand):
 
         number, filename, file_path = selected_prompt
 
-        # Load the prompt content
-        prompt_content = load_prompt_from_file(file_path)
-        if not prompt_content:
-            print(
-                f"{config.RED} *** Error: Could not read prompt file '{filename}'{config.RESET}"
-            )
-            return False, False
-
-        # Set the environment variable to override the main prompt
         import os
 
-        os.environ["AICODER_PROMPT_MAIN"] = str(file_path)
+        # Handle special case for original prompt (#1)
+        if prompt_number == 1:
+            # Reset to original startup prompt (same as /prompt reset)
+            if "AICODER_PROMPT_MAIN" in os.environ:
+                del os.environ["AICODER_PROMPT_MAIN"]
+            
+            # Load the original prompt
+            try:
+                from ..prompt_loader import get_main_prompt
+                prompt_content = get_main_prompt()
+            except Exception:
+                print(
+                    f"{config.RED} *** Error: Could not load original prompt{config.RESET}"
+                )
+                return False, False
+        else:
+            # Load the prompt content from file
+            prompt_content = load_prompt_from_file(file_path)
+            if not prompt_content:
+                print(
+                    f"{config.RED} *** Error: Could not read prompt file '{filename}'{config.RESET}"
+                )
+                return False, False
 
-        print(
-            f"{config.GREEN} *** Successfully set prompt '{filename}' as active{config.RESET}"
-        )
-        print(
-            f"{config.GREEN} *** Prompt #{number} loaded from: {file_path}{config.RESET}"
-        )
+            # Set the environment variable to override the main prompt
+            os.environ["AICODER_PROMPT_MAIN"] = str(file_path)
+
+        if prompt_number == 1:
+            print(
+                f"{config.GREEN} *** Successfully reset to original startup prompt{config.RESET}"
+            )
+        else:
+            print(
+                f"{config.GREEN} *** Successfully set prompt '{filename}' as active{config.RESET}"
+            )
+            print(
+                f"{config.GREEN} *** Prompt #{number} loaded from: {file_path}{config.RESET}"
+            )
         print(
             f"{config.YELLOW} *** Length: {len(prompt_content)} characters{config.RESET}"
         )
@@ -648,6 +673,72 @@ class PromptCommand(BaseCommand):
                     pass
             return False, False
 
+    def _handle_prompt_reset(self, args: List[str]) -> Tuple[bool, bool]:
+        """Reset the main prompt to the original default."""
+        import os
+        
+        # Store what we're resetting from for the message
+        old_prompt_source = os.environ.get("AICODER_PROMPT_MAIN", "Default")
+        
+        # Remove the environment variable override
+        if "AICODER_PROMPT_MAIN" in os.environ:
+            del os.environ["AICODER_PROMPT_MAIN"]
+        
+        print(f"{config.GREEN} *** Reset main prompt to default{config.RESET}")
+        print(f"{config.YELLOW} *** Previous source: {old_prompt_source}{config.RESET}")
+        
+        # Get the new default prompt
+        try:
+            from ..prompt_loader import get_main_prompt
+            new_prompt = get_main_prompt()
+            
+            print(f"{config.YELLOW} *** New length: {len(new_prompt)} characters{config.RESET}")
+            
+            # Show what source is being used now
+            if os.environ.get("AICODER_PROMPT_MAIN"):
+                new_source = os.environ["AICODER_PROMPT_MAIN"]
+                if "/" in new_source or new_source.startswith((".", "~")):
+                    new_source = f"File: {new_source}"
+                else:
+                    new_source = "Environment Variable (literal)"
+            else:
+                new_source = "Default File"
+            
+            print(f"{config.YELLOW} *** Current source: {new_source}{config.RESET}")
+            
+            # Update the system message in the current conversation
+            if (
+                self.app.message_history.messages
+                and self.app.message_history.messages[0].get("role") == "system"
+            ):
+                old_prompt = self.app.message_history.messages[0]["content"]
+                self.app.message_history.messages[0]["content"] = new_prompt
+                print(
+                    f"\n{config.GREEN} *** System prompt updated for current conversation{config.RESET}"
+                )
+                
+                # Show a brief preview of what changed
+                if len(old_prompt) != len(new_prompt):
+                    print(
+                        f"{config.YELLOW} *** Length changed from {len(old_prompt)} to {len(new_prompt)} characters{config.RESET}"
+                    )
+            else:
+                print(
+                    f"{config.YELLOW} *** Warning: Could not update current conversation - will apply to next new conversation{config.RESET}"
+                )
+                
+        except Exception as e:
+            print(
+                f"{config.RED} *** Warning: Could not load default prompt: {e}{config.RESET}"
+            )
+        
+        print(
+            f"\n{config.YELLOW} *** Use '/prompt' to see current prompt information{config.RESET}"
+        )
+        
+        # Return False to continue with current conversation
+        return False, False
+
     def _update_conversation_prompt(self, new_prompt: str) -> None:
         """Update the system prompt in the current conversation."""
         try:
@@ -705,6 +796,9 @@ class PromptCommand(BaseCommand):
             f"  {config.YELLOW}/prompt set <num>{config.RESET} Set prompt <num> as active main prompt"
         )
         print(
+            f"  {config.YELLOW}/prompt reset{config.RESET}    Reset to original default prompt"
+        )
+        print(
             f"  {config.YELLOW}/prompt edit{config.RESET}      Edit current main prompt in $EDITOR"
         )
         wmsg("  /prompt help     Show this help message")
@@ -730,7 +824,13 @@ class PromptCommand(BaseCommand):
         wmsg("  # List available prompts")
         print("  /prompt list")
         print()
-        wmsg("  # Set prompt #1 as active")
+        wmsg("  # Reset to original startup prompt")
+        print("  /prompt reset")
+        print()
+        wmsg("  # Set prompt #2 as active (user prompt)")
+        print("  /prompt set 2")
+        print()
+        wmsg("  # Set prompt #1 as active (original startup prompt)")
         print("  /prompt set 1")
         print()
         wmsg("  # Edit current prompt in $EDITOR")

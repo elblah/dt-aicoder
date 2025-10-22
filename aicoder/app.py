@@ -100,7 +100,7 @@ class AICoder(
         self.stats._app_instance = self  # Store reference for plugin access
         self.message_history = MessageHistory()
         self.animator = Animator()
-
+        
         # Initialize parent classes properly
         super().__init__()
 
@@ -109,6 +109,10 @@ class AICoder(
         )
         self._initialize_mcp_servers()
 
+        # Initialize project memory
+        from .memory import get_project_memory
+        self.project_memory = get_project_memory(self.current_directory)
+    
         # Load prompt history after readline is initialized
         self._load_prompt_history()
 
@@ -136,6 +140,11 @@ class AICoder(
         from .prompt_loader import print_prompt_override_info
 
         print_prompt_override_info()
+
+    @property
+    def current_directory(self):
+        """Get the current working directory."""
+        return os.getcwd()
 
     def _load_prompt_history(self):
         """Load persistent prompt history into readline."""

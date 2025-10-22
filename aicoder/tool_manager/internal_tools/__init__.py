@@ -10,6 +10,7 @@ from .grep import execute_grep
 from .glob import execute_glob
 from .pwd import execute_pwd
 from .edit_file import execute_edit_file
+from .memory import execute_memory
 
 
 # Map tool names to their execution functions
@@ -22,4 +23,5 @@ INTERNAL_TOOL_FUNCTIONS = {
     "glob": execute_glob,
     "pwd": execute_pwd,
     "edit_file": execute_edit_file,
+    "memory": execute_memory,
 }

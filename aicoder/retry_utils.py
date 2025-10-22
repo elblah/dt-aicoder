@@ -5,6 +5,7 @@ Retry utilities for API requests with common retry logic.
 import urllib.error
 
 from .utils import cancellable_sleep, wmsg, emsg
+from .api.errors import APIErrors
 
 # Import config module for dynamic access to config values
 from . import config
@@ -195,9 +196,7 @@ class APIRetryHandler(_APIRetryHandlerSingleton):
                 )
                 return False  # Don't retry, max attempts reached
 
-            wmsg(
-                f"    --- {error_type} error detected. Retrying in {retry_sleep_secs} secs..."
-            )
+            APIErrors.print(APIErrors.RETRY_ERROR, error_type=error_type, retry_sleep_secs=retry_sleep_secs)
             # Increment retry attempt counter for exponential backoff
             self.retry_attempt_count += 1
             # Use cancellable sleep to allow user to cancel retries
@@ -279,9 +278,7 @@ class APIRetryHandler(_APIRetryHandlerSingleton):
                 )
                 return False  # Don't retry, max attempts reached
 
-            wmsg(
-                f"    --- {error_type} detected. Retrying in {retry_sleep_secs} secs... (Press ESC to cancel)"
-            )
+            APIErrors.print(APIErrors.RETRY_ERROR_WITH_CANCEL, error_type=error_type, retry_sleep_secs=retry_sleep_secs)
             # Increment retry attempt counter for exponential backoff
             self.retry_attempt_count += 1
             # Use cancellable sleep to allow user to cancel retries

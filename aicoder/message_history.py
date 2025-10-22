@@ -847,6 +847,140 @@ Provide a detailed but concise summary of our conversation above. Focus on infor
         # Use the existing compact_memory method which properly handles tool call/response pairs
         self.compact_memory()
 
+    def identify_conversation_rounds(self) -> List[Dict[str, Any]]:
+        """
+        Identify conversation rounds in the message history.
+        
+        A round = user message + complete assistant response (including tool calls/responses).
+        
+        Returns:
+            List of rounds, where each round is a dict with:
+            - 'start_index': index of first message in round
+            - 'end_index': index of last message in round  
+            - 'message_count': number of messages in round
+            - 'messages': list of messages in the round
+        """
+        first_chat_index = self._get_first_chat_message_index()
+        chat_messages = self.messages[first_chat_index:]
+        
+        rounds = []
+        current_round = []
+        
+        for i, message in enumerate(chat_messages):
+            current_round.append(message)
+            
+            # Check if this is the end of a round
+            # A round ends when we encounter a user message and we already have content in current_round
+            if message.get("role") == "user" and len(current_round) > 1:
+                # Previous round is complete (everything except this new user message)
+                if len(current_round) > 1:
+                    rounds.append({
+                        'start_index': first_chat_index + i - len(current_round) + 1,
+                        'end_index': first_chat_index + i - 1,
+                        'message_count': len(current_round) - 1,
+                        'messages': current_round[:-1]
+                    })
+                # Start new round with this user message
+                current_round = [message]
+        
+        # Don't forget the last round if it exists
+        if len(current_round) > 0:
+            rounds.append({
+                'start_index': first_chat_index + len(chat_messages) - len(current_round),
+                'end_index': first_chat_index + len(chat_messages) - 1,
+                'message_count': len(current_round),
+                'messages': current_round
+            })
+        
+        return rounds
+    
+    def get_round_count(self) -> int:
+        """Get the number of conversation rounds."""
+        return len(self.identify_conversation_rounds())
+    
+    def compact_rounds(self, num_rounds: int = 1) -> List[Dict[str, Any]]:
+        """
+        Compact the specified number of oldest conversation rounds.
+        
+        Args:
+            num_rounds: Number of oldest rounds to compact (default: 1)
+            
+        Returns:
+            List of compacted rounds
+            
+        Raises:
+            NoMessagesToCompactError: If no rounds available to compact
+        """
+        rounds = self.identify_conversation_rounds()
+        
+        if not rounds:
+            raise NoMessagesToCompactError("No conversation rounds available to compact")
+        
+        # Limit to available rounds
+        rounds_to_compact = min(num_rounds, len(rounds))
+        oldest_rounds = rounds[:rounds_to_compact]
+        
+        # Collect all messages from the rounds to compact
+        messages_to_compact = []
+        for round_data in oldest_rounds:
+            messages_to_compact.extend(round_data['messages'])
+        
+        # Filter out protected messages (system messages and previous summaries)
+        eligible_messages = [
+            msg for msg in messages_to_compact
+            if not (
+                msg.get("role") == "system" and
+                msg.get("content", "").startswith(SUMMARY_MESSAGE_PREFIX)
+            )
+        ]
+        
+        if not eligible_messages:
+            raise NoMessagesToCompactError("No eligible messages to compact in specified rounds")
+        
+        # Create summary of the eligible messages
+        from .prompt_loader import get_compaction_prompt
+        compaction_prompt = get_compaction_prompt()
+        
+        if not compaction_prompt:
+            compaction_prompt = """You are a helpful AI assistant tasked with summarizing conversations.
+Please provide a concise summary of the following conversation messages, preserving key information and context."""
+
+        # Create the summary using the API
+        summary = self._summarize_old_messages(eligible_messages)
+        
+        summary_content = SUMMARY_MESSAGE_PREFIX + " " + (
+            summary if summary else "no prior content"
+        )
+        summary_message = {"role": "system", "content": summary_content}
+        
+        # Find insertion point (before the oldest round)
+        insertion_index = oldest_rounds[0]['start_index']
+        
+        # Reconstruct messages:
+        # 1. Messages before insertion point (system messages, previous summaries)
+        # 2. New summary message
+        # 3. Messages after all compacted rounds
+        last_compacted_end = oldest_rounds[-1]['end_index']
+        
+        self.messages = (
+            self.messages[:insertion_index] +           # Before compacted rounds
+            [summary_message] +                         # New summary
+            self.messages[last_compacted_end + 1:]       # After compacted rounds
+        )
+        
+        # Update stats
+        self.stats.compactions += 1
+        self._compaction_performed = True
+        
+        # Recalculate token count
+        if self.api_handler and hasattr(self.api_handler, "stats"):
+            from .utils import estimate_messages_tokens
+            self.api_handler.stats.current_prompt_size = estimate_messages_tokens(self.messages)
+            if config.DEBUG:
+                imsg(f" *** Token count recalculated after round compaction: {self.api_handler.stats.current_prompt_size} tokens")
+        
+        return oldest_rounds
+
     def _load_aicoder_md(self) -> str:
         """Load AICODER.md content from various possible locations."""
         import sys
