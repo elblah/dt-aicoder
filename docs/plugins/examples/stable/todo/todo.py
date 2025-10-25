@@ -163,6 +163,7 @@ def _display_todo(todo_text: str, explanation: str = None) -> None:
 
     # Show last updated time
     import datetime
+
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"\n🕒 Last updated: {now}")
 
@@ -176,8 +177,8 @@ def on_aicoder_init(aicoder_instance):
     try:
         # Check if todo is enabled in persistent config
         todo_enabled = True  # Default to enabled
-        if hasattr(aicoder_instance, 'persistent_config'):
-            todo_enabled = aicoder_instance.persistent_config.get('todo.enabled', True)
+        if hasattr(aicoder_instance, "persistent_config"):
+            todo_enabled = aicoder_instance.persistent_config.get("todo.enabled", True)
 
         # Store reference to aicoder instance for access to message history
         global _aicoder_ref
@@ -275,8 +276,12 @@ def _show_todo_help():
     print("                      If no todo exists, tells you how to create one")
     print("  /todo update       - Ask AI to create or update the current todo list")
     print("\nState Management:")
-    print("  /todo on           - Enable todo functionality and AI access to update_todo tool")
-    print("  /todo off          - Disable todo functionality and remove AI access to tool")
+    print(
+        "  /todo on           - Enable todo functionality and AI access to update_todo tool"
+    )
+    print(
+        "  /todo off          - Disable todo functionality and remove AI access to tool"
+    )
     print("\nExamples:")
     print("  /todo              - View current todo")
     print("  /todo on           - Enable todos")
@@ -289,36 +294,37 @@ def _show_todo_help():
 def _is_todo_tool_enabled():
     """Check if the update_todo tool is enabled in persistent config."""
     global _aicoder_ref
-    
-    if not _aicoder_ref or not hasattr(_aicoder_ref, 'persistent_config'):
+
+    if not _aicoder_ref or not hasattr(_aicoder_ref, "persistent_config"):
         return True  # Default to enabled
-    
-    return _aicoder_ref.persistent_config.get('todo.enabled', True)
+
+    return _aicoder_ref.persistent_config.get("todo.enabled", True)
 
 
 def _execute_todo_tool_if_enabled(todo_text, explanation, stats=None):
     """Execute the update_todo tool only if it's enabled."""
     if not _is_todo_tool_enabled():
         return "Error: Todo functionality is currently disabled. Use '/todo on' to enable it."
-    
+
     return execute_update_todo(todo_text, explanation, stats)
 
 
 def _add_todo_system_prompt():
     """Add todo functionality information to the system prompt."""
     global _aicoder_ref
-    
+
     if not _aicoder_ref:
         return
-    
+
     # Only add system prompt if todo is enabled
     if not _is_todo_tool_enabled():
         return
-    
+
     # Add comprehensive information about todo functionality to the system prompt
-    if (hasattr(_aicoder_ref, "message_history") and
-        _aicoder_ref.message_history.messages):
-        
+    if (
+        hasattr(_aicoder_ref, "message_history")
+        and _aicoder_ref.message_history.messages
+    ):
         system_prompt = _aicoder_ref.message_history.messages[0]
         if isinstance(system_prompt, dict) and "content" in system_prompt:
             todo_info = """
@@ -382,26 +388,27 @@ Users can also use the /todo command to view the current todo list:
 - /todo help - Show todo command help
 """
             # Only add if not already present
-            if ("Todo Management with update_todo Tool" not in 
-                system_prompt.get("content", "")):
+            if "Todo Management with update_todo Tool" not in system_prompt.get(
+                "content", ""
+            ):
                 system_prompt["content"] += todo_info
 
 
 def _set_todo_enabled(enabled):
     """Enable or disable todo functionality."""
     global _aicoder_ref
-    
-    if not _aicoder_ref or not hasattr(_aicoder_ref, 'persistent_config'):
+
+    if not _aicoder_ref or not hasattr(_aicoder_ref, "persistent_config"):
         print("❌ Cannot modify todo settings: persistent config not available")
         return
-    
+
     # Update the persistent config
-    _aicoder_ref.persistent_config['todo.enabled'] = enabled
-    
+    _aicoder_ref.persistent_config["todo.enabled"] = enabled
+
     if enabled:
         # Add system prompt info if not already added
         _add_todo_system_prompt()
-        
+
         print("✅ Todo functionality enabled")
         print("   - /todo command available")
         print("   - AI can use update_todo tool")
@@ -422,7 +429,7 @@ def _handle_todo_command(args):
     # Handle subcommands
     if args:
         subcommand = args[0].lower()
-        
+
         if subcommand in ["help", "-h", "--help"]:
             _show_todo_help()
             return False, False
@@ -434,12 +441,12 @@ def _handle_todo_command(args):
             return False, False
         elif subcommand == "update":
             # Check if todo is enabled before requesting update
-            if hasattr(_aicoder_ref, 'persistent_config'):
-                todo_enabled = _aicoder_ref.persistent_config.get('todo.enabled', True)
+            if hasattr(_aicoder_ref, "persistent_config"):
+                todo_enabled = _aicoder_ref.persistent_config.get("todo.enabled", True)
                 if not todo_enabled:
                     print("Todo functionality is disabled. Use '/todo on' to enable.")
                     return False, False
-            
+
             # Force a new todo request by asking the AI to call update_todo
             print("\n*** Requesting new todo from AI...")
             _aicoder_ref.message_history.add_user_message(
@@ -449,8 +456,8 @@ def _handle_todo_command(args):
 
     # Default behavior: show current todo
     # Check if todo is enabled
-    if hasattr(_aicoder_ref, 'persistent_config'):
-        todo_enabled = _aicoder_ref.persistent_config.get('todo.enabled', True)
+    if hasattr(_aicoder_ref, "persistent_config"):
+        todo_enabled = _aicoder_ref.persistent_config.get("todo.enabled", True)
         if not todo_enabled:
             print("Todo functionality is disabled. Use '/todo on' to enable.")
             return False, False
@@ -467,7 +474,9 @@ def _handle_todo_command(args):
     else:
         # No todo exists, instruct user to create one
         print("\n*** No todo found.")
-        print("    Use '/todo update' to ask the AI to create or update the current todo list.")
+        print(
+            "    Use '/todo update' to ask the AI to create or update the current todo list."
+        )
         return False, False
 
 

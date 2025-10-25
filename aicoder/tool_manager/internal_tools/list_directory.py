@@ -13,7 +13,6 @@ DEFAULT_FILE_LIMIT = 2000
 
 # Tool metadata
 TOOL_DEFINITION = {
-
     "type": "internal",
     "auto_approved": True,
     "approval_excludes_arguments": False,
@@ -37,7 +36,14 @@ def _list_files_with_rg(path: str, file_limit: int = DEFAULT_FILE_LIMIT) -> str:
     """List files recursively using ripgrep."""
     try:
         # Use rg --files piped to head -n file_limit to limit output and prevent hanging on large directories (safe against injection)
-        cmd = ["bash", "-c", f'{{ "$1" --files "$2"; }} | head -n {file_limit}', "_", "rg", path]
+        cmd = [
+            "bash",
+            "-c",
+            f'{{ "$1" --files "$2"; }} | head -n {file_limit}',
+            "_",
+            "rg",
+            path,
+        ]
 
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         if result.returncode == 0:
@@ -55,14 +61,25 @@ def _list_files_with_rg(path: str, file_limit: int = DEFAULT_FILE_LIMIT) -> str:
         return f"Error executing rg: {e}"
 
 
-def _list_files_with_fd(path: str, file_limit: int = DEFAULT_FILE_LIMIT, command_name: str = "fd") -> str:
+def _list_files_with_fd(
+    path: str, file_limit: int = DEFAULT_FILE_LIMIT, command_name: str = "fd"
+) -> str:
     """List files recursively using fd-find."""
     try:
         # Use fd/fdfind to list files, piped to head -n file_limit to limit output (safe against injection)
-        cmd = ["bash", "-c", f'{{ "$1" . "$2" --type f; }} | head -n {file_limit}', "_", command_name, path]
+        cmd = [
+            "bash",
+            "-c",
+            f'{{ "$1" . "$2" --type f; }} | head -n {file_limit}',
+            "_",
+            command_name,
+            path,
+        ]
 
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-        if result.returncode == 0 or result.returncode == 1:  # 0 = files found, 1 = no files
+        if (
+            result.returncode == 0 or result.returncode == 1
+        ):  # 0 = files found, 1 = no files
             files = [f for f in result.stdout.strip().split("\n") if f]
             output = "\n".join(files) if files and files[0] else "No files found"
             # Check if we hit the limit

@@ -19,16 +19,22 @@ def run_test(name, script, timeout=60):
         env = os.environ.copy()
         # Clear API-related environment to ensure tests use local servers
         for key in list(env.keys()):
-            if key.startswith('API_') or key.startswith('OPENAI_') or key in ['ANTHROPIC_API_KEY']:
+            if (
+                key.startswith("API_")
+                or key.startswith("OPENAI_")
+                or key in ["ANTHROPIC_API_KEY"]
+            ):
                 del env[key]
         # Ensure YOLO_MODE is set for tests
-        env['YOLO_MODE'] = '1'
-        
-        result = subprocess.run([sys.executable, script],
-                              capture_output=True,
-                              text=True,
-                              timeout=timeout,
-                              env=env)
+        env["YOLO_MODE"] = "1"
+
+        result = subprocess.run(
+            [sys.executable, script],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env=env,
+        )
         success = result.returncode == 0
         if success:
             print(f"✅ {name} PASSED")
@@ -54,15 +60,31 @@ def main():
 
     # List of comprehensive integration tests to run
     tests = [
-        ("Streaming Adapter Comprehensive Test", "tests/comprehensive/streaming_adapter_comprehensive_test.py", 60),
-        ("Animator and ESC Functionality Test", "tests/comprehensive/animator_esc_functionality_test.py", 30),
-        ("Animation Lifecycle Verification", "tests/comprehensive/animation_lifecycle_verification.py", 15),
+        (
+            "Streaming Adapter Comprehensive Test",
+            "tests/comprehensive/streaming_adapter_comprehensive_test.py",
+            60,
+        ),
+        (
+            "Animator and ESC Functionality Test",
+            "tests/comprehensive/animator_esc_functionality_test.py",
+            30,
+        ),
+        (
+            "Animation Lifecycle Verification",
+            "tests/comprehensive/animation_lifecycle_verification.py",
+            15,
+        ),
     ]
 
     # Optional advanced tests
     advanced_tests = [
         ("TMUX Animator Test", "tests/comprehensive/tmux_animator_esc_test.py", 30),
-        ("TMUX ESC Cancellation Test", "tests/comprehensive/tmux_esc_cancellation_test.py", 30),
+        (
+            "TMUX ESC Cancellation Test",
+            "tests/comprehensive/tmux_esc_cancellation_test.py",
+            30,
+        ),
     ]
 
     results = []
@@ -88,7 +110,7 @@ def main():
     print(f"\\nComprehensive Tests: {comprehensive_passed}/{comprehensive_total}")
 
     # Check if tmux is available and run advanced tests automatically
-    tmux_available = shutil.which('tmux') is not None
+    tmux_available = shutil.which("tmux") is not None
 
     if tmux_available:
         print("\\n📋 Running Advanced Tests (TMUX available)...")

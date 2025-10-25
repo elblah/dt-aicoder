@@ -93,14 +93,12 @@ def test_tool_registry_loads_external_tools():
     # Start a mock HTTP server for JSON-RPC testing
     httpd = None
     server_thread = None
-    
+
     # Try to find an available port
     server_port = None
     for port in range(8000, 9000):
         try:
-            httpd = http.server.HTTPServer(
-                ("localhost", port), MockHTTPHandler
-            )
+            httpd = http.server.HTTPServer(("localhost", port), MockHTTPHandler)
             server_thread = threading.Thread(target=httpd.serve_forever)
             server_thread.daemon = True
             server_thread.start()
@@ -216,14 +214,12 @@ def test_tool_registry_get_tool_definitions():
     # Start a mock HTTP server for JSON-RPC testing
     httpd = None
     server_thread = None
-    
+
     # Try to find an available port
     server_port = None
     for port in range(8000, 9000):
         try:
-            httpd = http.server.HTTPServer(
-                ("localhost", port), MockHTTPHandler
-            )
+            httpd = http.server.HTTPServer(("localhost", port), MockHTTPHandler)
             server_thread = threading.Thread(target=httpd.serve_forever)
             server_thread.daemon = True
             server_thread.start()
@@ -350,14 +346,12 @@ def test_mcp_tool_manager_initialization_with_external_tools():
     # Start a mock HTTP server for JSON-RPC testing
     httpd = None
     server_thread = None
-    
+
     # Try to find an available port
     server_port = None
     for port in range(8000, 9000):
         try:
-            httpd = http.server.HTTPServer(
-                ("localhost", port), MockHTTPHandler
-            )
+            httpd = http.server.HTTPServer(("localhost", port), MockHTTPHandler)
             server_thread = threading.Thread(target=httpd.serve_forever)
             server_thread.daemon = True
             server_thread.start()
@@ -473,14 +467,12 @@ def test_execute_command_tool():
     # Start a mock HTTP server for JSON-RPC testing
     httpd = None
     server_thread = None
-    
+
     # Try to find an available port
     server_port = None
     for port in range(8000, 9000):
         try:
-            httpd = http.server.HTTPServer(
-                ("localhost", port), MockHTTPHandler
-            )
+            httpd = http.server.HTTPServer(("localhost", port), MockHTTPHandler)
             server_thread = threading.Thread(target=httpd.serve_forever)
             server_thread.daemon = True
             server_thread.start()
@@ -595,14 +587,12 @@ def test_execute_jsonrpc_tool():
     # Start a mock HTTP server for JSON-RPC testing
     httpd = None
     server_thread = None
-    
+
     # Try to find an available port
     server_port = None
     for port in range(8000, 9000):
         try:
-            httpd = http.server.HTTPServer(
-                ("localhost", port), MockHTTPHandler
-            )
+            httpd = http.server.HTTPServer(("localhost", port), MockHTTPHandler)
             server_thread = threading.Thread(target=httpd.serve_forever)
             server_thread.daemon = True
             server_thread.start()
@@ -717,14 +707,12 @@ def test_execute_disabled_tool_returns_error():
     # Start a mock HTTP server for JSON-RPC testing
     httpd = None
     server_thread = None
-    
+
     # Try to find an available port
     server_port = None
     for port in range(8000, 9000):
         try:
-            httpd = http.server.HTTPServer(
-                ("localhost", port), MockHTTPHandler
-            )
+            httpd = http.server.HTTPServer(("localhost", port), MockHTTPHandler)
             server_thread = threading.Thread(target=httpd.serve_forever)
             server_thread.daemon = True
             server_thread.start()

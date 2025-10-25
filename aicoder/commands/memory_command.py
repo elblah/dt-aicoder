@@ -20,6 +20,51 @@ class MemoryCommand(BaseCommand):
         self.aliases = ["/memory", "/m"]
 
     def execute(self, args: List[str]) -> Tuple[bool, bool]:
+        """Execute memory command with subcommands."""
+        if not args:
+            # Default behavior: open editor
+            return self._open_editor()
+        
+        subcommand = args[0].lower()
+        
+        if subcommand in ["estimate", "est", "tokens"]:
+            return self._estimate_tokens()
+        elif subcommand in ["help", "-h", "--help"]:
+            self._show_help()
+        elif subcommand in ["edit", "e"]:
+            return self._open_editor()
+        else:
+            wmsg(f"*** Unknown subcommand: {subcommand}")
+            self._show_help()
+        
+        return False, False
+
+    def _estimate_tokens(self) -> Tuple[bool, bool]:
+        """Estimate tokens in current session data."""
+        try:
+            messages = self.app.message_history.messages
+            estimated_tokens = estimate_messages_tokens(messages)
+            
+            imsg(f"\n>>> Session token estimation:")
+            imsg(f"    Messages: {len(messages)}")
+            imsg(f"    Estimated tokens: ~{estimated_tokens}")
+            
+            # Additional breakdown if helpful
+            if messages:
+                total_chars = sum(len(msg.get("content", "")) for msg in messages)
+                avg_chars = total_chars / len(messages) if messages else 0
+                imsg(f"    Total characters: {total_chars}")
+                imsg(f"    Average chars per message: {avg_chars:.1f}")
+            
+        except Exception as e:
+            emsg(f"*** Error estimating tokens: {e}")
+            if config.DEBUG:
+                import traceback
+                traceback.print_exc()
+        
+        return False, False
+
+    def _open_editor(self) -> Tuple[bool, bool]:
         """Opens $EDITOR to write the memory."""
         editor = os.environ.get("EDITOR", "vim")
         try:
@@ -64,6 +109,25 @@ class MemoryCommand(BaseCommand):
         except Exception as e:
             emsg(f"\n*** Error during edit: {e}")
             return False, False
+
+    def _show_help(self):
+        """Show help for memory command."""
+        imsg("Memory command usage:")
+        imsg("  /memory                       - Open editor to edit memory (default)")
+        imsg("  /memory edit                  - Open editor to edit memory")
+        imsg("  /memory estimate               - Estimate tokens in current session")
+        imsg("  /memory help                   - Show this help message")
+        imsg("")
+        imsg("Aliases:")
+        imsg("  /m, /memory")
+        imsg("")
+        imsg("Examples:")
+        imsg("  /memory                       - Edit memory")
+        imsg("  /memory estimate               - Show token estimation")
+        imsg("  /m estimate                   - Show token estimation (short form)")
+        imsg("")
+        imsg("Note: The estimate command analyzes your current session data")
+        imsg("      and provides a token count approximation.")
 
     def _run_editor_in_tmux_popup(self, editor: str, file_path: str) -> bool:
         """

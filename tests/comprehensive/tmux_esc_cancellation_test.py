@@ -24,15 +24,15 @@ def run_tmux_command(cmd):
 def test_tmux_available():
     """Check if tmux is available."""
     try:
-        status, output = getstatusoutput('tmux -V')
+        status, output = getstatusoutput("tmux -V")
         return status == 0
-    except:
+    except Exception:
         return False
 
 
 def create_cancellable_test_script():
     """Create a test script with a longer delay for ESC testing."""
-    script_content = '''
+    script_content = """
 #!/usr/bin/env python3
 import sys
 import time
@@ -136,10 +136,10 @@ def main():
 
 if __name__ == "__main__":
     main()
-'''
+"""
 
     # Write the script to a temporary file
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write(script_content)
         return f.name
 
@@ -163,55 +163,65 @@ def main():
         print(f"Creating tmux session: {session_name}")
 
         # Start tmux session
-        stdout, stderr, rc = run_tmux_command(f"new-session -d -s {session_name} -n test bash")
+        stdout, stderr, rc = run_tmux_command(
+            f"new-session -d -s {session_name} -n test bash"
+        )
         if rc != 0:
             print(f"❌ Failed to create tmux session: {stderr}")
             return 1
 
         try:
             print("Starting test with long delay to allow ESC cancellation...")
-            
+
             # Send the python command to the tmux session
-            run_tmux_command(f"send-keys -t {session_name} 'python3 {test_script}' Enter")
+            run_tmux_command(
+                f"send-keys -t {session_name} 'python3 {test_script}' Enter"
+            )
 
             # Monitor the pane content looking for animation
             print("\\nMonitoring for animation...")
-            
+
             animation_detected = False
             for i in range(15):  # Wait up to 15 seconds
-                stdout, stderr, rc = run_tmux_command(f"capture-pane -t {session_name} -p")
-                
+                stdout, stderr, rc = run_tmux_command(
+                    f"capture-pane -t {session_name} -p"
+                )
+
                 if stdout and "Working..." in stdout:
                     print("✅ Animation detected!")
                     animation_detected = True
                     break
                 time.sleep(1)
-            
+
             if not animation_detected:
                 print("⚠️  Animation not detected in time")
-            
+
             # Send ESC to cancel the request
             print("Sending ESC to cancel the request...")
             # In tmux, ESC can be sent as C-[ (Ctrl + [)
             run_tmux_command(f"send-keys -t {session_name} C-[ Enter")
-            
+
             # Wait a moment for cancellation to process
             time.sleep(2)
-            
+
             # Check final state
             stdout, stderr, rc = run_tmux_command(f"capture-pane -t {session_name} -p")
             print("\\nFinal output from test session:")
             print(f"---\\n{stdout}\\n---")
-            
+
             # Check if cancellation was detected
-            cancellation_detected = "CANCELLED:" in stdout or "cancelled" in stdout.lower()
+            cancellation_detected = (
+                "CANCELLED:" in stdout or "cancelled" in stdout.lower()
+            )
             print(f"\\nCancellation detected: {cancellation_detected}")
-            
+
             if cancellation_detected:
                 print("✅ ESC cancellation test PASSED!")
             else:
-                print("⚠️  ESC cancellation may not have been detected, but that's OK for this test")
-                
+                print(
+                    "⚠️  ESC cancellation may not have been detected, but that's OK for this test"
+                )
+
         finally:
             # Kill the tmux session
             run_tmux_command(f"kill-session -t {session_name}")
@@ -220,14 +230,14 @@ def main():
         # Clean up the test script
         try:
             os.unlink(test_script)
-        except:
+        except Exception:
             pass
 
     print("\\n" + "=" * 50)
     print("Advanced TMUX ESC cancellation test completed.")
     print("This test demonstrated:")
     print("1. Animation detection in tmux pane")
-    print("2. ESC key sending to tmux session") 
+    print("2. ESC key sending to tmux session")
     print("3. Cancellation verification")
 
     return 0

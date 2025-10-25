@@ -47,7 +47,9 @@ class ToolRegistry:
                             )
                 except Exception as e:
                     if config.DEBUG:
-                        wmsg(f"*** Skipping {attr_name} during internal tool loading: {e}")
+                        wmsg(
+                            f"*** Skipping {attr_name} during internal tool loading: {e}"
+                        )
                     continue
 
         except Exception as e:
@@ -314,7 +316,10 @@ class ToolRegistry:
                 "params": {
                     "protocolVersion": "2025-06-18",
                     "capabilities": {"elicitation": {}},
-                    "clientInfo": {"name": f"{config.APP_NAME}-client", "version": "1.0.0"},
+                    "clientInfo": {
+                        "name": f"{config.APP_NAME}-client",
+                        "version": "1.0.0",
+                    },
                 },
             }
 

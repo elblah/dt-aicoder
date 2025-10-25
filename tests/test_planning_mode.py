@@ -7,9 +7,14 @@ import sys
 import os
 
 # Add the parent directory to the path to import aicoder modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from aicoder.planning_mode import PlanningMode, get_planning_mode, PLAN_MODE_CONTENT, BUILD_SWITCH_CONTENT
+from aicoder.planning_mode import (
+    PlanningMode,
+    get_planning_mode,
+    PLAN_MODE_CONTENT,
+    BUILD_SWITCH_CONTENT,
+)
 
 
 class TestPlanningMode(unittest.TestCase):
@@ -19,6 +24,7 @@ class TestPlanningMode(unittest.TestCase):
         """Set up a fresh planning mode instance for each test."""
         # Reset the global instance
         import aicoder.planning_mode
+
         aicoder.planning_mode._planning_mode = None
         self.planning_mode = PlanningMode()
 
@@ -27,7 +33,7 @@ class TestPlanningMode(unittest.TestCase):
         self.assertFalse(self.planning_mode.is_plan_mode_active())
         # Check internal state - message should be considered sent initially to avoid startup message
         self.assertTrue(self.planning_mode._mode_message_sent)
-        
+
         # First call should return None (no build message on startup)
         content = self.planning_mode.get_mode_content()
         self.assertIsNone(content)
@@ -66,13 +72,13 @@ class TestPlanningMode(unittest.TestCase):
         # Initially in build mode, no content should be available (startup state)
         content = self.planning_mode.get_mode_content()
         self.assertIsNone(content)
-        
+
         # Switch to plan mode - should get plan mode content once
         self.planning_mode.set_plan_mode(True)
         content = self.planning_mode.get_mode_content()
         # Check for the mode marker
         self.assertIn("<aicoder_active_mode>plan</aicoder_active_mode>", content)
-        
+
         # Second call should return None (no more content for this mode)
         content = self.planning_mode.get_mode_content()
         self.assertIsNone(content)
@@ -97,15 +103,17 @@ class TestPlanningMode(unittest.TestCase):
         """Test getting content when staying in the same mode."""
         # Force a transition to build mode by toggling from plan mode first
         self.planning_mode.set_plan_mode(True)  # Switch to plan mode
-        self.planning_mode.set_plan_mode(False)  # Switch back to build mode (this is a real transition)
+        self.planning_mode.set_plan_mode(
+            False
+        )  # Switch back to build mode (this is a real transition)
         content = self.planning_mode.get_mode_content()
         # Should get build mode content once
         self.assertIn("<aicoder_active_mode>build</aicoder_active_mode>", content)
-        
+
         # Second call should return None
         content = self.planning_mode.get_mode_content()
         self.assertIsNone(content)
-        
+
         # Third call should still return None (no change)
         content = self.planning_mode.get_mode_content()
         self.assertIsNone(content)
@@ -117,17 +125,17 @@ class TestPlanningMode(unittest.TestCase):
         self.planning_mode.set_plan_mode(False)  # Switch back to build mode
         content1 = self.planning_mode.get_mode_content()
         self.assertIn("<aicoder_active_mode>build</aicoder_active_mode>", content1)
-        
+
         # Switch to plan mode
         self.planning_mode.set_plan_mode(True)
         content2 = self.planning_mode.get_mode_content()
         self.assertIn("<aicoder_active_mode>plan</aicoder_active_mode>", content2)
-        
+
         # Switch back to build mode
         self.planning_mode.set_plan_mode(False)
         content3 = self.planning_mode.get_mode_content()
         self.assertIn("<aicoder_active_mode>build</aicoder_active_mode>", content3)
-        
+
         # All subsequent calls should return None until next mode change
         for _ in range(3):
             self.assertIsNone(self.planning_mode.get_mode_content())
@@ -173,7 +181,15 @@ class TestPlanningMode(unittest.TestCase):
         # When plan mode is off, all tools should be active
         self.planning_mode.set_plan_mode(False)
         active_tools = self.planning_mode.get_active_tools(all_tools)
-        expected_active = ["write_file", "edit_file", "read_file", "list_directory", "grep", "run_shell_command", "create_backup"]
+        expected_active = [
+            "write_file",
+            "edit_file",
+            "read_file",
+            "list_directory",
+            "grep",
+            "run_shell_command",
+            "create_backup",
+        ]
         self.assertEqual(set(active_tools), set(expected_active))
 
         # When plan mode is on, writing tools should be filtered out
@@ -216,6 +232,7 @@ class TestGlobalPlanningMode(unittest.TestCase):
     def setUp(self):
         """Reset global instance before each test."""
         import aicoder.planning_mode
+
         aicoder.planning_mode._planning_mode = None
 
     def test_get_planning_mode_singleton(self):
@@ -250,18 +267,22 @@ class TestSessionModeDetection(unittest.TestCase):
     def setUp(self):
         """Reset global instance before each test."""
         import aicoder.planning_mode
+
         aicoder.planning_mode._planning_mode = None
 
     def test_detect_planning_mode_from_session_planning(self):
         """Test detecting planning mode from session messages."""
         from aicoder.message_history import MessageHistory
-        
+
         messages = [
             {"role": "user", "content": "Hello"},
             {"role": "assistant", "content": "I'll help you plan this"},
-            {"role": "user", "content": "<aicoder_active_mode>plan</aicoder_active_mode>\n\nPlanning mode: Read-only tools only"}
+            {
+                "role": "user",
+                "content": "<aicoder_active_mode>plan</aicoder_active_mode>\n\nPlanning mode: Read-only tools only",
+            },
         ]
-        
+
         history = MessageHistory()
         detected = history.detect_planning_mode_from_session(messages)
         self.assertTrue(detected)
@@ -269,13 +290,13 @@ class TestSessionModeDetection(unittest.TestCase):
     def test_detect_planning_mode_from_session_build(self):
         """Test detecting build mode from session messages."""
         from aicoder.message_history import MessageHistory
-        
+
         messages = [
             {"role": "user", "content": "Hello"},
             {"role": "assistant", "content": "I'll help you implement this"},
-            {"role": "user", "content": "Make the changes"}
+            {"role": "user", "content": "Make the changes"},
         ]
-        
+
         history = MessageHistory()
         detected = history.detect_planning_mode_from_session(messages)
         self.assertFalse(detected)
@@ -283,11 +304,11 @@ class TestSessionModeDetection(unittest.TestCase):
     def test_detect_planning_mode_from_empty_session(self):
         """Test detecting mode from empty session."""
         from aicoder.message_history import MessageHistory
-        
+
         history = MessageHistory()
         detected = history.detect_planning_mode_from_session([])
         self.assertFalse(detected)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

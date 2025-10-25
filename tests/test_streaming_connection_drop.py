@@ -15,13 +15,13 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from unittest.mock import patch
 
 # Add aicoder to path FIRST
-sys.path.insert(0, '/home/blah/poc/aicoder/v2')
+sys.path.insert(0, "/home/blah/poc/aicoder/v2")
 
 
 def find_free_port():
     """Find and return a free port."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(('', 0))
+        s.bind(("", 0))
         s.listen(1)
         port = s.getsockname()[1]
     return port
@@ -38,40 +38,71 @@ def mock_server():
         def do_POST(self):
             """Handle POST requests like Grok, but drop connection mid-stream."""
             # Read the request body
-            content_length = int(self.headers['Content-Length'])
+            content_length = int(self.headers["Content-Length"])
             post_data = self.rfile.read(content_length)
 
             # Parse the request
             try:
-                request = json.loads(post_data.decode('utf-8'))
-                print(f"Mock Grok received request: {request.get('messages', [{}])[-1].get('content', 'No content')[:100]}...")
-            except:
+                request = json.loads(post_data.decode("utf-8"))
+                print(
+                    f"Mock Grok received request: {request.get('messages', [{}])[-1].get('content', 'No content')[:100]}..."
+                )
+            except Exception:
                 print("Mock Grok received malformed request")
 
             # Send headers like a real streaming response
             self.send_response(200)
-            self.send_header('Content-Type', 'text/event-stream')
-            self.send_header('Cache-Control', 'no-cache')
-            self.send_header('Connection', 'keep-alive')
-            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "keep-alive")
+            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
 
             # Start streaming normally
             try:
                 # Send a few normal SSE messages
                 messages = [
-                    {"id": "chatcmpl-123", "object": "chat.completion.chunk", "created": 1234567890, "model": "grok-4-fast", "choices": [{"index": 0, "delta": {"role": "assistant", "content": "Hello"}}]},
-                    {"id": "chatcmpl-123", "object": "chat.completion.chunk", "created": 1234567890, "model": "grok-4-fast", "choices": [{"index": 0, "delta": {"content": " there!"}}]},
-                    {"id": "chatcmpl-123", "object": "chat.completion.chunk", "created": 1234567890, "model": "grok-4-fast", "choices": [{"index": 0, "delta": {"content": " I'm"}}]},
-                    {"id": "chatcmpl-123", "object": "chat.completion.chunk", "created": 1234567890, "model": "grok-4-fast", "choices": [{"index": 0, "delta": {"content": " Grok"}}]},
+                    {
+                        "id": "chatcmpl-123",
+                        "object": "chat.completion.chunk",
+                        "created": 1234567890,
+                        "model": "grok-4-fast",
+                        "choices": [
+                            {
+                                "index": 0,
+                                "delta": {"role": "assistant", "content": "Hello"},
+                            }
+                        ],
+                    },
+                    {
+                        "id": "chatcmpl-123",
+                        "object": "chat.completion.chunk",
+                        "created": 1234567890,
+                        "model": "grok-4-fast",
+                        "choices": [{"index": 0, "delta": {"content": " there!"}}],
+                    },
+                    {
+                        "id": "chatcmpl-123",
+                        "object": "chat.completion.chunk",
+                        "created": 1234567890,
+                        "model": "grok-4-fast",
+                        "choices": [{"index": 0, "delta": {"content": " I'm"}}],
+                    },
+                    {
+                        "id": "chatcmpl-123",
+                        "object": "chat.completion.chunk",
+                        "created": 1234567890,
+                        "model": "grok-4-fast",
+                        "choices": [{"index": 0, "delta": {"content": " Grok"}}],
+                    },
                 ]
 
                 # Send initial messages normally
                 for i, msg in enumerate(messages):
                     sse_data = f"data: {json.dumps(msg)}\n\n"
-                    self.wfile.write(sse_data.encode('utf-8'))
+                    self.wfile.write(sse_data.encode("utf-8"))
                     self.wfile.flush()
-                    print(f"Mock Grok sent message {i+1}")
+                    print(f"Mock Grok sent message {i + 1}")
                     time.sleep(0.1)  # Smaller delay between messages for faster test
 
                 # Now simulate the connection drop - this is the key part
@@ -81,11 +112,11 @@ def mock_server():
                 self.close_connection = True
                 try:
                     self.connection.shutdown(socket.SHUT_RDWR)
-                except:
+                except Exception:
                     pass
                 try:
                     self.connection.close()
-                except:
+                except Exception:
                     pass
 
                 print("Mock Grok: Connection dropped!")
@@ -100,7 +131,7 @@ def mock_server():
             pass
 
     # Create and start server
-    server = HTTPServer(('localhost', port), MockGrokHandler)
+    server = HTTPServer(("localhost", port), MockGrokHandler)
     print(f"Mock Grok server running on http://localhost:{port}")
     print("This server will drop connections mid-stream to simulate the Grok issue")
 
@@ -118,7 +149,7 @@ def mock_server():
     time.sleep(0.5)
 
     # Create tmp directory
-    os.makedirs('./tmp', exist_ok=True)
+    os.makedirs("./tmp", exist_ok=True)
 
     yield server, port
 
@@ -126,7 +157,7 @@ def mock_server():
     server.shutdown()
 
     # Clean up log file
-    log_file = './tmp/test_connection_drop.log'
+    log_file = "./tmp/test_connection_drop.log"
     if os.path.exists(log_file):
         os.remove(log_file)
 
@@ -136,27 +167,27 @@ def mock_config():
     """Set up mock configuration for testing."""
     # Find free port for the server
     port = find_free_port()
-    api_endpoint = f'http://localhost:{port}'
-    
+    api_endpoint = f"http://localhost:{port}"
+
     # Set environment variables
     env_vars = {
-        'API_ENDPOINT': api_endpoint,
-        'API_KEY': 'fake-key',
-        'API_MODEL': 'grok-4-fast',
-        'STREAM_LOG_FILE': './tmp/test_connection_drop.log',
-        'STREAMING_TIMEOUT': '2',  # Very short timeout for testing
-        'STREAMING_READ_TIMEOUT': '1',  # Even shorter read timeout
-        'YOLO_MODE': '1',  # Prevent approval prompts
+        "API_ENDPOINT": api_endpoint,
+        "API_KEY": "fake-key",
+        "API_MODEL": "grok-4-fast",
+        "STREAM_LOG_FILE": "./tmp/test_connection_drop.log",
+        "STREAMING_TIMEOUT": "2",  # Very short timeout for testing
+        "STREAMING_READ_TIMEOUT": "1",  # Even shorter read timeout
+        "YOLO_MODE": "1",  # Prevent approval prompts
     }
 
     for key, value in env_vars.items():
         os.environ[key] = value
 
     # Set environment variables for config
-    os.environ['OPENAI_BASE_URL'] = api_endpoint.replace('/chat/completions', '')
-    os.environ['OPENAI_API_KEY'] = 'fake-key'
-    os.environ['OPENAI_MODEL'] = 'grok-4-fast'
-    
+    os.environ["OPENAI_BASE_URL"] = api_endpoint.replace("/chat/completions", "")
+    os.environ["OPENAI_API_KEY"] = "fake-key"
+    os.environ["OPENAI_MODEL"] = "grok-4-fast"
+
     # Import config after setting environment variables
     import aicoder.config as config
 
@@ -168,16 +199,24 @@ def mock_config():
             del os.environ[key]
 
 
-@patch('select.select')
-@patch('tty.setcbreak')
-@patch('aicoder.terminal_manager.enter_prompt_mode')
-@patch('aicoder.terminal_manager.exit_prompt_mode')
-@patch('sys.stdin')
-def test_connection_drop_detection(mock_stdin, mock_exit_prompt, mock_enter_prompt, mock_setcbreak, mock_select, mock_server, mock_config):
+@patch("select.select")
+@patch("tty.setcbreak")
+@patch("aicoder.terminal_manager.enter_prompt_mode")
+@patch("aicoder.terminal_manager.exit_prompt_mode")
+@patch("sys.stdin")
+def test_connection_drop_detection(
+    mock_stdin,
+    mock_exit_prompt,
+    mock_enter_prompt,
+    mock_setcbreak,
+    mock_select,
+    mock_server,
+    mock_config,
+):
     """Test that connection drops are properly detected."""
     # Mock stdin to avoid the fileno error during testing
     mock_stdin.fileno.return_value = 0
-    mock_stdin.read.return_value = ''  # Return empty string instead of MagicMock
+    mock_stdin.read.return_value = ""  # Return empty string instead of MagicMock
     # Mock terminal manager to avoid terminal access issues during testing
     mock_enter_prompt.return_value = None
     mock_exit_prompt.return_value = None
@@ -190,7 +229,7 @@ def test_connection_drop_detection(mock_stdin, mock_exit_prompt, mock_enter_prom
     print("=" * 50)
 
     from aicoder.app import AICoder
-    
+
     # Create AICoder instance AFTER setting environment
     app = AICoder()
 
@@ -211,7 +250,9 @@ def test_connection_drop_detection(mock_stdin, mock_exit_prompt, mock_enter_prom
         else:
             # If we get a response, it should mean the connection didn't drop
             # This would be unexpected for our test
-            content = response.get('choices', [{}])[0].get('message', {}).get('content', '')
+            content = (
+                response.get("choices", [{}])[0].get("message", {}).get("content", "")
+            )
             print(f"⚠️  Unexpected: Request succeeded with content: '{content}'")
             print("   This might mean the connection drop wasn't simulated correctly")
 
@@ -233,7 +274,9 @@ def test_connection_drop_detection(mock_stdin, mock_exit_prompt, mock_enter_prom
             assert True  # No state corruption
         else:
             # If we get a response, check if it's valid
-            content = response.get('choices', [{}])[0].get('message', {}).get('content', '')
+            content = (
+                response.get("choices", [{}])[0].get("message", {}).get("content", "")
+            )
             print(f"✅ Second request got content: '{content}'")
 
     except Exception as e:

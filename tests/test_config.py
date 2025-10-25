@@ -40,8 +40,9 @@ def test_debug_mode_enabled():
     """Test that debug mode is enabled when environment variable is set."""
     # Reload the config module to pick up the environment variable
     import aicoder.config
+
     importlib.reload(aicoder.config)
-    
+
     assert aicoder.config.DEBUG is True
 
 
@@ -59,8 +60,9 @@ def test_model_type():
 def test_yolo_mode_enabled():
     """Test that YOLO mode is enabled when environment variable is set."""
     import aicoder.config
+
     importlib.reload(aicoder.config)
-    
+
     assert aicoder.config.YOLO_MODE is True
 
 
@@ -73,6 +75,7 @@ def test_streaming_type():
 def test_stream_log_file():
     """Test that stream log file is set from environment variable."""
     import aicoder.config
+
     importlib.reload(aicoder.config)
-    
+
     assert aicoder.config.STREAM_LOG_FILE == "/tmp/test.log"

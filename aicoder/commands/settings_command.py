@@ -18,7 +18,7 @@ class SettingsCommand(BaseCommand):
         if not args:
             self._show_all_settings()
             return False, False
-        
+
         if len(args) == 1:
             if args[0] in ["show", "list", "ls"]:
                 self._show_all_settings()
@@ -34,17 +34,17 @@ class SettingsCommand(BaseCommand):
             self._set_setting(key, value)
         else:
             self._show_help()
-        
+
         return False, False
 
     def _show_all_settings(self):
         """Show all current settings."""
         config = self.app.persistent_config
-        
+
         if not config:
             imsg("No persistent settings configured.")
             return
-        
+
         imsg("Current persistent settings:")
         for key, value in sorted(config.items()):
             imsg(f"  {key}: {value}")
@@ -52,7 +52,7 @@ class SettingsCommand(BaseCommand):
     def _show_setting(self, key):
         """Show a specific setting."""
         config = self.app.persistent_config
-        
+
         if key in config:
             imsg(f"{key}: {config[key]}")
         else:
@@ -61,13 +61,13 @@ class SettingsCommand(BaseCommand):
     def _set_setting(self, key, value):
         """Set a setting value."""
         config = self.app.persistent_config
-        
+
         # Convert string to appropriate type
         parsed_value = self._parse_value(value)
-        
+
         old_value = config.get(key)
         config[key] = parsed_value
-        
+
         if old_value is not None:
             wmsg(f"Updated {key}: {old_value} → {parsed_value}")
         else:
@@ -80,7 +80,7 @@ class SettingsCommand(BaseCommand):
             return True
         elif value.lower() in ["false", "off", "no", "0"]:
             return False
-        
+
         # Handle numeric values
         try:
             if "." in value:
@@ -89,7 +89,7 @@ class SettingsCommand(BaseCommand):
                 return int(value)
         except ValueError:
             pass
-        
+
         # Return as string
         return value
 

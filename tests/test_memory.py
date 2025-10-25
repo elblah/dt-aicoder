@@ -28,6 +28,7 @@ class TestProjectMemory(unittest.TestCase):
 
         # Check tables exist
         import sqlite3
+
         with sqlite3.connect(self.memory.db_path) as conn:
             cursor = conn.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name='notes'"
@@ -43,16 +44,18 @@ class TestProjectMemory(unittest.TestCase):
     def test_create_and_read_note(self):
         """Test creating and reading a note."""
         # Create note
-        result = self.memory.create("test_note", "This is test content", ["tag1", "tag2"])
+        result = self.memory.create(
+            "test_note", "This is test content", ["tag1", "tag2"]
+        )
         self.assertIn("Created memory note: test_note", result)
 
         # Read note
         note = self.memory.read("test_note")
         self.assertIsNotNone(note)
-        self.assertEqual(note['name'], "test_note")
-        self.assertEqual(note['content'], "This is test content")
-        self.assertEqual(note['tags'], ["tag1", "tag2"])
-        self.assertEqual(note['access_count'], 1)
+        self.assertEqual(note["name"], "test_note")
+        self.assertEqual(note["content"], "This is test content")
+        self.assertEqual(note["tags"], ["tag1", "tag2"])
+        self.assertEqual(note["access_count"], 1)
 
     def test_update_note(self):
         """Test updating an existing note."""
@@ -65,8 +68,8 @@ class TestProjectMemory(unittest.TestCase):
 
         # Check updated content
         note = self.memory.read("test_note")
-        self.assertEqual(note['content'], "Updated content")
-        self.assertEqual(note['tags'], ["new_tag"])
+        self.assertEqual(note["content"], "Updated content")
+        self.assertEqual(note["tags"], ["new_tag"])
 
     def test_read_nonexistent_note(self):
         """Test reading a note that doesn't exist."""
@@ -76,9 +79,17 @@ class TestProjectMemory(unittest.TestCase):
     def test_search_notes(self):
         """Test searching notes."""
         # Create test notes
-        self.memory.create("api_setup", "Configure the API with OAuth2", ["api", "auth"])
-        self.memory.create("database_issue", "Fixed database connection timeout", ["database", "debugging"])
-        self.memory.create("auth_fix", "Updated authentication middleware", ["auth", "security"])
+        self.memory.create(
+            "api_setup", "Configure the API with OAuth2", ["api", "auth"]
+        )
+        self.memory.create(
+            "database_issue",
+            "Fixed database connection timeout",
+            ["database", "debugging"],
+        )
+        self.memory.create(
+            "auth_fix", "Updated authentication middleware", ["auth", "security"]
+        )
 
         # Search for "auth"
         results = self.memory.search("auth")
@@ -87,7 +98,7 @@ class TestProjectMemory(unittest.TestCase):
         # Search for "database"
         results = self.memory.search("database")
         self.assertEqual(len(results), 1)
-        self.assertEqual(results[0]['name'], "database_issue")
+        self.assertEqual(results[0]["name"], "database_issue")
 
     def test_list_notes(self):
         """Test listing all notes."""
@@ -101,7 +112,7 @@ class TestProjectMemory(unittest.TestCase):
         self.assertEqual(len(notes), 3)
 
         # Check sorting (default by updated_at DESC)
-        names = [note['name'] for note in notes]
+        names = [note["name"] for note in notes]
         self.assertIn("note1", names)
         self.assertIn("note2", names)
         self.assertIn("note3", names)
@@ -140,14 +151,14 @@ class TestProjectMemory(unittest.TestCase):
 
         stats = self.memory.get_stats()
 
-        self.assertEqual(stats['total_notes'], 2)
-        self.assertGreater(stats['storage_bytes'], 0)
-        self.assertEqual(stats['tag_count'], 2)
-        self.assertIn("tag1", stats['unique_tags'])
-        self.assertIn("tag2", stats['unique_tags'])
+        self.assertEqual(stats["total_notes"], 2)
+        self.assertGreater(stats["storage_bytes"], 0)
+        self.assertEqual(stats["tag_count"], 2)
+        self.assertIn("tag1", stats["unique_tags"])
+        self.assertIn("tag2", stats["unique_tags"])
 
         # Check most accessed
-        most_accessed = dict(stats['most_accessed'])
+        most_accessed = dict(stats["most_accessed"])
         self.assertIn("note1", most_accessed)
         self.assertEqual(most_accessed["note1"], 2)
 
@@ -156,7 +167,7 @@ class TestProjectMemory(unittest.TestCase):
         result = self.memory.auto_save_decision(
             "API calls were failing with timeout errors",
             "Increased timeout from 30s to 60s in config.yaml",
-            ["debugging", "api"]
+            ["debugging", "api"],
         )
 
         self.assertIn("Created memory note: decision_", result)
@@ -165,11 +176,11 @@ class TestProjectMemory(unittest.TestCase):
         notes = self.memory.list_all()
         self.assertEqual(len(notes), 1)
 
-        note = self.memory.read(notes[0]['name'])
-        self.assertIn("API calls were failing", note['content'])
-        self.assertIn("Increased timeout", note['content'])
-        self.assertIn("auto-saved", note['tags'])
-        self.assertIn("decision", note['tags'])
+        note = self.memory.read(notes[0]["name"])
+        self.assertIn("API calls were failing", note["content"])
+        self.assertIn("Increased timeout", note["content"])
+        self.assertIn("auto-saved", note["tags"])
+        self.assertIn("decision", note["tags"])
 
 
 class TestMemoryTool(unittest.TestCase):
@@ -179,6 +190,7 @@ class TestMemoryTool(unittest.TestCase):
         """Set up test environment."""
         self.test_dir = tempfile.mkdtemp()
         from aicoder.memory import get_project_memory, reset_memory
+
         reset_memory()
         self.memory = get_project_memory(self.test_dir)
 
@@ -186,6 +198,7 @@ class TestMemoryTool(unittest.TestCase):
         """Clean up test environment."""
         shutil.rmtree(self.test_dir)
         from aicoder.memory import reset_memory
+
         reset_memory()
 
     def test_memory_tool_create(self):
@@ -203,7 +216,7 @@ class TestMemoryTool(unittest.TestCase):
             name="test_note",
             content="Test content",
             tags=["test"],
-            stats=stats
+            stats=stats,
         )
 
         self.assertIn("Created memory note: test_note", result)
@@ -227,16 +240,16 @@ class TestMemoryTool(unittest.TestCase):
             name="test_note",
             content="Updated content",
             tags=["updated"],
-            stats=stats
+            stats=stats,
         )
 
         self.assertIn("Updated memory note: test_note", result)
         self.assertEqual(stats.tool_calls, 1)
-        
+
         # Verify the update worked
         note = self.memory.read("test_note")
-        self.assertEqual(note['content'], "Updated content")
-        self.assertEqual(note['tags'], ["updated"])
+        self.assertEqual(note["content"], "Updated content")
+        self.assertEqual(note["tags"], ["updated"])
 
     def test_memory_tool_read(self):
         """Test memory tool read operation."""
@@ -250,11 +263,7 @@ class TestMemoryTool(unittest.TestCase):
             tool_errors = 0
 
         stats = MockStats()
-        result = execute_memory(
-            operation="read",
-            name="test_note",
-            stats=stats
-        )
+        result = execute_memory(operation="read", name="test_note", stats=stats)
 
         self.assertIn("Memory Note: test_note", result)
         self.assertIn("Test content", result)
@@ -273,11 +282,7 @@ class TestMemoryTool(unittest.TestCase):
             tool_errors = 0
 
         stats = MockStats()
-        result = execute_memory(
-            operation="search",
-            query="API",
-            stats=stats
-        )
+        result = execute_memory(operation="search", query="API", stats=stats)
 
         self.assertIn("Found 1 memory notes matching 'API'", result)
         self.assertIn("api_note", result)
@@ -296,10 +301,7 @@ class TestMemoryTool(unittest.TestCase):
             tool_errors = 0
 
         stats = MockStats()
-        result = execute_memory(
-            operation="list",
-            stats=stats
-        )
+        result = execute_memory(operation="list", stats=stats)
 
         self.assertIn("Memory notes (sorted by updated_at)", result)
         self.assertIn("note1", result)
@@ -319,10 +321,7 @@ class TestMemoryTool(unittest.TestCase):
             tool_errors = 0
 
         stats = MockStats()
-        result = execute_memory(
-            operation="stats",
-            stats=stats
-        )
+        result = execute_memory(operation="stats", stats=stats)
 
         self.assertIn("Memory Statistics:", result)
         self.assertIn("Total notes: 2", result)
@@ -340,11 +339,7 @@ class TestMemoryTool(unittest.TestCase):
             tool_errors = 0
 
         stats = MockStats()
-        result = execute_memory(
-            operation="delete",
-            name="test_note",
-            stats=stats
-        )
+        result = execute_memory(operation="delete", name="test_note", stats=stats)
 
         self.assertIn("Deleted memory note: test_note", result)
         self.assertEqual(stats.tool_calls, 1)
@@ -374,5 +369,5 @@ class TestMemoryTool(unittest.TestCase):
         self.assertEqual(stats.tool_errors, 2)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

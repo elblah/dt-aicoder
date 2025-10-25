@@ -34,6 +34,7 @@ if ENABLED:
     def say(msg):
         def fn():
             os.system(f"PULSE_SINK='{sink}' espeak '{msg}' 2> {DEV_NULL}")
+
         t = threading.Thread(target=fn)
         t.start()
 
@@ -45,10 +46,8 @@ if ENABLED:
 
         if os.path.exists(".notify-prompt"):
             return True
-        
-        st, outp = shell(
-            f"""tmux display -p -t "{tmux_pane}" '#{{window_active}}'"""
-        )
+
+        st, outp = shell(f"""tmux display -p -t "{tmux_pane}" '#{{window_active}}'""")
         # Notify if pane is NOT active (outp != "1") or if command failed
         return st != 0 or outp != "1"
 

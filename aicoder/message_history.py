@@ -13,11 +13,14 @@ from .utils import emsg, wmsg, imsg
 # Global constants for message compaction to ensure single source of truth
 SUMMARY_MESSAGE_PREFIX = "Summary of earlier conversation:"
 NEUTRAL_USER_MESSAGE_CONTENT = "..."
-COMPACTED_TOOL_RESULT_CONTENT = "[Old tool result content cleared due to memory compaction]"
+COMPACTED_TOOL_RESULT_CONTENT = (
+    "[Old tool result content cleared due to memory compaction]"
+)
 
 
 class NoMessagesToCompactError(Exception):
     """Raised when there are no messages to compact (all are recent or already compacted)."""
+
     pass
 
 
@@ -194,10 +197,12 @@ class MessageHistory:
         """Create the initial system message."""
         # Apply environment variable override for main prompt
         from .prompt_loader import get_main_prompt
+
         INITIAL_PROMPT = get_main_prompt()  # This will exit if no prompt found
 
         # Check if project-specific context file exists and append its content
         from .prompt_loader import get_project_filename
+
         project_file = get_project_filename()
 
         # Also try lowercase version for compatibility
@@ -300,8 +305,9 @@ class MessageHistory:
         # Don't compact if we don't have enough chat messages
         if chat_message_count < config.COMPACT_MIN_MESSAGES:
             wmsg(
-                f" *** Auto-compaction: Not enough messages to compact (chat messages: {chat_message_count}, minimum: {config.COMPACT_MIN_MESSAGES})"
+                f" *** Auto-compaction skipped: Not enough messages to compact (chat messages: {chat_message_count}, minimum: {config.COMPACT_MIN_MESSAGES})"
             )
+            wmsg(" *** If you need to force compaction, use: /compact force <N>")
             return self.messages
 
         imsg(" *** Compacting memory... ")
@@ -322,8 +328,13 @@ class MessageHistory:
         if tokens_after_pruning < config.AUTO_COMPACT_THRESHOLD:
             if actual_pruning_occurred:
                 imsg(
-                    f" *** Pruning was sufficient (tokens: {tokens_after_pruning}, threshold: {config.AUTO_COMPACT_THRESHOLD})"
+                    f" *** Memory compacted via pruning (tokens: {tokens_after_pruning}, threshold: {config.AUTO_COMPACT_THRESHOLD})"
                 )
+            else:
+                wmsg(
+                    " *** Auto-compaction skipped: no tool results to prune and messages are already optimal"
+                )
+                wmsg(" *** If you need to force compaction, use: /compact force <N>")
             self.messages = pruned_messages
             # Set the flag to True to indicate compaction has been attempted
             self._compaction_performed = True
@@ -335,6 +346,7 @@ class MessageHistory:
                 self.api_handler.stats.current_prompt_size = estimate_messages_tokens(
                     self.messages
                 )
+                self.api_handler.stats.current_prompt_size_estimated = True
                 if config.DEBUG:
                     imsg(
                         f" *** Token count recalculated after compaction: {self.api_handler.stats.current_prompt_size} tokens"
@@ -357,10 +369,11 @@ class MessageHistory:
 
         # Filter out previously compacted messages (messages that start with SUMMARY_MESSAGE_PREFIX)
         older_messages = [
-            msg for msg in older_messages
+            msg
+            for msg in older_messages
             if not (
-                msg.get("role") == "system" and
-                msg.get("content", "").startswith(SUMMARY_MESSAGE_PREFIX)
+                msg.get("role") == "system"
+                and msg.get("content", "").startswith(SUMMARY_MESSAGE_PREFIX)
             )
         ]
 
@@ -369,12 +382,20 @@ class MessageHistory:
 
         # If there are no messages to summarize, raise exception to skip compaction
         if not clean_older_messages:
-            raise NoMessagesToCompactError("No messages to summarize - all are recent or already compacted")
+            if actual_pruning_occurred:
+                raise NoMessagesToCompactError(
+                    "Pruning insufficient and no messages to summarize - all remaining messages are recent or already compacted"
+                )
+            else:
+                raise NoMessagesToCompactError(
+                    "No messages to summarize - all are recent or already compacted"
+                )
 
+        imsg(" *** Pruning insufficient, using AI summarization to compact memory...")
         summary = self._summarize_old_messages(clean_older_messages)
 
-        summary_content = SUMMARY_MESSAGE_PREFIX + " " + (
-            summary if summary else "no prior content"
+        summary_content = (
+            SUMMARY_MESSAGE_PREFIX + " " + (summary if summary else "no prior content")
         )
         summary_message = {"role": "system", "content": summary_content}
 
@@ -387,9 +408,9 @@ class MessageHistory:
         # 2. The new summary (inserted at the correct position)
         # 3. The recent messages
         new_messages = (
-            self.messages[:first_chat_index] +  # All existing system messages
-            [summary_message] +                  # New summary
-            recent_messages                      # Recent messages
+            self.messages[:first_chat_index]  # All existing system messages
+            + [summary_message]  # New summary
+            + recent_messages  # Recent messages
         )
 
         # Ensure the first message after system is a user message for compatibility
@@ -399,16 +420,25 @@ class MessageHistory:
         # This requirement was discovered through trial and error (not documented in their API docs)
         # If recent_messages doesn't start with a user message, insert a neutral user message
         if recent_messages and recent_messages[0].get("role") != "user":
-            neutral_user_message = {"role": "user", "content": NEUTRAL_USER_MESSAGE_CONTENT}
+            neutral_user_message = {
+                "role": "user",
+                "content": NEUTRAL_USER_MESSAGE_CONTENT,
+            }
             # Insert the neutral user message after the new summary (at position first_chat_index + 1)
             new_messages = (
-                new_messages[:first_chat_index + 1] +  # All system messages + new summary
-                [neutral_user_message] +               # Neutral user message
-                recent_messages                         # Recent messages
+                new_messages[
+                    : first_chat_index + 1
+                ]  # All system messages + new summary
+                + [neutral_user_message]  # Neutral user message
+                + recent_messages  # Recent messages
             )
             if config.DEBUG:
-                wmsg(" *** Inserted neutral user message for z.ai GLM model compatibility")
-                wmsg(" *** This prevents error 1214: 'The messages parameter is illegal' (OpenAI API doesn't require this)")
+                wmsg(
+                    " *** Inserted neutral user message for z.ai GLM model compatibility"
+                )
+                wmsg(
+                    " *** This prevents error 1214: 'The messages parameter is illegal' (OpenAI API doesn't require this)"
+                )
 
         self.messages = new_messages
         # Set the flag to True to indicate compaction has been attempted
@@ -421,6 +451,7 @@ class MessageHistory:
             self.api_handler.stats.current_prompt_size = estimate_messages_tokens(
                 self.messages
             )
+            self.api_handler.stats.current_prompt_size_estimated = True
             if config.DEBUG:
                 imsg(
                     f" *** Token count recalculated after compaction: {self.api_handler.stats.current_prompt_size} tokens"
@@ -436,7 +467,6 @@ class MessageHistory:
         """
         if "DISABLE_PRUNING" in os.environ:
             return self.messages, False
-
 
         # Make a copy of messages to work with
         messages = [msg.copy() for msg in self.messages]
@@ -588,6 +618,7 @@ class MessageHistory:
 
             # Apply environment variable override for compaction prompt
             from .prompt_loader import get_compaction_prompt
+
             compaction_prompt = get_compaction_prompt()
 
             # If no prompt found, use hardcoded fallback
@@ -712,6 +743,7 @@ Provide a detailed but concise summary of our conversation above. Focus on infor
             self.api_handler.stats.current_prompt_size = estimate_messages_tokens(
                 self.messages
             )
+            self.api_handler.stats.current_prompt_size_estimated = True
             if config.DEBUG:
                 imsg(
                     f" *** Token count recalculated after reset: {self.api_handler.stats.current_prompt_size} tokens"
@@ -727,45 +759,49 @@ Provide a detailed but concise summary of our conversation above. Focus on infor
             # Check if autosave should be enabled/disabled based on filename
             if "autosave" in filename.lower():
                 self.autosave_filename = filename
-                print(f"{config.CYAN} *** Autosave ENABLED (filename contains 'autosave'){config.RESET}")
-                print(f"{config.CYAN} *** Session will auto-save before each prompt{config.RESET}")
+                print(
+                    f"{config.CYAN} *** Autosave ENABLED (filename contains 'autosave'){config.RESET}"
+                )
+                print(
+                    f"{config.CYAN} *** Session will auto-save before each prompt{config.RESET}"
+                )
             else:
                 if self.autosave_filename:
-                    wmsg(" *** Autosave DISABLED (filename does not contain 'autosave')")
+                    wmsg(
+                        " *** Autosave DISABLED (filename does not contain 'autosave')"
+                    )
                 self.autosave_filename = None
         except Exception as e:
-            emsg(
-                f"\n *** Error saving session to {filename}: {e}"
-            )
+            emsg(f"\n *** Error saving session to {filename}: {e}")
 
     def detect_planning_mode_from_session(self, messages: List[Dict]) -> bool:
         """Detect if the last session was in planning mode by analyzing messages."""
         if not messages:
             return False
-        
+
         # Look at the last few messages to find mode markers
         for message in reversed(messages[-5:]):  # Check last 5 messages
             content = message.get("content", "")
-            
+
             # Check for the mode marker - most reliable way to detect
             if "<aicoder_active_mode>plan</aicoder_active_mode>" in content:
                 return True
             elif "<aicoder_active_mode>build</aicoder_active_mode>" in content:
                 return False
-            
+
             # Fallback to older detection methods for backward compatibility
             if "PLANNING MODE - READ-ONLY ACCESS ONLY" in content:
                 return True
-            
+
             # Check for planning mode user instructions
             if "Read-only tools only" in content and message.get("role") == "user":
                 return True
-                
+
             # Check for plan mode indicators in assistant responses
             if message.get("role") == "assistant":
                 if "I'm in planning mode" in content or "read-only access" in content:
                     return True
-        
+
         return False
 
     def load_session(self, filename: str = "session.json"):
@@ -782,12 +818,15 @@ Provide a detailed but concise summary of our conversation above. Focus on infor
             self._compaction_performed = False
 
             # Detect and restore planning mode state
-            planning_mode_detected = self.detect_planning_mode_from_session(clean_messages)
+            planning_mode_detected = self.detect_planning_mode_from_session(
+                clean_messages
+            )
             try:
                 from .planning_mode import get_planning_mode
+
                 planning_mode = get_planning_mode()
                 current_mode = planning_mode.is_plan_mode_active()
-                
+
                 if planning_mode_detected and not current_mode:
                     # Session was in plan mode but we're in build mode - switch to plan mode
                     planning_mode.set_plan_mode(True)
@@ -796,7 +835,7 @@ Provide a detailed but concise summary of our conversation above. Focus on infor
                     # Session was in build mode but we're in plan mode - switch to build mode
                     planning_mode.set_plan_mode(False)
                     imsg(" 🔄 Build mode restored from session")
-                
+
                 # After setting the mode, mark message as sent to avoid duplicate mode messages on first user input
                 planning_mode._mode_message_sent = True
             except ImportError:
@@ -806,7 +845,9 @@ Provide a detailed but concise summary of our conversation above. Focus on infor
             if "autosave" in filename.lower():
                 self.autosave_filename = filename
                 imsg(f"\n *** Session loaded with autosave enabled: {filename}")
-                print(f"{config.CYAN} *** Auto-saving session before each prompt...{config.RESET}")
+                print(
+                    f"{config.CYAN} *** Auto-saving session before each prompt...{config.RESET}"
+                )
             else:
                 self.autosave_filename = None
                 imsg(f"\n *** Session loaded: {filename}")
@@ -818,14 +859,13 @@ Provide a detailed but concise summary of our conversation above. Focus on infor
                 self.api_handler.stats.current_prompt_size = estimate_messages_tokens(
                     self.messages
                 )
+                self.api_handler.stats.current_prompt_size_estimated = True
                 if config.DEBUG:
                     imsg(
                         f" *** Token count recalculated: {self.api_handler.stats.current_prompt_size} tokens"
                     )
         except Exception as e:
-            emsg(
-                f"\n *** Error loading session from {filename}: {e}"
-            )
+            emsg(f"\n *** Error loading session from {filename}: {e}")
 
     def autosave_if_enabled(self):
         """Auto-save the session if autosave is enabled."""
@@ -835,10 +875,14 @@ Provide a detailed but concise summary of our conversation above. Focus on infor
                 with open(self.autosave_filename, "w") as f:
                     json.dump(self.messages, f, indent=4)
                 if config.DEBUG:
-                    print(f"{config.CYAN} *** Session auto-saved to: {self.autosave_filename}{config.RESET}")
+                    print(
+                        f"{config.CYAN} *** Session auto-saved to: {self.autosave_filename}{config.RESET}"
+                    )
             except Exception as e:
                 # Always warn the user if autosave fails - this is about data safety!
-                emsg(f" *** ⚠️  AUTOSAVE FAILED: Could not save to {self.autosave_filename}")
+                emsg(
+                    f" *** ⚠️  AUTOSAVE FAILED: Could not save to {self.autosave_filename}"
+                )
                 emsg(f" *** Error: {e}")
                 wmsg(" *** Your session may not be saved if the application crashes!")
 
@@ -850,135 +894,156 @@ Provide a detailed but concise summary of our conversation above. Focus on infor
     def identify_conversation_rounds(self) -> List[Dict[str, Any]]:
         """
         Identify conversation rounds in the message history.
-        
+
         A round = user message + complete assistant response (including tool calls/responses).
-        
+
         Returns:
             List of rounds, where each round is a dict with:
             - 'start_index': index of first message in round
-            - 'end_index': index of last message in round  
+            - 'end_index': index of last message in round
             - 'message_count': number of messages in round
             - 'messages': list of messages in the round
         """
         first_chat_index = self._get_first_chat_message_index()
         chat_messages = self.messages[first_chat_index:]
-        
+
         rounds = []
         current_round = []
-        
+
         for i, message in enumerate(chat_messages):
             current_round.append(message)
-            
+
             # Check if this is the end of a round
             # A round ends when we encounter a user message and we already have content in current_round
             if message.get("role") == "user" and len(current_round) > 1:
                 # Previous round is complete (everything except this new user message)
                 if len(current_round) > 1:
-                    rounds.append({
-                        'start_index': first_chat_index + i - len(current_round) + 1,
-                        'end_index': first_chat_index + i - 1,
-                        'message_count': len(current_round) - 1,
-                        'messages': current_round[:-1]
-                    })
+                    rounds.append(
+                        {
+                            "start_index": first_chat_index
+                            + i
+                            - len(current_round)
+                            + 1,
+                            "end_index": first_chat_index + i - 1,
+                            "message_count": len(current_round) - 1,
+                            "messages": current_round[:-1],
+                        }
+                    )
                 # Start new round with this user message
                 current_round = [message]
-        
+
         # Don't forget the last round if it exists
         if len(current_round) > 0:
-            rounds.append({
-                'start_index': first_chat_index + len(chat_messages) - len(current_round),
-                'end_index': first_chat_index + len(chat_messages) - 1,
-                'message_count': len(current_round),
-                'messages': current_round
-            })
-        
+            rounds.append(
+                {
+                    "start_index": first_chat_index
+                    + len(chat_messages)
+                    - len(current_round),
+                    "end_index": first_chat_index + len(chat_messages) - 1,
+                    "message_count": len(current_round),
+                    "messages": current_round,
+                }
+            )
+
         return rounds
-    
+
     def get_round_count(self) -> int:
         """Get the number of conversation rounds."""
         return len(self.identify_conversation_rounds())
-    
+
     def compact_rounds(self, num_rounds: int = 1) -> List[Dict[str, Any]]:
         """
         Compact the specified number of oldest conversation rounds.
-        
+
         Args:
             num_rounds: Number of oldest rounds to compact (default: 1)
-            
+
         Returns:
             List of compacted rounds
-            
+
         Raises:
             NoMessagesToCompactError: If no rounds available to compact
         """
         rounds = self.identify_conversation_rounds()
-        
+
         if not rounds:
-            raise NoMessagesToCompactError("No conversation rounds available to compact")
-        
+            raise NoMessagesToCompactError(
+                "No conversation rounds available to compact"
+            )
+
         # Limit to available rounds
         rounds_to_compact = min(num_rounds, len(rounds))
         oldest_rounds = rounds[:rounds_to_compact]
-        
+
         # Collect all messages from the rounds to compact
         messages_to_compact = []
         for round_data in oldest_rounds:
-            messages_to_compact.extend(round_data['messages'])
-        
+            messages_to_compact.extend(round_data["messages"])
+
         # Filter out protected messages (system messages and previous summaries)
         eligible_messages = [
-            msg for msg in messages_to_compact
+            msg
+            for msg in messages_to_compact
             if not (
-                msg.get("role") == "system" and
-                msg.get("content", "").startswith(SUMMARY_MESSAGE_PREFIX)
+                msg.get("role") == "system"
+                and msg.get("content", "").startswith(SUMMARY_MESSAGE_PREFIX)
             )
         ]
-        
+
         if not eligible_messages:
-            raise NoMessagesToCompactError("No eligible messages to compact in specified rounds")
-        
+            raise NoMessagesToCompactError(
+                "No eligible messages to compact in specified rounds"
+            )
+
         # Create summary of the eligible messages
         from .prompt_loader import get_compaction_prompt
+
         compaction_prompt = get_compaction_prompt()
-        
+
         if not compaction_prompt:
             compaction_prompt = """You are a helpful AI assistant tasked with summarizing conversations.
 Please provide a concise summary of the following conversation messages, preserving key information and context."""
 
         # Create the summary using the API
         summary = self._summarize_old_messages(eligible_messages)
-        
-        summary_content = SUMMARY_MESSAGE_PREFIX + " " + (
-            summary if summary else "no prior content"
+
+        summary_content = (
+            SUMMARY_MESSAGE_PREFIX + " " + (summary if summary else "no prior content")
         )
         summary_message = {"role": "system", "content": summary_content}
-        
+
         # Find insertion point (before the oldest round)
-        insertion_index = oldest_rounds[0]['start_index']
-        
+        insertion_index = oldest_rounds[0]["start_index"]
+
         # Reconstruct messages:
         # 1. Messages before insertion point (system messages, previous summaries)
         # 2. New summary message
         # 3. Messages after all compacted rounds
-        last_compacted_end = oldest_rounds[-1]['end_index']
-        
+        last_compacted_end = oldest_rounds[-1]["end_index"]
+
         self.messages = (
-            self.messages[:insertion_index] +           # Before compacted rounds
-            [summary_message] +                         # New summary
-            self.messages[last_compacted_end + 1:]       # After compacted rounds
+            self.messages[:insertion_index]  # Before compacted rounds
+            + [summary_message]  # New summary
+            + self.messages[last_compacted_end + 1 :]  # After compacted rounds
         )
-        
+
         # Update stats
         self.stats.compactions += 1
         self._compaction_performed = True
-        
+
         # Recalculate token count
         if self.api_handler and hasattr(self.api_handler, "stats"):
             from .utils import estimate_messages_tokens
-            self.api_handler.stats.current_prompt_size = estimate_messages_tokens(self.messages)
+
+            self.api_handler.stats.current_prompt_size = estimate_messages_tokens(
+                self.messages
+            )
+            self.api_handler.stats.current_prompt_size_estimated = True
             if config.DEBUG:
-                imsg(f" *** Token count recalculated after round compaction: {self.api_handler.stats.current_prompt_size} tokens")
-        
+                imsg(
+                    f" *** Token count recalculated after round compaction: {self.api_handler.stats.current_prompt_size} tokens"
+                )
+
         return oldest_rounds
 
     def _load_aicoder_md(self) -> str:
@@ -1042,7 +1107,9 @@ Please provide a concise summary of the following conversation messages, preserv
                         content = data.decode("utf-8").strip()
                         if content:
                             if config.DEBUG:
-                                imsg(f" *** Found AICODER.md in package data ({package_name})")
+                                imsg(
+                                    f" *** Found AICODER.md in package data ({package_name})"
+                                )
                             return content
                 except Exception:
                     continue
@@ -1073,7 +1140,9 @@ Please provide a concise summary of the following conversation messages, preserv
                                             content = f.read().decode("utf-8").strip()
                                             if content:
                                                 if config.DEBUG:
-                                                    imsg(f" *** Found AICODER.md in zipapp ({path_entry}/{zip_path})")
+                                                    imsg(
+                                                        f" *** Found AICODER.md in zipapp ({path_entry}/{zip_path})"
+                                                    )
                                                 return content
                                     except Exception:
                                         continue

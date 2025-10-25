@@ -30,7 +30,7 @@ def on_aicoder_init(aicoder_instance):
     try:
         _aicoder_ref = aicoder_instance
         print("🔧 DEBUG: Smart Edit plugin on_aicoder_init called")
-        
+
         # Register the smart_edit tool
         tool_definition = {
             "type": "internal",
@@ -53,183 +53,199 @@ smart_edit(path="example.py", changes=[{
                 "properties": {
                     "path": {
                         "type": "string",
-                        "description": "The absolute path to the file to edit"
+                        "description": "The absolute path to the file to edit",
                     },
                     "changes": {
                         "type": "array",
-                        "description": "List of changes to apply"
+                        "description": "List of changes to apply",
                     },
                     "mode": {
                         "type": "string",
-                        "enum": ["context", "line_based", "pattern", "semantic", "auto"],
+                        "enum": [
+                            "context",
+                            "line_based",
+                            "pattern",
+                            "semantic",
+                            "auto",
+                        ],
                         "default": "context",
-                        "description": "Primary editing mode"
+                        "description": "Primary editing mode",
                     },
                     "preview_mode": {
-                        "type": "string", 
+                        "type": "string",
                         "enum": ["rich", "simple", "none"],
                         "default": "rich",
-                        "description": "How to display the diff preview"
+                        "description": "How to display the diff preview",
                     },
                     "create_backup": {
                         "type": "boolean",
                         "default": True,
-                        "description": "Create automatic timestamped backup"
+                        "description": "Create automatic timestamped backup",
                     },
                     "auto_confirm": {
-                        "type": "boolean", 
+                        "type": "boolean",
                         "default": False,
-                        "description": "Skip preview if no conflicts detected"
+                        "description": "Skip preview if no conflicts detected",
                     },
                     "encoding": {
                         "type": "string",
                         "default": "utf-8",
-                        "description": "File encoding for reading/writing"
+                        "description": "File encoding for reading/writing",
                     },
                     "conflict_resolution": {
                         "type": "string",
                         "enum": ["prompt", "skip", "override", "merge"],
                         "default": "prompt",
-                        "description": "How to handle file modification conflicts"
-                    }
+                        "description": "How to handle file modification conflicts",
+                    },
                 },
-                "required": ["path", "changes"]
+                "required": ["path", "changes"],
             },
-            "validate_function": "validate_smart_edit"
+            "validate_function": "validate_smart_edit",
         }
-        
+
         print("🔧 DEBUG: About to register smart_edit tool")
-        
+
         # Register the tool
         aicoder_instance.tool_manager.registry.mcp_tools["smart_edit"] = tool_definition
-        
+
         # Register the implementation function in INTERNAL_TOOL_FUNCTIONS
         try:
             from aicoder.tool_manager.executor import INTERNAL_TOOL_FUNCTIONS
+
             INTERNAL_TOOL_FUNCTIONS["smart_edit"] = execute_smart_edit
-            print("🔧 DEBUG: Implementation function registered in INTERNAL_TOOL_FUNCTIONS")
+            print(
+                "🔧 DEBUG: Implementation function registered in INTERNAL_TOOL_FUNCTIONS"
+            )
         except ImportError as e:
             print(f"🔧 DEBUG: Failed to import INTERNAL_TOOL_FUNCTIONS: {e}")
             return False
-        
+
         print("✅ Smart Edit Tool plugin registered successfully")
         return True
-        
+
     except Exception as e:
         print(f"❌ Failed to load Smart Edit Tool plugin: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
 
 class DiffVisualizer:
     """Rich diff visualization with color coding."""
-    
+
     def __init__(self, config_ref=None):
         self.config = config_ref
-    
-    def show_rich_diff(self, file_path: str, original: str, modified: str, context_lines: int = 3) -> str:
+
+    def show_rich_diff(
+        self, file_path: str, original: str, modified: str, context_lines: int = 3
+    ) -> str:
         """Generate rich color-coded diff."""
         try:
             import aicoder.config as config
+
             self.config = config
         except ImportError:
             pass
-            
+
         original_lines = original.splitlines(True)
         modified_lines = modified.splitlines(True)
-        
+
         # Generate unified diff
-        diff_lines = list(difflib.unified_diff(
-            original_lines, 
-            modified_lines,
-            fromfile=f"{file_path} (original)",
-            tofile=f"{file_path} (modified)",
-            n=context_lines,
-            lineterm=''
-        ))
-        
+        diff_lines = list(
+            difflib.unified_diff(
+                original_lines,
+                modified_lines,
+                fromfile=f"{file_path} (original)",
+                tofile=f"{file_path} (modified)",
+                n=context_lines,
+                lineterm="",
+            )
+        )
+
         if not diff_lines:
             return "No changes to display"
-            
+
         # Colorize the diff
         if self.config:
             try:
                 from aicoder.utils import colorize_diff_lines
-                colored_diff = colorize_diff_lines('\n'.join(diff_lines) + '\n')
+
+                colored_diff = colorize_diff_lines("\n".join(diff_lines) + "\n")
                 return colored_diff
             except ImportError:
                 pass
-        
-        return '\n'.join(diff_lines)
-    
+
+        return "\n".join(diff_lines)
+
     def show_summary(self, file_path: str, original: str, modified: str) -> str:
         """Show a summary of changes."""
         orig_lines = original.splitlines()
         mod_lines = modified.splitlines()
-        
+
         additions = len(mod_lines) - len(orig_lines)
         deletions = len(orig_lines) - len(mod_lines)
-        
+
         summary = f"\n📊 Changes Summary for {os.path.basename(file_path)}:\n"
         summary += "=" * 60 + "\n"
-        
+
         if additions > 0:
             summary += f"➕ {additions} line{'s' if additions != 1 else ''} added\n"
         if deletions > 0:
             summary += f"➖ {deletions} line{'s' if deletions != 1 else ''} removed\n"
         if additions == 0 and deletions == 0:
             summary += "✨ Content modified (no line count change)\n"
-            
+
         summary += f"📝 Total lines: {len(mod_lines)}\n"
         return summary
 
 
 class BackupManager:
     """Manages file backups and rollback operations."""
-    
+
     def __init__(self):
         self.backups = {}  # Track created backups
-        
+
     def create_backup(self, file_path: str) -> Optional[str]:
         """Create timestamped backup in a directory next to the original file."""
         if not os.path.exists(file_path):
             return None
-            
+
         # Create backup directory next to the file
         file_dir = os.path.dirname(file_path)
         backup_dir = os.path.join(file_dir, "smart_edit_backups")
-        
+
         try:
             os.makedirs(backup_dir, exist_ok=True)
         except (OSError, PermissionError):
             # Fallback to temp directory if we can't create backup dir
             backup_dir = tempfile.gettempdir()
-        
+
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = os.path.basename(file_path)
         backup_name = f"{filename}.{timestamp}.backup"
         backup_path = os.path.join(backup_dir, backup_name)
-        
+
         try:
             shutil.copy2(file_path, backup_path)
             self.backups[file_path] = backup_path
             return backup_path
         except Exception:
             return None
-    
+
     def rollback(self, file_path: str) -> bool:
         """Rollback file to last backup."""
         if file_path not in self.backups:
             print("❌ No backup found for rollback")
             return False
-            
+
         backup_path = self.backups[file_path]
-        
+
         if not os.path.exists(backup_path):
             print(f"❌ Backup file not found: {backup_path}")
             return False
-            
+
         try:
             shutil.copy2(backup_path, file_path)
             print(f"✅ Successfully rolled back {file_path}")
@@ -241,126 +257,143 @@ class BackupManager:
 
 class EditStrategyManager:
     """Handles different editing strategies."""
-    
+
     def __init__(self):
         self.strategies = {
-            'context': self._apply_context_edit,
-            'line_based': self._apply_line_edit,
-            'pattern': self._apply_pattern_edit,
-            'semantic': self._apply_semantic_edit
+            "context": self._apply_context_edit,
+            "line_based": self._apply_line_edit,
+            "pattern": self._apply_pattern_edit,
+            "semantic": self._apply_semantic_edit,
         }
-    
-    def apply_changes(self, content: str, changes: List[Dict[str, Any]], default_mode: str = 'context') -> Tuple[str, List[str]]:
+
+    def apply_changes(
+        self, content: str, changes: List[Dict[str, Any]], default_mode: str = "context"
+    ) -> Tuple[str, List[str]]:
         """Apply multiple changes using appropriate strategies."""
         modified_content = content
         applied_changes = []
         errors = []
-        
+
         for i, change in enumerate(changes):
             try:
                 # Determine strategy
-                mode = change.get('mode', default_mode)
-                if mode == 'auto':
+                mode = change.get("mode", default_mode)
+                if mode == "auto":
                     mode = self._detect_best_strategy(change)
-                
+
                 if mode not in self.strategies:
-                    errors.append(f"Change {i+1}: Unknown editing mode '{mode}'")
+                    errors.append(f"Change {i + 1}: Unknown editing mode '{mode}'")
                     continue
-                
+
                 # Apply the change
-                modified_content, success = self.strategies[mode](modified_content, change)
-                
+                modified_content, success = self.strategies[mode](
+                    modified_content, change
+                )
+
                 if success:
-                    applied_changes.append(f"Change {i+1}: Applied {mode} edit")
+                    applied_changes.append(f"Change {i + 1}: Applied {mode} edit")
                 else:
-                    errors.append(f"Change {i+1}: Failed to apply {mode} edit")
-                    
+                    errors.append(f"Change {i + 1}: Failed to apply {mode} edit")
+
             except Exception as e:
-                errors.append(f"Change {i+1}: Error - {str(e)}")
-        
+                errors.append(f"Change {i + 1}: Error - {str(e)}")
+
         return modified_content, applied_changes + errors
-    
+
     def _detect_best_strategy(self, change: Dict[str, Any]) -> str:
         """Auto-detect the best editing strategy for a change."""
-        if 'context' in change:
-            return 'context'
-        elif 'lines' in change:
-            return 'line_based'
-        elif 'pattern' in change:
-            return 'pattern'
+        if "context" in change:
+            return "context"
+        elif "lines" in change:
+            return "line_based"
+        elif "pattern" in change:
+            return "pattern"
         else:
-            return 'context'  # Default to safest
-    
-    def _apply_context_edit(self, content: str, change: Dict[str, Any]) -> Tuple[str, bool]:
+            return "context"  # Default to safest
+
+    def _apply_context_edit(
+        self, content: str, change: Dict[str, Any]
+    ) -> Tuple[str, bool]:
         """Apply context-based edit."""
-        context = change.get('context', [])
-        replacement = change.get('replacement', '')
-        
+        context = change.get("context", [])
+        replacement = change.get("replacement", "")
+
         if not context:
             return content, False
-        
+
         # Convert replacement to string if it's a list
         if isinstance(replacement, list):
-            replacement = '\n'.join(replacement)
-        
+            replacement = "\n".join(replacement)
+
         # Find the context in the content
-        context_str = '\n'.join(context)
+        context_str = "\n".join(context)
         if context_str not in content:
             return content, False
-        
+
         # Count occurrences to ensure unique match
         occurrences = content.count(context_str)
         if occurrences > 1:
             return content, False
-        
+
         # Replace the context
         new_content = content.replace(context_str, replacement, 1)
         return new_content, True
-    
-    def _apply_line_edit(self, content: str, change: Dict[str, Any]) -> Tuple[str, bool]:
+
+    def _apply_line_edit(
+        self, content: str, change: Dict[str, Any]
+    ) -> Tuple[str, bool]:
         """Apply line-based edit."""
-        lines_spec = change.get('lines', [])
-        replacement = change.get('replacement', '')
-        
+        lines_spec = change.get("lines", [])
+        replacement = change.get("replacement", "")
+
         if len(lines_spec) != 2:
             return content, False
-        
+
         start_line, end_line = lines_spec
         lines = content.splitlines(True)
-        
+
         # Validate line numbers
         if start_line < 1 or end_line > len(lines) or start_line > end_line:
             return content, False
-        
+
         # Convert replacement to lines if it's a string
         if isinstance(replacement, str):
             replacement_lines = replacement.splitlines(True)
             # Ensure last line has newline if original did
-            if replacement_lines and not replacement_lines[-1].endswith('\n') and end_line < len(lines) and lines[end_line - 1].endswith('\n'):
-                replacement_lines[-1] += '\n'
+            if (
+                replacement_lines
+                and not replacement_lines[-1].endswith("\n")
+                and end_line < len(lines)
+                and lines[end_line - 1].endswith("\n")
+            ):
+                replacement_lines[-1] += "\n"
         else:
             replacement_lines = replacement
-        
+
         # Replace the line range
-        new_lines = lines[:start_line-1] + replacement_lines + lines[end_line:]
-        return ''.join(new_lines), True
-    
-    def _apply_pattern_edit(self, content: str, change: Dict[str, Any]) -> Tuple[str, bool]:
+        new_lines = lines[: start_line - 1] + replacement_lines + lines[end_line:]
+        return "".join(new_lines), True
+
+    def _apply_pattern_edit(
+        self, content: str, change: Dict[str, Any]
+    ) -> Tuple[str, bool]:
         """Apply pattern-based edit."""
-        pattern = change.get('pattern', '')
-        replacement = change.get('replacement', '')
-        
+        pattern = change.get("pattern", "")
+        replacement = change.get("replacement", "")
+
         if not pattern:
             return content, False
-        
+
         try:
             # Use regex for replacement
             new_content = re.sub(pattern, replacement, content, count=1)
             return new_content, new_content != content
         except re.error:
             return content, False
-    
-    def _apply_semantic_edit(self, content: str, change: Dict[str, Any]) -> Tuple[str, bool]:
+
+    def _apply_semantic_edit(
+        self, content: str, change: Dict[str, Any]
+    ) -> Tuple[str, bool]:
         """Apply semantic edit (language-aware)."""
         # For now, fallback to context-based editing
         # In a full implementation, this would parse the language structure
@@ -372,7 +405,7 @@ def validate_smart_edit(arguments: Dict[str, Any]) -> str | bool:
     try:
         path = arguments.get("path", "")
         changes = arguments.get("changes", [])
-        
+
         # Validate file path
         if not path:
             return "Error: path is required"
@@ -393,18 +426,18 @@ def validate_smart_edit(arguments: Dict[str, Any]) -> str | bool:
         # Validate each change
         for i, change in enumerate(changes):
             if not isinstance(change, dict):
-                return f"Error: Change {i+1} must be a dictionary"
+                return f"Error: Change {i + 1} must be a dictionary"
 
             # Check for at least one editing strategy
-            strategies = ['context', 'lines', 'pattern', 'semantic']
+            strategies = ["context", "lines", "pattern", "semantic"]
             has_strategy = any(key in change for key in strategies)
 
             if not has_strategy:
-                return f"Error: Change {i+1} must specify an editing strategy (context, lines, pattern, or semantic)"
+                return f"Error: Change {i + 1} must specify an editing strategy (context, lines, pattern, or semantic)"
 
             # Check for replacement
-            if 'replacement' not in change:
-                return f"Error: Change {i+1} must specify 'replacement'"
+            if "replacement" not in change:
+                return f"Error: Change {i + 1} must specify 'replacement'"
 
         # Check if file exists for non-creation operations
         if os.path.exists(path):
@@ -417,68 +450,75 @@ def validate_smart_edit(arguments: Dict[str, Any]) -> str | bool:
         return f"Error during validation: {str(e)}"
 
 
-def get_preview(tool_name: str, arguments: Dict[str, Any], tool_config: Dict[str, Any]) -> str:
+def get_preview(
+    tool_name: str, arguments: Dict[str, Any], tool_config: Dict[str, Any]
+) -> str:
     """Generate preview for smart_edit tool."""
     try:
         import difflib
         from aicoder.utils import colorize_diff_lines
         from aicoder import config
-        
+
         path = arguments.get("path", "")
         changes = arguments.get("changes", [])
         mode = arguments.get("mode", "context")
         encoding = arguments.get("encoding", "utf-8")
-        
+
         if not path or not changes:
             return f"\n{config.YELLOW}{tool_name} tool called{config.RESET}\n{config.CYAN}📁 Path: {path or 'Not specified'}{config.RESET}\n"
-        
+
         # Read current file content
         original_content = ""
         if os.path.exists(path):
             try:
-                with open(path, 'r', encoding=encoding) as f:
+                with open(path, "r", encoding=encoding) as f:
                     original_content = f.read()
             except Exception as e:
                 return f"\n{config.YELLOW}{tool_name} tool called{config.RESET}\n{config.CYAN}📁 File: {path}{config.RESET}\n{config.RED}Error reading file: {e}{config.RESET}\n"
-        
+
         # Apply changes to preview
         strategy_manager = EditStrategyManager()
-        modified_content, change_results = strategy_manager.apply_changes(original_content, changes, mode)
-        
+        modified_content, change_results = strategy_manager.apply_changes(
+            original_content, changes, mode
+        )
+
         # Build preview text
         preview_lines = [f"\n{config.YELLOW}{tool_name} tool called{config.RESET}"]
         preview_lines.append(f"{config.CYAN}📁 File: {path}{config.RESET}")
-        
+
         # Show diff if there are changes
         if modified_content != original_content:
             # Generate unified diff
             original_lines = original_content.splitlines(True)
             modified_lines = modified_content.splitlines(True)
-            
-            diff_lines = list(difflib.unified_diff(
-                original_lines, 
-                modified_lines,
-                fromfile=f"{path} (original)",
-                tofile=f"{path} (modified)",
-                n=3,
-                lineterm=''
-            ))
-            
+
+            diff_lines = list(
+                difflib.unified_diff(
+                    original_lines,
+                    modified_lines,
+                    fromfile=f"{path} (original)",
+                    tofile=f"{path} (modified)",
+                    n=3,
+                    lineterm="",
+                )
+            )
+
             if diff_lines:
                 # Colorize the diff
-                diff_text = colorize_diff_lines('\n'.join(diff_lines) + '\n')
+                diff_text = colorize_diff_lines("\n".join(diff_lines) + "\n")
                 preview_lines.append("Changes:")
                 preview_lines.append(diff_text)
             else:
                 preview_lines.append("No significant changes detected.")
         else:
             preview_lines.append("No changes would be applied.")
-        
-        return '\n'.join(preview_lines)
-            
+
+        return "\n".join(preview_lines)
+
     except Exception as e:
         # Fallback to basic display
         from aicoder import config
+
         path = arguments.get("path", "")
         return f"\n{config.YELLOW}{tool_name} tool called{config.RESET}\n{config.CYAN}📁 Path: {path}{config.RESET}\n{config.RED}Preview error: {e}{config.RESET}\n"
 
@@ -492,22 +532,20 @@ def execute_smart_edit(
     auto_confirm: bool = False,
     encoding: str = "utf-8",
     conflict_resolution: str = "prompt",
-    stats=None
+    stats=None,
 ) -> str:
     """Main smart_edit tool implementation."""
     try:
         print(f"🔧 DEBUG: Processing file {path} with {len(changes)} changes")
-        
+
         # Initialize components
-        visualizer = DiffVisualizer()
-        
         backup_manager = BackupManager()
         strategy_manager = EditStrategyManager()
 
         # Read current file content
         if os.path.exists(path):
             try:
-                with open(path, 'r', encoding=encoding) as f:
+                with open(path, "r", encoding=encoding) as f:
                     original_content = f.read()
             except Exception as e:
                 return f"❌ Error reading file '{path}': {e}"
@@ -515,7 +553,9 @@ def execute_smart_edit(
             original_content = ""
 
         # Apply changes
-        modified_content, change_results = strategy_manager.apply_changes(original_content, changes, mode)
+        modified_content, change_results = strategy_manager.apply_changes(
+            original_content, changes, mode
+        )
 
         # Check if any changes were actually made
         if modified_content == original_content:
@@ -533,12 +573,13 @@ def execute_smart_edit(
             if parent_dir and not os.path.exists(parent_dir):
                 os.makedirs(parent_dir, exist_ok=True)
 
-            with open(path, 'w', encoding=encoding) as f:
+            with open(path, "w", encoding=encoding) as f:
                 f.write(modified_content)
 
             # Record the file operation with the file tracker
             try:
                 from aicoder.tool_manager.file_tracker import record_file_read
+
                 record_file_read(path)
             except ImportError:
                 pass
@@ -562,12 +603,15 @@ def execute_smart_edit(
                 if backup_manager.rollback(path):
                     return f"❌ Error writing file '{path}': {e}\n✅ Successfully rolled back from backup"
                 else:
-                    return f"❌ Error writing file '{path}': {e}\n❌ Rollback also failed"
+                    return (
+                        f"❌ Error writing file '{path}': {e}\n❌ Rollback also failed"
+                    )
             else:
                 return f"❌ Error writing file '{path}': {e}"
 
     except Exception as e:
         print(f"🔧 DEBUG: Exception in execute_smart_edit: {e}")
         import traceback
+
         traceback.print_exc()
         return f"❌ Error in smart_edit: {str(e)}"

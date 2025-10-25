@@ -79,6 +79,7 @@ class AICoder(
     def __init__(self):
         # Initialize terminal manager first (before any terminal operations)
         from .terminal_manager import get_terminal_manager
+
         get_terminal_manager()  # This initializes the global terminal manager
 
         # Set up global exception handler
@@ -100,7 +101,7 @@ class AICoder(
         self.stats._app_instance = self  # Store reference for plugin access
         self.message_history = MessageHistory()
         self.animator = Animator()
-        
+
         # Initialize parent classes properly
         super().__init__()
 
@@ -111,8 +112,9 @@ class AICoder(
 
         # Initialize project memory
         from .memory import get_project_memory
+
         self.project_memory = get_project_memory(self.current_directory)
-    
+
         # Load prompt history after readline is initialized
         self._load_prompt_history()
 
@@ -150,16 +152,17 @@ class AICoder(
         """Load persistent prompt history into readline."""
         try:
             from .readline_history_manager import prompt_history_manager
-            
+
             # Load persistent history into readline history manager
             prompt_history_manager.load_persistent_history()
-            
+
         except ImportError:
             # Prompt history manager not available - skip
             pass
         except Exception as e:
             # Silently fail to avoid breaking startup
             from .utils import emsg
+
             emsg(f"Warning: Could not load prompt history: {e}")
 
     def _signal_handler(self, sig, frame):
@@ -221,25 +224,34 @@ class AICoder(
     def _handle_diff_edit_notifications(self, tool_results):
         """Handle diff-edit notifications by adding them after tool results."""
         # Check if any tool result was from diff-edit and add notification after the tool result
-        if hasattr(self, 'tool_manager') and hasattr(self.tool_manager.executor, 'approval_system'):
+        if hasattr(self, "tool_manager") and hasattr(
+            self.tool_manager.executor, "approval_system"
+        ):
             approval_system = self.tool_manager.executor.approval_system
-            if hasattr(approval_system, '_diff_edit_result') and approval_system._diff_edit_result:
-                diff_edit_result = approval_system._diff_edit_result
+            if (
+                hasattr(approval_system, "_diff_edit_result")
+                and approval_system._diff_edit_result
+            ):
                 approval_system._diff_edit_result = None  # Clear it
-                
+
                 # Check for diff-edit notification (stored separately from _diff_edit_result)
-                if hasattr(approval_system, '_diff_edit_notification') and approval_system._diff_edit_notification:
+                if (
+                    hasattr(approval_system, "_diff_edit_notification")
+                    and approval_system._diff_edit_notification
+                ):
                     notification = approval_system._diff_edit_notification
                     approval_system._diff_edit_notification = None  # Clear it
-                    
+
                     # Add the notification to message history AFTER the tool results
-                    self.message_history.messages.append({
-                        "role": "system", 
-                        "content": notification
-                    })
-            
+                    self.message_history.messages.append(
+                        {"role": "system", "content": notification}
+                    )
+
             # Also clean up _diff_edit_result if it exists
-            if hasattr(approval_system, '_diff_edit_result') and approval_system._diff_edit_result:
+            if (
+                hasattr(approval_system, "_diff_edit_result")
+                and approval_system._diff_edit_result
+            ):
                 approval_system._diff_edit_result = None  # Clear it
 
     def _check_auto_compaction(self):
@@ -263,20 +275,16 @@ class AICoder(
                 )
                 try:
                     self.message_history.compact_memory()
-                except NoMessagesToCompactError:
+                except NoMessagesToCompactError as e:
                     # This is normal - no messages to compact (all recent or already compacted)
-                    if config.DEBUG:
-                        wmsg(
-                            " *** Skipping compaction: no messages to compact"
-                        )
+                    wmsg(f" *** Auto-compaction skipped: {str(e)}")
+                    wmsg(
+                        " *** If you need to force compaction, use: /compact force <N>"
+                    )
                 except Exception as e:
                     # CRITICAL: Compaction failed - preserve user data and inform user
-                    emsg(
-                        f"\n ❌ Compaction failed: {str(e)}"
-                    )
-                    wmsg(
-                        " *** Your conversation history has been preserved."
-                    )
+                    emsg(f"\n ❌ Compaction failed: {str(e)}")
+                    wmsg(" *** Your conversation history has been preserved.")
                     wmsg(
                         " *** Options: Try '/compact' again, save with '/save', or continue with a new message."
                     )
@@ -293,13 +301,9 @@ class AICoder(
                         imsg("*** Initializing MCP servers...")
                         init_printed = True
                     tools = self.tool_manager.registry._discover_mcp_server_tools(name)
-                    imsg(
-                        f"*** Initialized MCP server '{name}' with {len(tools)} tools"
-                    )
+                    imsg(f"*** Initialized MCP server '{name}' with {len(tools)} tools")
                 except Exception as e:
-                    emsg(
-                        f"*** Failed to initialize MCP server '{name}': {e}"
-                    )
+                    emsg(f"*** Failed to initialize MCP server '{name}': {e}")
 
     def _save_crash_session(self):
         """Save the current session to a crash file."""
@@ -365,6 +369,7 @@ class AICoder(
                     if not user_input:
                         # Exit prompt mode before continuing
                         from .terminal_manager import exit_prompt_mode
+
                         exit_prompt_mode()
                         continue
 
@@ -383,6 +388,7 @@ class AICoder(
                         if not run_api_call:
                             # Exit prompt mode since no API call will be made
                             from .terminal_manager import exit_prompt_mode
+
                             exit_prompt_mode()
                             continue
 
@@ -391,6 +397,7 @@ class AICoder(
 
                     # Exit prompt mode before making API call or continuing
                     from .terminal_manager import exit_prompt_mode
+
                     exit_prompt_mode()
 
                     # Reset retry counter for new API requests
@@ -400,9 +407,7 @@ class AICoder(
                         response = self._make_api_request(self.message_history.messages)
                         if response is None:
                             # User cancelled the request
-                            emsg(
-                                "\nRequest cancelled. Returning to user input."
-                            )
+                            emsg("\nRequest cancelled. Returning to user input.")
                             break
                         if (
                             not response
@@ -431,13 +436,11 @@ class AICoder(
                                 # Check and handle large tool results for size limiting
                                 self._check_and_handle_large_tool_results(tool_results)
                                 self.message_history.add_tool_results(tool_results)
-                                
+
                                 # Check if any tool result was from diff-edit and add notification after the tool result
                                 self._handle_diff_edit_notifications(tool_results)
                             else:
-                                emsg(
-                                    " * Warning: No tool results to add"
-                                )
+                                emsg(" * Warning: No tool results to add")
 
                             # If cancel all was activated, break out of the tool loop and return to user input
                             if cancel_all_active:
@@ -540,8 +543,7 @@ def main():
     # Simple tab completion
     def tab_complete_simple(text, state):
         """Simple tab completion."""
-        
-        
+
         # Return the completion
         return "/plan toggle" if state == 0 else None
 
@@ -565,9 +567,7 @@ def main():
                 os.remove("session_crash.json")
                 imsg("Crash session file deleted.")
             except Exception as e:
-                emsg(
-                    f"Failed to delete crash session file: {e}"
-                )
+                emsg(f"Failed to delete crash session file: {e}")
             # Continue with fresh session
             app = AICoder()
             app.run()
@@ -600,9 +600,7 @@ def main():
                 imsg("Crash session loaded successfully.")
                 # Optionally rename the crash file to indicate it's been loaded
                 os.rename("session_crash.json", "session_crash_loaded.json")
-                wmsg(
-                    "Crash file renamed to session_crash_loaded.json"
-                )
+                wmsg("Crash file renamed to session_crash_loaded.json")
 
                 # Run the app with loaded data
                 app.run()

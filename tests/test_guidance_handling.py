@@ -19,9 +19,7 @@ def test_single_tool_call_with_guidance():
     executor = ToolExecutor(tool_registry, stats, animator)
 
     # Mock the approval system to auto-approve tools
-    executor.approval_system.request_user_approval = Mock(
-        return_value=(True, False)
-    )
+    executor.approval_system.request_user_approval = Mock(return_value=(True, False))
 
     # Add a mock internal tool for testing
     def mock_tool_function(param1: str, param2: int, stats=None):
@@ -74,9 +72,7 @@ def test_multiple_tool_calls_with_guidance():
     executor = ToolExecutor(tool_registry, stats, animator)
 
     # Mock the approval system to auto-approve tools
-    executor.approval_system.request_user_approval = Mock(
-        return_value=(True, False)
-    )
+    executor.approval_system.request_user_approval = Mock(return_value=(True, False))
 
     # Add a mock internal tool for testing
     def mock_tool_function(param1: str, param2: int, stats=None):
@@ -117,7 +113,12 @@ def test_multiple_tool_calls_with_guidance():
     # Mock execute_tool to return different guidance for each call
     def mock_execute_tool(tool_name, arguments, tool_index, total_tools):
         guidance_content = f"Guidance for call {tool_index}"
-        return (f"result_{tool_index}", {}, guidance_content, True)  # guidance_requested=True
+        return (
+            f"result_{tool_index}",
+            {},
+            guidance_content,
+            True,
+        )  # guidance_requested=True
 
     with patch.object(executor, "execute_tool", side_effect=mock_execute_tool):
         tool_results, cancel_all = executor.execute_tool_calls(message)
@@ -145,9 +146,7 @@ def test_tool_calls_with_mixed_guidance():
     executor = ToolExecutor(tool_registry, stats, animator)
 
     # Mock the approval system to auto-approve tools
-    executor.approval_system.request_user_approval = Mock(
-        return_value=(True, False)
-    )
+    executor.approval_system.request_user_approval = Mock(return_value=(True, False))
 
     # Add a mock internal tool for testing
     def mock_tool_function(param1: str, param2: int, stats=None):
@@ -188,7 +187,12 @@ def test_tool_calls_with_mixed_guidance():
     # Mock execute_tool to return guidance for some calls only
     def mock_execute_tool(tool_name, arguments, tool_index, total_tools):
         if tool_index == 2:  # Only middle call has guidance
-            return (f"result_{tool_index}", {}, f"Guidance for call {tool_index}", True)  # guidance_requested=True
+            return (
+                f"result_{tool_index}",
+                {},
+                f"Guidance for call {tool_index}",
+                True,
+            )  # guidance_requested=True
         return (f"result_{tool_index}", {}, None, False)  # guidance_requested=False
 
     with patch.object(executor, "execute_tool", side_effect=mock_execute_tool):
@@ -215,9 +219,7 @@ def test_tool_call_without_guidance():
     executor = ToolExecutor(tool_registry, stats, animator)
 
     # Mock the approval system to auto-approve tools
-    executor.approval_system.request_user_approval = Mock(
-        return_value=(True, False)
-    )
+    executor.approval_system.request_user_approval = Mock(return_value=(True, False))
 
     # Add a mock internal tool for testing
     def mock_tool_function(param1: str, param2: int, stats=None):

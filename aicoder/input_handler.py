@@ -9,25 +9,24 @@ from .readline_history_manager import prompt_history_manager
 from .terminal_manager import enter_prompt_mode, exit_prompt_mode
 
 
-
-
-
 class InputHandlerMixin:
     """Mixin class for input handling."""
 
     def _display_token_info(self):
         """Display token information before user prompt and AI response."""
-        if not hasattr(self, 'stats'):
+        if not hasattr(self, "stats"):
             return
 
         from .utils import display_token_info
+
         display_token_info(self.stats, config.AUTO_COMPACT_THRESHOLD)
 
     def _get_multiline_input(self) -> str:
         """Get user input with simplified handling (no multiline support)."""
         # Notify plugins before user prompt
-        if hasattr(self, 'loaded_plugins'):
+        if hasattr(self, "loaded_plugins"):
             from .plugin_system.loader import notify_plugins_before_user_prompt
+
             notify_plugins_before_user_prompt(self.loaded_plugins)
 
         # Display token information before user prompt if enabled
@@ -40,9 +39,10 @@ class InputHandlerMixin:
         # Reset terminal state to fix any display issues before showing prompt
         try:
             from .terminal_manager import get_terminal_manager
+
             manager = get_terminal_manager()
             manager._perform_terminal_reset(silent=True)
-        except:
+        except Exception:
             pass  # If reset fails, continue anyway
 
         # Switch to user input mode for proper history
@@ -50,6 +50,7 @@ class InputHandlerMixin:
 
         # Get planning mode instance to check if we should show [PLAN] prefix
         from .planning_mode import get_planning_mode
+
         planning_mode = get_planning_mode()
 
         # Get the prompt prefix
@@ -111,6 +112,7 @@ class InputHandlerMixin:
 
         try:
             from .planning_mode import get_planning_mode
+
             planning_mode = get_planning_mode()
 
             # Get mode content (plan mode reminder or build switch)

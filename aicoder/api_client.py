@@ -46,11 +46,15 @@ class APIClient:
             api_data["temperature"] = config.get_temperature()
 
         # Top-p settings
-        if ("TOP_P" in os.environ or "PLAN_TOP_P" in os.environ) and config.get_top_p() != 1.0:
+        if (
+            "TOP_P" in os.environ or "PLAN_TOP_P" in os.environ
+        ) and config.get_top_p() != 1.0:
             api_data["top_p"] = config.get_top_p()
 
         # Top-k settings
-        if ("TOP_K" in os.environ or "PLAN_TOP_K" in os.environ) and config.get_top_k() != 0:
+        if (
+            "TOP_K" in os.environ or "PLAN_TOP_K" in os.environ
+        ) and config.get_top_k() != 0:
             api_data["top_k"] = config.get_top_k()
 
         # Max tokens
@@ -103,7 +107,7 @@ class APIClient:
 
         api_key = config.get_api_key()
         api_endpoint = config.get_api_endpoint()
-        
+
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}",
@@ -143,6 +147,7 @@ class APIClient:
                 if "prompt_tokens" in usage:
                     # Track current prompt size for auto-compaction decisions
                     self.stats.current_prompt_size = usage["prompt_tokens"]
+                    self.stats.current_prompt_size_estimated = False
                     # Accumulate prompt tokens for session statistics
                     self.stats.prompt_tokens += usage["prompt_tokens"]
                 if "completion_tokens" in usage:
@@ -176,6 +181,7 @@ class APIClient:
                 # Update current prompt size for auto-compaction (use estimated input tokens if available)
                 if estimated_input_tokens > 0:
                     self.stats.current_prompt_size = estimated_input_tokens
+                    self.stats.current_prompt_size_estimated = True
 
         # Reset retry counter on successful API call
         self.retry_handler.reset_retry_counter()
@@ -197,14 +203,3 @@ class APIClient:
         if self.stats:
             # Record time spent even on failed API calls
             self.stats.api_time_spent += time.time() - api_start_time
-
-    def _handle_http_error(self, e: urllib.error.HTTPError) -> bool:
-        """Handle HTTP errors with retry logic. Returns True if should retry."""
-        if isinstance(e, urllib.error.HTTPError):
-            return self.retry_handler.handle_http_error_with_retry(e)
-        return False
-
-    def _handle_connection_error(self, e: urllib.error.URLError):
-        """Handle connection errors."""
-        if isinstance(e, urllib.error.URLError):
-            self.retry_handler.handle_connection_error(e)

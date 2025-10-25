@@ -5,14 +5,31 @@ Animator for AI Coder - handles animated status messages and cursor management.
 import sys
 import time
 import threading
-from datetime import timedelta
 
 from . import config
 from .terminal_manager import is_esc_pressed
 
+# Module-level singleton
+_animator_instance = None
+
+
+def get_animator():
+    """Get the singleton animator instance."""
+    global _animator_instance
+    if _animator_instance is None:
+        _animator_instance = Animator()
+    return _animator_instance
+
 
 class Animator:
     """Handles animated status messages with elapsed time and cursor management."""
+
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
 
     def __init__(self):
         self._stop_event = None
@@ -39,7 +56,6 @@ class Animator:
             while not self._stop_event.is_set():
                 char = chars[char_index % len(chars)]
                 elapsed = time.time() - self._start_time
-                elapsed_str = str(timedelta(seconds=int(elapsed)))
 
                 # Toggle cursor visibility as part of animation
                 if self._cursor_visible:
@@ -88,14 +104,21 @@ class Animator:
 
         def blink_cursor():
             visible = True
-            while not self._cursor_stop_event.is_set():
-                if visible:
-                    sys.stdout.write("\033[?25h")  # Show cursor
-                else:
-                    sys.stdout.write("\033[?25l")  # Hide cursor
-                sys.stdout.flush()
-                visible = not visible
-                time.sleep(0.5)  # Blink every 0.5 seconds
+            # Keep a local reference to avoid race conditions
+            stop_event = self._cursor_stop_event
+            try:
+                while stop_event and not stop_event.is_set():
+                    if visible:
+                        sys.stdout.write("\033[?25h")  # Show cursor
+                    else:
+                        sys.stdout.write("\033[?25l")  # Hide cursor
+                    sys.stdout.flush()
+                    visible = not visible
+                    time.sleep(0.5)  # Blink every 0.5 seconds
+            except Exception:
+                # Silently handle errors to avoid thread exceptions bubbling up
+                # This can happen if the terminal is closed or during rapid cleanup
+                pass
 
         self._cursor_thread = threading.Thread(target=blink_cursor, daemon=True)
         self._cursor_thread.start()
@@ -104,9 +127,11 @@ class Animator:
         """Stop cursor blinking and ensure cursor is visible."""
         self._is_streaming = False
 
+        # Signal the thread to stop
         if self._cursor_stop_event:
             self._cursor_stop_event.set()
 
+        # Wait for the thread to actually stop
         if self._cursor_thread and self._cursor_thread.is_alive():
             self._cursor_thread.join(timeout=1.0)
 
@@ -114,7 +139,7 @@ class Animator:
         sys.stdout.write("\033[?25h")
         sys.stdout.flush()
 
-        # Clean up
+        # Clean up only after thread has stopped
         self._cursor_stop_event = None
         self._cursor_thread = None
 

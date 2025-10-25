@@ -18,7 +18,7 @@ def adapter():
     """Create a StreamingAdapter instance with mocked dependencies."""
     # Import the real Stats class
     from aicoder.stats import Stats
-    
+
     # Create a mock API handler
     mock_api_handler = Mock()
     mock_api_handler.stats = Stats()
@@ -29,17 +29,17 @@ def adapter():
     mock_api_handler.stats.api_time_spent = 0.0
     mock_api_handler.stats.prompt_tokens = 0
     mock_api_handler.stats.completion_tokens = 0
-    
+
     # Create a single adapter instance for all tests
     adapter = StreamingAdapter(mock_api_handler)
-    
+
     # Mock all animator methods to prevent actual terminal operations
     adapter.animator = Mock()
     adapter.animator.stop_animation = Mock()
     adapter.animator.start_cursor_blinking = Mock()
     adapter.animator.stop_cursor_blinking = Mock()
     adapter.animator.ensure_cursor_visible = Mock()
-    
+
     # Mock the colorization state attributes that are used in _print_with_colorization
     adapter._color_in_code = False
     adapter._color_code_tick_count = 0
@@ -47,7 +47,7 @@ def adapter():
     adapter._color_star_count = 0
     adapter._color_at_line_start = True
     adapter._color_in_header = False
-    
+
     return adapter
 
 
@@ -208,11 +208,11 @@ def test_validate_tool_calls_with_empty_function_name(adapter):
 def test_make_request_with_streaming():
     """Test making a streaming request."""
     from aicoder.stats import Stats
-    
+
     # Create a mock API handler
     mock_api_handler = Mock()
     mock_api_handler.stats = Stats()
-    
+
     # Create streaming adapter instance
     adapter = StreamingAdapter(mock_api_handler)
 
@@ -222,9 +222,7 @@ def test_make_request_with_streaming():
     # Mock the streaming request method to return a simple response
     with patch.object(adapter, "_streaming_request") as mock_streaming_request:
         mock_streaming_request.return_value = {
-            "choices": [
-                {"message": {"content": "Hello back!", "role": "assistant"}}
-            ]
+            "choices": [{"message": {"content": "Hello back!", "role": "assistant"}}]
         }
 
         # Make the request
@@ -240,11 +238,11 @@ def test_make_request_with_streaming():
 def test_make_request_with_streaming_disabled():
     """Test making a request with streaming disabled."""
     from aicoder.stats import Stats
-    
+
     # Create a mock API handler
     mock_api_handler = Mock()
     mock_api_handler.stats = Stats()
-    
+
     # Create streaming adapter instance
     adapter = StreamingAdapter(mock_api_handler)
 
@@ -256,9 +254,7 @@ def test_make_request_with_streaming_disabled():
         adapter, "_make_non_streaming_request"
     ) as mock_non_streaming_request:
         mock_non_streaming_request.return_value = {
-            "choices": [
-                {"message": {"content": "Hello back!", "role": "assistant"}}
-            ]
+            "choices": [{"message": {"content": "Hello back!", "role": "assistant"}}]
         }
 
         # Make the request with streaming disabled
@@ -274,11 +270,11 @@ def test_make_request_with_streaming_disabled():
 def test_network_blocking_is_active():
     """Test that network blocking is actually working."""
     import urllib.request
-    
+
     # Try to access an external URL - this should be blocked
     with pytest.raises(RuntimeError) as context:
         urllib.request.urlopen("http://example.com")
-    
+
     # Verify the error message mentions network blocking
     assert "EXTERNAL INTERNET ACCESS BLOCKED" in str(context.value)
     assert "example.com" in str(context.value)
@@ -287,11 +283,13 @@ def test_network_blocking_is_active():
 def test_local_urls_still_work():
     """Test that local URLs are still allowed."""
     import urllib.request
-    
+
     # Local URLs should work (though this will fail because no server is running,
     # it should fail with connection refused, not network blocking)
     try:
-        urllib.request.urlopen("http://127.0.0.1:99999")  # Port that's unlikely to be in use
+        urllib.request.urlopen(
+            "http://127.0.0.1:99999"
+        )  # Port that's unlikely to be in use
     except RuntimeError as e:
         if "EXTERNAL INTERNET ACCESS BLOCKED" in str(e):
             pytest.fail("Local URL should not be blocked by network security")

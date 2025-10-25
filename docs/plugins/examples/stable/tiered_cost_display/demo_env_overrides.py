@@ -19,7 +19,7 @@ sys.modules["aicoder.api_handler"] = MagicMock()
 # Add the plugin directory to the path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from tiered_cost_display_plugin import (
+from tiered_cost_display_plugin import (  # noqa: E402
     get_model_pricing,
     calculate_cost,
 )

@@ -4,10 +4,12 @@ Comprehensive test for animator and ESC cancellation functionality.
 Uses a real web server to simulate delayed responses and test the
 'Making...' animation and ESC cancellation mechanism.
 """
+
 import sys
 import os
+
 # Add the parent directory to Python path so imports work from subdirectory
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 import sys
 import time
@@ -22,20 +24,20 @@ class TestAPIHandler(BaseHTTPRequestHandler):
     """HTTP handler that simulates various API scenarios for testing"""
 
     def do_POST(self):
-        if self.path == '/chat/completions':
+        if self.path == "/chat/completions":
             # Read the request body
-            content_length = int(self.headers['Content-Length'])
+            content_length = int(self.headers["Content-Length"])
             body = self.rfile.read(content_length)
-            request_data = json.loads(body.decode('utf-8'))
+            request_data = json.loads(body.decode("utf-8"))
 
             # Check if this is a test for delayed response (simulating slow API)
-            delay_requested = request_data.get('delay_test', False)
-            esc_test = request_data.get('esc_test', False)
+            delay_requested = request_data.get("delay_test", False)
+            esc_test = request_data.get("esc_test", False)
 
             if delay_requested:
                 # Simulate a delayed response to test animator
                 self.send_response(200)
-                self.send_header('Content-Type', 'application/json')
+                self.send_header("Content-Type", "application/json")
                 self.end_headers()
 
                 # Delay before first response to trigger animator
@@ -47,23 +49,28 @@ class TestAPIHandler(BaseHTTPRequestHandler):
                     "object": "chat.completion",
                     "created": 1234567890,
                     "model": "test-model",
-                    "choices": [{
-                        "index": 0,
-                        "message": {"role": "assistant", "content": "Hello from delayed response"},
-                        "finish_reason": "stop"
-                    }],
+                    "choices": [
+                        {
+                            "index": 0,
+                            "message": {
+                                "role": "assistant",
+                                "content": "Hello from delayed response",
+                            },
+                            "finish_reason": "stop",
+                        }
+                    ],
                     "usage": {
                         "prompt_tokens": 10,
                         "completion_tokens": 5,
-                        "total_tokens": 15
-                    }
+                        "total_tokens": 15,
+                    },
                 }
                 self.wfile.write(json.dumps(response).encode())
 
             elif esc_test:
                 # Simulate response that we can interrupt with ESC (non-streaming for simplicity)
                 self.send_response(200)
-                self.send_header('Content-Type', 'application/json')
+                self.send_header("Content-Type", "application/json")
                 self.end_headers()
 
                 # Send response immediately (for ESC test we'll mock the ESC during the request)
@@ -72,22 +79,27 @@ class TestAPIHandler(BaseHTTPRequestHandler):
                     "object": "chat.completion",
                     "created": 1234567890,
                     "model": "test-model",
-                    "choices": [{
-                        "index": 0,
-                        "message": {"role": "assistant", "content": "Hello from ESC test"},
-                        "finish_reason": "stop"
-                    }],
+                    "choices": [
+                        {
+                            "index": 0,
+                            "message": {
+                                "role": "assistant",
+                                "content": "Hello from ESC test",
+                            },
+                            "finish_reason": "stop",
+                        }
+                    ],
                     "usage": {
                         "prompt_tokens": 10,
                         "completion_tokens": 5,
-                        "total_tokens": 15
-                    }
+                        "total_tokens": 15,
+                    },
                 }
                 self.wfile.write(json.dumps(response).encode())
             else:
                 # Normal response
                 self.send_response(200)
-                self.send_header('Content-Type', 'application/json')
+                self.send_header("Content-Type", "application/json")
                 self.end_headers()
 
                 response = {
@@ -95,16 +107,18 @@ class TestAPIHandler(BaseHTTPRequestHandler):
                     "object": "chat.completion",
                     "created": 1234567890,
                     "model": "test-model",
-                    "choices": [{
-                        "index": 0,
-                        "message": {"role": "assistant", "content": "Hello"},
-                        "finish_reason": "stop"
-                    }],
+                    "choices": [
+                        {
+                            "index": 0,
+                            "message": {"role": "assistant", "content": "Hello"},
+                            "finish_reason": "stop",
+                        }
+                    ],
                     "usage": {
                         "prompt_tokens": 10,
                         "completion_tokens": 5,
-                        "total_tokens": 15
-                    }
+                        "total_tokens": 15,
+                    },
                 }
                 self.wfile.write(json.dumps(response).encode())
         else:
@@ -114,7 +128,7 @@ class TestAPIHandler(BaseHTTPRequestHandler):
 
 def start_test_server():
     """Start the test server on a random port"""
-    server = HTTPServer(('localhost', 0), TestAPIHandler)
+    server = HTTPServer(("localhost", 0), TestAPIHandler)
     port = server.server_port
 
     server_thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -144,13 +158,6 @@ def test_animator_with_delay():
         animator = Animator()
         adapter = StreamingAdapter(api_handler=mock_api_handler, animator=animator)
 
-        # Temporarily modify config to point to our test server
-        import aicoder.config as config_module
-
-        # Save original values
-        original_endpoint = config_module.API_ENDPOINT
-        original_key = config_module.API_KEY
-
         # Set environment variables for local server
         os.environ["OPENAI_BASE_URL"] = f"http://localhost:{port}"
         os.environ["OPENAI_API_KEY"] = "test-key"
@@ -167,7 +174,9 @@ def test_animator_with_delay():
             # Make the call with delay - this should trigger animator
             # We need to call the method that prepares the API request data
             # Let's call make_request instead of _make_non_streaming_request directly
-            result = adapter.make_request(messages, disable_streaming_mode=True, disable_tools=True)
+            result = adapter.make_request(
+                messages, disable_streaming_mode=True, disable_tools=True
+            )
 
             # Restore stdout
             sys.stdout = old_stdout
@@ -184,7 +193,9 @@ def test_animator_with_delay():
             print(f"Response received: {response_received}")
 
             if result:
-                print(f"Response content: {result.get('choices', [{}])[0].get('message', {}).get('content', 'No content')}")
+                print(
+                    f"Response content: {result.get('choices', [{}])[0].get('message', {}).get('content', 'No content')}"
+                )
 
             return has_animation and response_received
 
@@ -192,6 +203,7 @@ def test_animator_with_delay():
             sys.stdout = old_stdout
             print(f"Error during delayed response test: {e}")
             import traceback
+
             traceback.print_exc()
             # Even if there's an error, if animation appeared, that's a partial success
             output = captured_output.getvalue()
@@ -214,7 +226,6 @@ def test_esc_detection_logic():
 
     try:
         from aicoder.terminal_manager import TerminalManager
-        import aicoder.config as config_module
 
         # Set test mode to avoid terminal operations
         original_test_mode = os.environ.get("TEST_MODE")
@@ -254,6 +265,7 @@ def test_esc_detection_logic():
     except Exception as e:
         print(f"ESC detection test error: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -264,7 +276,6 @@ def test_animator_functionality():
 
     try:
         from aicoder.animator import Animator
-        import aicoder.config as config_module
 
         # Create animator
         animator = Animator()
@@ -300,6 +311,7 @@ def test_animator_functionality():
     except Exception as e:
         print(f"Animator test error: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -314,9 +326,8 @@ def test_esc_during_request():
     try:
         from aicoder.streaming_adapter import StreamingAdapter
         from aicoder.animator import Animator
-        from aicoder.terminal_manager import TerminalManager, get_terminal_manager
+        from aicoder.terminal_manager import get_terminal_manager
         from unittest.mock import Mock
-        import aicoder.config as config_module
 
         # Set test mode to avoid terminal operations
         original_test_mode = os.environ.get("TEST_MODE")
@@ -345,12 +356,16 @@ def test_esc_during_request():
             tm.reset_esc_state()
 
             # Make the request
-            result = adapter.make_request(messages, disable_streaming_mode=True, disable_tools=True)
+            result = adapter.make_request(
+                messages, disable_streaming_mode=True, disable_tools=True
+            )
 
             # Config restored via environment variables
 
             print(f"Request completed with result: {result is not None}")
-            return result is not None  # Should complete normally since no ESC was pressed
+            return (
+                result is not None
+            )  # Should complete normally since no ESC was pressed
 
         finally:
             # Restore original test mode
@@ -365,6 +380,7 @@ def test_esc_during_request():
     except Exception as e:
         print(f"ESC during request test error: {e}")
         import traceback
+
         traceback.print_exc()
         return False
     finally:
@@ -393,7 +409,6 @@ def test_real_esc_simulation():
             print("✓ ESC state is initially clear")
 
             # Simulate ESC press by setting internal state
-            import aicoder.terminal_manager as tm_module
             tm._esc_pressed = True
             tm._esc_timestamp = time.time()
 
@@ -421,6 +436,7 @@ def test_real_esc_simulation():
     except Exception as e:
         print(f"Real ESC simulation test error: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 

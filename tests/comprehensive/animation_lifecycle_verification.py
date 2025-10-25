@@ -2,14 +2,17 @@
 """
 Test to verify animation appearance and disappearance.
 """
+
 import sys
 import os
+
 # Add the parent directory to Python path so imports work from subdirectory
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 import sys
 import time
 from io import StringIO
+
 
 def test_animation_lifecycle():
     """Test that animation appears and then disappears after response."""
@@ -64,6 +67,7 @@ def test_animation_lifecycle():
         sys.stdout = old_stdout
         print(f"Error in animation lifecycle test: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 

@@ -8,7 +8,9 @@ from typing import Dict, Any
 from ..file_tracker import record_file_read, check_file_modification_strict
 
 # Environment variable to control write_file suggestions
-ENABLE_WRITEFILE_SUGGESTIONS = os.getenv("ENABLE_WRITEFILE_SUGGESTIONS", "true").lower() == "true"
+ENABLE_WRITEFILE_SUGGESTIONS = (
+    os.getenv("ENABLE_WRITEFILE_SUGGESTIONS", "true").lower() == "true"
+)
 
 # Tool metadata
 TOOL_DEFINITION = {
@@ -71,6 +73,216 @@ def generate_diff(old_content: str, new_content: str, path: str) -> str:
     return "".join(diff_lines)
 
 
+def _quick_word_search(content: str, search_text: str) -> str | None:
+    """Fast word-based location finding."""
+    # Extract meaningful words (skip common words)
+    skip_words = {
+        "def",
+        "if",
+        "for",
+        "while",
+        "return",
+        "class",
+        "import",
+        "from",
+        "the",
+        "and",
+        "or",
+        "not",
+    }
+    words = [
+        w for w in search_text.split() if len(w) >= 3 and w.lower() not in skip_words
+    ][:3]
+
+    if not words:
+        return None
+
+    lines = content.splitlines()
+    best_matches = []
+
+    for word in words:
+        for i, line in enumerate(lines):
+            if word.lower() in line.lower():
+                # Calculate relevance score
+                score = _calculate_relevance_score(word, line, i)
+                best_matches.append((score, i + 1, line.strip(), word))
+
+    if best_matches:
+        # Sort by relevance and return the best
+        best_matches.sort(reverse=True)
+        score, line_num, line, word = best_matches[0]
+        confidence = "🎯" if score > 0.8 else "💡"
+        return f"{confidence} Found '{word}' near line {line_num}: {line[:60]}..."
+
+    return None
+
+
+def _should_use_fuzzy_search(search_text: str) -> bool:
+    """Determine if fuzzy search is worth the cost."""
+    # Use fuzzy search for longer, more specific content
+    lines = search_text.splitlines()
+
+    # Skip for very short content
+    if len(search_text.strip()) < 20:
+        return False
+
+    # Skip for single common words
+    if len(lines) == 1 and len(search_text.split()) <= 2:
+        return False
+
+    # Use fuzzy for multi-line or longer content
+    return len(lines) > 1 or len(search_text) > 50
+
+
+def _fuzzy_search(content: str, search_text: str) -> str | None:
+    """Thorough fuzzy search with SequenceMatcher."""
+    from difflib import SequenceMatcher
+
+    lines = content.splitlines()
+    old_lines = search_text.splitlines()
+
+    best_match = None
+    best_ratio = 0.0
+
+    # Search through the file, but limit scope for performance
+    search_limit = min(1000, len(lines))
+
+    for i in range(search_limit):
+        for j in range(min(3, len(old_lines) + 1)):
+            if i + j >= len(lines):
+                break
+
+            content_snippet = "\n".join(lines[i : i + j + 1])
+
+            # Skip very long snippets
+            if len(content_snippet) > 300:
+                continue
+
+            ratio = SequenceMatcher(
+                None, search_text.strip(), content_snippet.strip()
+            ).ratio()
+
+            if ratio > best_ratio and ratio > 0.6:  # Threshold for "similar enough"
+                best_ratio = ratio
+                best_match = (i + 1, content_snippet)
+
+    if best_match:
+        line_num, similar_content = best_match
+        confidence = "🔥" if best_ratio > 0.8 else "🎯"
+        return f"{confidence} {best_ratio:.0%} similar content at line {line_num}: {similar_content[:60]}..."
+
+    return None
+
+
+def _calculate_relevance_score(word: str, line: str, line_index: int) -> float:
+    """Calculate relevance score for word matches."""
+    word_lower = word.lower()
+    line_lower = line.lower()
+
+    score = 0.0
+
+    # Exact match gets bonus
+    if word_lower == line_lower.strip():
+        score += 1.0
+
+    # Word at start of line gets bonus
+    if line_lower.startswith(word_lower):
+        score += 0.5
+
+    # Word appears in function/class definition gets bonus
+    if any(keyword in line_lower for keyword in ["def ", "class ", "function "]):
+        score += 0.3
+
+    # Shorter lines are more specific (less noise)
+    score += max(0, (100 - len(line)) / 200)
+
+    return score
+
+
+def _generate_not_found_error(content: str, old_string: str, path: str) -> str:
+    """Generate a helpful error message using hybrid search approach."""
+    # Phase 1: Quick word search for common cases
+    word_result = _quick_word_search(content, old_string)
+    if word_result:
+        return f"Error: ❌ Match not found. {word_result}"
+
+    # Phase 2: Fuzzy search only for substantial searches
+    if _should_use_fuzzy_search(old_string):
+        fuzzy_result = _fuzzy_search(content, old_string)
+        if fuzzy_result:
+            return f"Error: ❌ Match not found. {fuzzy_result}"
+
+    # Phase 3: Basic suggestion
+    return (
+        f"Error: ❌ Match not found. 🔧 Try read_file('{path}') to see current content"
+    )
+
+
+def _generate_multiple_matches_error(content: str, old_string: str, path: str) -> str:
+    """Generate a helpful error message when old_string appears multiple times."""
+    lines = content.splitlines()
+    old_lines = old_string.splitlines()
+
+    # Find occurrences efficiently (limit to avoid performance issues)
+    occurrences = []
+    content_lower = content.lower()
+    old_lower = old_string.lower()
+
+    pos = 0
+    max_matches = 20  # Limit to prevent huge outputs
+    while pos < len(content) and len(occurrences) < max_matches:
+        pos = content_lower.find(old_lower, pos)
+        if pos == -1:
+            break
+
+        line_num = content[:pos].count("\n") + 1
+        occurrences.append(line_num)
+        pos += 1
+
+    error_msg = f"Error: ❌ MULTIPLE MATCHES in '{path}'\n"
+    error_msg += (
+        f"🔍 Found {len(occurrences)}+ occurrences (showing first {len(occurrences)})\n"
+    )
+    error_msg += f"📍 Lines: {', '.join(map(str, occurrences[:10]))}"
+    if len(occurrences) > 10:
+        error_msg += " (and more...)"
+    error_msg += "\n\n"
+
+    error_msg += "💡 TO FIX: Add unique context to identify the specific match\n"
+    error_msg += "   • Include 2-3 lines before your change\n"
+    error_msg += "   • Include 2-3 lines after your change\n"
+    error_msg += "   • Choose a more specific part of the text\n\n"
+
+    # Show minimal context for first 2 matches only
+    error_msg += "📄 Example contexts (pick one and add surrounding lines):\n"
+    for i, line_num in enumerate(occurrences[:2]):
+        start = max(0, line_num - 2)
+        end = min(len(lines), line_num + len(old_lines))
+
+        error_msg += f"\n--- Match {i + 1} around line {line_num} ---\n"
+        for j in range(start, end):
+            marker = (
+                ">>> "
+                if j >= line_num - 1 and j < line_num - 1 + len(old_lines)
+                else "    "
+            )
+            # Truncate very long lines
+            line = lines[j]
+            if len(line) > 100:
+                line = line[:97] + "..."
+            error_msg += f"{marker}{j + 1:3d}: {line}\n"
+
+    if len(occurrences) > 2:
+        error_msg += f"... and {len(occurrences) - 2} more matches\n"
+
+    error_msg += "\n🛠️  ALTERNATIVE: Use write_file for multi-location changes:\n"
+    error_msg += f"   1. read_file('{path}')\n"
+    error_msg += "   2. Make all changes\n"
+    error_msg += f"   3. write_file('{path}', modified_content)"
+
+    return error_msg
+
+
 def execute_edit_file(
     path: str,
     old_string: str,
@@ -92,7 +304,7 @@ def execute_edit_file(
     try:
         # Convert to absolute path
         path = os.path.abspath(path)
-        
+
         # Track edit for efficiency optimization
         # We need to pass message_history, but it's not available directly in edit_file
         # The tracking will be handled at the executor level where message_history is available
@@ -165,22 +377,13 @@ def _delete_content(path: str, old_string: str, stats) -> str:
 
         # Check if old_string exists
         if old_string not in old_content:
-            error_msg = "Error: old_string not found in file. Make sure it matches exactly, including whitespace and line breaks"
-            if ENABLE_WRITEFILE_SUGGESTIONS:
-                error_msg += "\nSUGGESTION: Use write_file instead - read the file first, then make comprehensive changes"
-            return error_msg
+            return _generate_not_found_error(old_content, old_string, path)
 
         # Check if old_string is unique
         first_index = old_content.find(old_string)
         last_index = old_content.rfind(old_string)
         if first_index != last_index:
-            error_msg = "Error: old_string appears multiple times in the file. Please provide more context to ensure a unique match"
-            if ENABLE_WRITEFILE_SUGGESTIONS:
-                error_msg += ("\nSUGGESTION: For complex changes with multiple matches, use write_file instead:\n"
-                             "1. Read the file with read_file()\n"
-                             "2. Make all necessary changes\n"
-                             "3. Write back with write_file()")
-            return error_msg
+            return _generate_multiple_matches_error(old_content, old_string, path)
 
         # Create new content
         new_content = (
@@ -224,13 +427,13 @@ def _replace_content(path: str, old_string: str, new_string: str, stats) -> str:
 
         # Check if old_string exists
         if old_string not in old_content:
-            return "Error: old_string not found in file. Make sure it matches exactly, including whitespace and line breaks"
+            return _generate_not_found_error(old_content, old_string, path)
 
         # Check if old_string is unique
         first_index = old_content.find(old_string)
         last_index = old_content.rfind(old_string)
         if first_index != last_index:
-            return "Error: old_string appears multiple times in the file. Please provide more context to ensure a unique match"
+            return _generate_multiple_matches_error(old_content, old_string, path)
 
         # Check if content is actually changing
         if old_string == new_string:
@@ -297,23 +500,14 @@ def validate_edit_file(arguments: Dict[str, Any]) -> str | bool:
 
         # Check if old_string exists (for deletion or replacement)
         if old_string != "" and old_string not in old_content:
-            error_msg = "Error: old_string not found in file. Make sure it matches exactly, including whitespace and line breaks"
-            if ENABLE_WRITEFILE_SUGGESTIONS:
-                error_msg += "\nSUGGESTION: Use write_file instead - read the file first, then make comprehensive changes"
-            return error_msg
+            return _generate_not_found_error(old_content, old_string, path)
 
         # Check if old_string is unique (if it exists)
         if old_string != "":
             first_index = old_content.find(old_string)
             last_index = old_content.rfind(old_string)
             if first_index != last_index:
-                error_msg = "Error: old_string appears multiple times in the file. Please provide more context to ensure a unique match"
-                if ENABLE_WRITEFILE_SUGGESTIONS:
-                    error_msg += ("\nSUGGESTION: For complex changes with multiple matches, use write_file instead:\n"
-                                 "1. Read the file with read_file()\n"
-                                 "2. Make all necessary changes\n"
-                                 "3. Write back with write_file()")
-                return error_msg
+                return _generate_multiple_matches_error(old_content, old_string, path)
 
         # Check if content is actually changing (for replacement)
         if old_string != "" and new_string != "" and old_string == new_string:

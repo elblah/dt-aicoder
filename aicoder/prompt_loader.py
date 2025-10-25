@@ -44,14 +44,20 @@ def _load_default_prompt(prompt_name: str) -> Optional[str]:
     possible_paths = []
 
     # 1. Same directory as this file (regular installation)
-    possible_paths.append(os.path.join(os.path.dirname(__file__), "prompts", prompt_filename))
+    possible_paths.append(
+        os.path.join(os.path.dirname(__file__), "prompts", prompt_filename)
+    )
 
     # 2. In current working directory's aicoder folder
-    possible_paths.append(os.path.join(os.getcwd(), "aicoder", "prompts", prompt_filename))
+    possible_paths.append(
+        os.path.join(os.getcwd(), "aicoder", "prompts", prompt_filename)
+    )
 
     # 3. Relative path from current file
     possible_paths.append(
-        os.path.join(os.path.dirname(__file__), "..", "aicoder", "prompts", prompt_filename)
+        os.path.join(
+            os.path.dirname(__file__), "..", "aicoder", "prompts", prompt_filename
+        )
     )
 
     # 4. In the same directory as the script being run
@@ -77,15 +83,11 @@ def _load_default_prompt(prompt_name: str) -> Optional[str]:
                     content = f.read().strip()
                     if content:
                         if config.DEBUG:
-                            imsg(
-                                f" *** Found {prompt_filename} at: {normalized_path}"
-                            )
+                            imsg(f" *** Found {prompt_filename} at: {normalized_path}")
                         return content
         except Exception as e:
             if config.DEBUG:
-                emsg(
-                    f" *** Error reading {prompt_filename} from {path}: {e}"
-                )
+                emsg(f" *** Error reading {prompt_filename} from {path}: {e}")
             continue
 
     # Special handling for zipapp - try to read from the package directly
@@ -110,9 +112,7 @@ def _load_default_prompt(prompt_name: str) -> Optional[str]:
                 continue
     except Exception as e:
         if config.DEBUG:
-            emsg(
-                f" *** Error reading {prompt_filename} from package data: {e}"
-            )
+            emsg(f" *** Error reading {prompt_filename} from package data: {e}")
 
     # Additional zipapp handling - try to read from sys.path
     try:
@@ -145,15 +145,11 @@ def _load_default_prompt(prompt_name: str) -> Optional[str]:
                         continue
     except Exception as e:
         if config.DEBUG:
-            emsg(
-                f" *** Error reading {prompt_filename} from zipapp: {e}"
-            )
+            emsg(f" *** Error reading {prompt_filename} from zipapp: {e}")
 
     # If we get here, we couldn't find the prompt file
     if config.DEBUG:
-        wmsg(
-            f" *** {prompt_filename} not found in any expected location"
-        )
+        wmsg(f" *** {prompt_filename} not found in any expected location")
         wmsg(f" *** Searched paths: {possible_paths}")
     return None
 
@@ -184,7 +180,7 @@ def load_prompt_from_env(env_var_name: str, prompt_name: str) -> str:
 
     # Simple heuristic: if it looks like a file path, try reading as file
     # Consider it a path if it contains '/' or starts with '.' or '~'
-    if not ('/' in env_value or env_value.startswith(('.', '~'))):
+    if not ("/" in env_value or env_value.startswith((".", "~"))):
         # Treat as literal prompt content
         if config.DEBUG:
             imsg(f" *** Loaded {prompt_name} from environment variable content")
@@ -194,7 +190,9 @@ def load_prompt_from_env(env_var_name: str, prompt_name: str) -> str:
     expanded_path = os.path.expanduser(env_value)
     if not os.path.exists(expanded_path):
         if config.DEBUG:
-            wmsg(f" *** {env_var_name} file not found: {expanded_path}, treating as literal content")
+            wmsg(
+                f" *** {env_var_name} file not found: {expanded_path}, treating as literal content"
+            )
         return env_value
 
     if not os.path.isfile(expanded_path):
@@ -205,7 +203,7 @@ def load_prompt_from_env(env_var_name: str, prompt_name: str) -> str:
         return default_content
 
     try:
-        with open(expanded_path, 'r', encoding='utf-8') as f:
+        with open(expanded_path, "r", encoding="utf-8") as f:
             content = f.read().strip()
             if content:
                 if config.DEBUG:
@@ -219,7 +217,9 @@ def load_prompt_from_env(env_var_name: str, prompt_name: str) -> str:
                 return default_content
     except Exception as e:
         if config.DEBUG:
-            emsg(f" *** Error reading {env_var_name} file {expanded_path}: {e}, treating as literal content")
+            emsg(
+                f" *** Error reading {env_var_name} file {expanded_path}: {e}, treating as literal content"
+            )
         return env_value
 
 
@@ -257,7 +257,7 @@ def list_available_prompts() -> List[Tuple[int, str, Path]]:
     prompt_files = []
 
     # Get all .txt and .md files
-    for ext in ['*.txt', '*.md']:
+    for ext in ["*.txt", "*.md"]:
         for file_path in sorted(prompts_dir.glob(ext)):
             prompt_files.append(file_path)
 
@@ -279,7 +279,7 @@ def load_prompt_from_file(file_path: Path) -> Optional[str]:
         Prompt content with variables replaced, or None if file cannot be read
     """
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
 
         # Apply the same variable replacement as get_main_prompt
@@ -305,14 +305,16 @@ def _apply_prompt_variables(base_prompt: str) -> str:
     import getpass
 
     # Apply template variables if they exist in the prompt
-    if '{current_directory}' in base_prompt:
-        base_prompt = base_prompt.replace('{current_directory}', os.getcwd())
+    if "{current_directory}" in base_prompt:
+        base_prompt = base_prompt.replace("{current_directory}", os.getcwd())
 
-    if '{current_datetime}' in base_prompt:
+    if "{current_datetime}" in base_prompt:
         current_datetime = datetime.now()
-        base_prompt = base_prompt.replace('{current_datetime}', current_datetime.strftime("%Y-%m-%d %H:%M:%S"))
+        base_prompt = base_prompt.replace(
+            "{current_datetime}", current_datetime.strftime("%Y-%m-%d %H:%M:%S")
+        )
 
-    if '{available_tools}' in base_prompt:
+    if "{available_tools}" in base_prompt:
         # Detect available tools (same logic as message_history)
         tool_map = {
             "text search": ["rg", "ag", "grep"],
@@ -339,25 +341,28 @@ def _apply_prompt_variables(base_prompt: str) -> str:
         else:
             available_tools = "Standard Unix/Linux tools are available on this system."
 
-        base_prompt = base_prompt.replace('{available_tools}', available_tools)
+        base_prompt = base_prompt.replace("{available_tools}", available_tools)
 
     # Add platform information
-    if '{platform_info}' in base_prompt:
-        platform_info = f"{platform.system()} {platform.release()} ({platform.machine()})"
-        base_prompt = base_prompt.replace('{platform_info}', platform_info)
+    if "{platform_info}" in base_prompt:
+        platform_info = (
+            f"{platform.system()} {platform.release()} ({platform.machine()})"
+        )
+        base_prompt = base_prompt.replace("{platform_info}", platform_info)
 
     # Add current user
-    if '{current_user}' in base_prompt:
+    if "{current_user}" in base_prompt:
         import getpass
+
         current_user = getpass.getuser()
-        base_prompt = base_prompt.replace('{current_user}', current_user)
+        base_prompt = base_prompt.replace("{current_user}", current_user)
 
     # Add system info
-    if '{system_info}' in base_prompt:
+    if "{system_info}" in base_prompt:
         system = platform.system()
         machine = platform.machine()
         system_info = f"This is a {system} system on {machine} architecture"
-        base_prompt = base_prompt.replace('{system_info}', system_info)
+        base_prompt = base_prompt.replace("{system_info}", system_info)
 
     return base_prompt
 
@@ -369,24 +374,24 @@ _original_prompt_source = None
 def _get_original_prompt_source() -> str:
     """
     Get the description of the original prompt source from when AI Coder started.
-    
+
     Returns:
         Description of the original source (built-in, env var, or file path)
     """
     global _original_prompt_source
-    
+
     if _original_prompt_source is not None:
         return _original_prompt_source
-    
+
     # Determine the original source
     env_value = os.environ.get("AICODER_PROMPT_MAIN")
     if not env_value:
         _original_prompt_source = "built-in"
-    elif '/' in env_value or env_value.startswith(('.', '~')):
+    elif "/" in env_value or env_value.startswith((".", "~")):
         _original_prompt_source = f"file: {env_value}"
     else:
         _original_prompt_source = "env var"
-    
+
     return _original_prompt_source
 
 
@@ -403,7 +408,7 @@ def get_main_prompt() -> str:
     import sys
 
     # Get the base prompt content
-    base_prompt = load_prompt_from_env('AICODER_PROMPT_MAIN', 'main')
+    base_prompt = load_prompt_from_env("AICODER_PROMPT_MAIN", "main")
 
     # If no prompt was found, this is a fatal error
     if not base_prompt:
@@ -426,7 +431,7 @@ def get_plan_prompt() -> str:
     Returns:
         Plan prompt content as string
     """
-    return load_prompt_from_env('AICODER_PROMPT_PLAN', 'plan')
+    return load_prompt_from_env("AICODER_PROMPT_PLAN", "plan")
 
 
 def get_build_switch_prompt() -> str:
@@ -436,7 +441,7 @@ def get_build_switch_prompt() -> str:
     Returns:
         Build switch prompt content as string
     """
-    return load_prompt_from_env('AICODER_PROMPT_BUILD_SWITCH', 'build-switch')
+    return load_prompt_from_env("AICODER_PROMPT_BUILD_SWITCH", "build-switch")
 
 
 def get_compaction_prompt() -> str:
@@ -446,7 +451,7 @@ def get_compaction_prompt() -> str:
     Returns:
         Compaction prompt content as string
     """
-    return load_prompt_from_env('AICODER_PROMPT_COMPACTION', 'compaction')
+    return load_prompt_from_env("AICODER_PROMPT_COMPACTION", "compaction")
 
 
 def get_project_filename() -> str:
@@ -456,11 +461,11 @@ def get_project_filename() -> str:
     Returns:
         Project filename as string (e.g., "AGENTS.md", "CLAUDE.md", "GEMINI.md")
     """
-    project_file = os.environ.get('AICODER_PROMPT_PROJECT', 'AGENTS.md')
+    project_file = os.environ.get("AICODER_PROMPT_PROJECT", "AGENTS.md")
 
     # Ensure it has .md extension
-    if not project_file.endswith('.md'):
-        project_file += '.md'
+    if not project_file.endswith(".md"):
+        project_file += ".md"
 
     if config.DEBUG:
         imsg(f" *** Using project prompt file: {project_file}")
@@ -478,27 +483,27 @@ def print_prompt_override_info():
     prompt_overrides = []
 
     # Check main prompt
-    main_env = os.environ.get('AICODER_PROMPT_MAIN')
+    main_env = os.environ.get("AICODER_PROMPT_MAIN")
     if main_env:
         prompt_overrides.append(f"AICODER_PROMPT_MAIN: {main_env}")
 
     # Check plan prompt
-    plan_env = os.environ.get('AICODER_PROMPT_PLAN')
+    plan_env = os.environ.get("AICODER_PROMPT_PLAN")
     if plan_env:
         prompt_overrides.append(f"AICODER_PROMPT_PLAN: {plan_env}")
 
     # Check build switch prompt
-    build_switch_env = os.environ.get('AICODER_PROMPT_BUILD_SWITCH')
+    build_switch_env = os.environ.get("AICODER_PROMPT_BUILD_SWITCH")
     if build_switch_env:
         prompt_overrides.append(f"AICODER_PROMPT_BUILD_SWITCH: {build_switch_env}")
 
     # Check compaction prompt
-    compaction_env = os.environ.get('AICODER_PROMPT_COMPACTION')
+    compaction_env = os.environ.get("AICODER_PROMPT_COMPACTION")
     if compaction_env:
         prompt_overrides.append(f"AICODER_PROMPT_COMPACTION: {compaction_env}")
 
     # Check project prompt
-    project_env = os.environ.get('AICODER_PROMPT_PROJECT')
+    project_env = os.environ.get("AICODER_PROMPT_PROJECT")
     if project_env:
         prompt_overrides.append(f"AICODER_PROMPT_PROJECT: {project_env}")
 

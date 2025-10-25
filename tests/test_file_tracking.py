@@ -3,9 +3,15 @@
 
 import pytest
 import sys
-sys.path.insert(0, '/home/blah/poc/aicoder/v2')
 
-from aicoder.tool_manager.file_tracker import track_file_read, track_file_edit, file_read_counts, file_edit_counts
+sys.path.insert(0, "/home/blah/poc/aicoder/v2")
+
+from aicoder.tool_manager.file_tracker import (
+    track_file_read,
+    track_file_edit,
+    file_read_counts,
+    file_edit_counts,
+)
 
 
 @pytest.fixture
@@ -17,6 +23,7 @@ def mock_file_tracker():
 
     # Override thresholds for faster testing
     import aicoder.tool_manager.file_tracker as ft
+
     original_read_threshold = ft.READ_THRESHOLD
     original_edit_threshold = ft.MICRO_EDIT_THRESHOLD
     original_read_detection = ft.READ_DETECTION
@@ -30,7 +37,7 @@ def mock_file_tracker():
     class MockMessageHistory:
         def __init__(self):
             self.messages = []
-    
+
     message_history = MockMessageHistory()
 
     yield message_history
@@ -50,12 +57,16 @@ def test_read_tracking_above_threshold(mock_file_tracker):
     track_file_read("/tmp/test.py", mock_file_tracker)  # count = 1
     track_file_read("/tmp/test.py", mock_file_tracker)  # count = 2
     track_file_read("/tmp/test.py", mock_file_tracker)  # count = 3
-    track_file_read("/tmp/test.py", mock_file_tracker)  # count = 4 (exceeds threshold of 3)
+    track_file_read(
+        "/tmp/test.py", mock_file_tracker
+    )  # count = 4 (exceeds threshold of 3)
 
     # Should have suggestion
     assert len(mock_file_tracker.messages) > 0
     assert "EFFICIENCY TIP" in mock_file_tracker.messages[0]["content"]
-    assert "keeping the file content in memory" in mock_file_tracker.messages[0]["content"]
+    assert (
+        "keeping the file content in memory" in mock_file_tracker.messages[0]["content"]
+    )
 
 
 def test_edit_tracking_above_threshold(mock_file_tracker):
@@ -81,8 +92,15 @@ def test_multiple_files_tracked_separately(mock_file_tracker):
     track_file_edit("/tmp/test2.py", mock_file_tracker)
 
     # Should have at least one message (for test1.py)
-    edit_messages = [msg for msg in mock_file_tracker.messages if "write_file" in msg.get("content", "")]
+    edit_messages = [
+        msg
+        for msg in mock_file_tracker.messages
+        if "write_file" in msg.get("content", "")
+    ]
     assert len(edit_messages) >= 0  # May be 0 in test environment
     # If there is a message, it should be for one of the files
     if edit_messages:
-        assert "test1.py" in edit_messages[0]["content"] or "test2.py" in edit_messages[0]["content"]
+        assert (
+            "test1.py" in edit_messages[0]["content"]
+            or "test2.py" in edit_messages[0]["content"]
+        )

@@ -163,7 +163,9 @@ class PromptCommand(BaseCommand):
 
         imsg(f"{config.BOLD}🎯 PLANNING MODE PROMPT")
         wmsg(f"   Source: {plan_source}")
-        wmsg(f"   Status: {'🟢 ACTIVE' if planning_mode.is_plan_mode_active() else '⚪ INACTIVE'}")
+        wmsg(
+            f"   Status: {'🟢 ACTIVE' if planning_mode.is_plan_mode_active() else '⚪ INACTIVE'}"
+        )
         wmsg(f"   Length: {len(plan_prompt)} characters")
         print(
             f"{config.CYAN}   ──────────────────────────────────────────────────────────────{config.RESET}"
@@ -222,7 +224,9 @@ class PromptCommand(BaseCommand):
 
         imsg(f"{config.BOLD}🗜️  COMPACTION PROMPT")
         wmsg(f"   Source: {compaction_source}")
-        wmsg(f"   Length: {len(compaction_prompt) if compaction_prompt else 0} characters")
+        wmsg(
+            f"   Length: {len(compaction_prompt) if compaction_prompt else 0} characters"
+        )
         if compaction_prompt:
             print(
                 f"{config.CYAN}   ──────────────────────────────────────────────────────────────{config.RESET}"
@@ -386,10 +390,11 @@ class PromptCommand(BaseCommand):
             # Reset to original startup prompt (same as /prompt reset)
             if "AICODER_PROMPT_MAIN" in os.environ:
                 del os.environ["AICODER_PROMPT_MAIN"]
-            
+
             # Load the original prompt
             try:
                 from ..prompt_loader import get_main_prompt
+
                 prompt_content = get_main_prompt()
             except Exception:
                 print(
@@ -676,24 +681,27 @@ class PromptCommand(BaseCommand):
     def _handle_prompt_reset(self, args: List[str]) -> Tuple[bool, bool]:
         """Reset the main prompt to the original default."""
         import os
-        
+
         # Store what we're resetting from for the message
         old_prompt_source = os.environ.get("AICODER_PROMPT_MAIN", "Default")
-        
+
         # Remove the environment variable override
         if "AICODER_PROMPT_MAIN" in os.environ:
             del os.environ["AICODER_PROMPT_MAIN"]
-        
+
         print(f"{config.GREEN} *** Reset main prompt to default{config.RESET}")
         print(f"{config.YELLOW} *** Previous source: {old_prompt_source}{config.RESET}")
-        
+
         # Get the new default prompt
         try:
             from ..prompt_loader import get_main_prompt
+
             new_prompt = get_main_prompt()
-            
-            print(f"{config.YELLOW} *** New length: {len(new_prompt)} characters{config.RESET}")
-            
+
+            print(
+                f"{config.YELLOW} *** New length: {len(new_prompt)} characters{config.RESET}"
+            )
+
             # Show what source is being used now
             if os.environ.get("AICODER_PROMPT_MAIN"):
                 new_source = os.environ["AICODER_PROMPT_MAIN"]
@@ -703,9 +711,9 @@ class PromptCommand(BaseCommand):
                     new_source = "Environment Variable (literal)"
             else:
                 new_source = "Default File"
-            
+
             print(f"{config.YELLOW} *** Current source: {new_source}{config.RESET}")
-            
+
             # Update the system message in the current conversation
             if (
                 self.app.message_history.messages
@@ -716,7 +724,7 @@ class PromptCommand(BaseCommand):
                 print(
                     f"\n{config.GREEN} *** System prompt updated for current conversation{config.RESET}"
                 )
-                
+
                 # Show a brief preview of what changed
                 if len(old_prompt) != len(new_prompt):
                     print(
@@ -726,16 +734,16 @@ class PromptCommand(BaseCommand):
                 print(
                     f"{config.YELLOW} *** Warning: Could not update current conversation - will apply to next new conversation{config.RESET}"
                 )
-                
+
         except Exception as e:
             print(
                 f"{config.RED} *** Warning: Could not load default prompt: {e}{config.RESET}"
             )
-        
+
         print(
             f"\n{config.YELLOW} *** Use '/prompt' to see current prompt information{config.RESET}"
         )
-        
+
         # Return False to continue with current conversation
         return False, False
 

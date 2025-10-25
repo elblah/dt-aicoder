@@ -14,6 +14,7 @@ from . import config
 from .utils import emsg
 from .streaming_adapter import StreamingAdapter
 from .api_client import APIClient
+from .retry_utils import handle_request_error, ShouldRetryException
 
 
 class APIHandlerMixin(APIClient):
@@ -43,11 +44,13 @@ class APIHandlerMixin(APIClient):
                 self._streaming_adapter = StreamingAdapter(
                     self, getattr(self, "animator", None)
                 )
+
             return self._streaming_adapter.make_request(
                 messages, disable_streaming_mode, disable_tools
             )
 
         # Original implementation for non-streaming
+
         # Update stats
         self.stats.api_requests += 1
 
@@ -166,6 +169,7 @@ class APIHandlerMixin(APIClient):
                         # Extract prompt tokens (input) and completion tokens (output)
                         if "prompt_tokens" in usage:
                             self.stats.current_prompt_size = usage["prompt_tokens"]
+                            self.stats.current_prompt_size_estimated = False
                             self.stats.prompt_tokens += usage["prompt_tokens"]
                         if "completion_tokens" in usage:
                             self.stats.completion_tokens += usage["completion_tokens"]
@@ -174,12 +178,15 @@ class APIHandlerMixin(APIClient):
                         # This can happen with some API providers that don't include token usage
                         estimated_input_tokens = 0
                         estimated_output_tokens = 0
-                        
+
                         # For input tokens, we need to access the message history
-                        if hasattr(self, 'message_history') and self.message_history:
+                        if hasattr(self, "message_history") and self.message_history:
                             from .utils import estimate_messages_tokens
-                            estimated_input_tokens = estimate_messages_tokens(self.message_history.messages)
-                        
+
+                            estimated_input_tokens = estimate_messages_tokens(
+                                self.message_history.messages
+                            )
+
                         # Estimate output tokens from the response content
                         if "choices" in response and len(response["choices"]) > 0:
                             choice = response["choices"][0]
@@ -187,14 +194,16 @@ class APIHandlerMixin(APIClient):
                                 content = choice["message"]["content"]
                                 if content:
                                     from .utils import estimate_tokens
+
                                     estimated_output_tokens = estimate_tokens(content)
-                        
+
                         # Update stats with estimated values
                         self.stats.prompt_tokens += estimated_input_tokens
                         self.stats.completion_tokens += estimated_output_tokens
                         # Update current prompt size for auto-compaction (use estimated input tokens if available)
                         if estimated_input_tokens > 0:
                             self.stats.current_prompt_size = estimated_input_tokens
+                            self.stats.current_prompt_size_estimated = True
 
                     return response
                 else:
@@ -209,15 +218,13 @@ class APIHandlerMixin(APIClient):
                     self._update_stats_on_failure(api_start_time)
                     return None
 
-                # Handle HTTP errors specifically
-                if isinstance(e, urllib.error.HTTPError):
-                    if self._handle_http_error(e):
-                        continue
-                    return None
-                # Handle connection errors (Broken pipe, etc.)
-                elif isinstance(e, urllib.error.URLError):
-                    self._handle_connection_error(e)
-                    return None
+                # Handle all request errors using centralized handler
+                if isinstance(e, (urllib.error.HTTPError, urllib.error.URLError)):
+                    try:
+                        handle_request_error(e)
+                        # If handle_request_error returns without raising, don't retry
+                        break
+                    except ShouldRetryException:
+                        continue  # Only continue if ShouldRetryException is raised
                 else:
                     raise
-

@@ -30,7 +30,10 @@ def validate_tool_parameters(
             try:
                 arguments = parse_json_arguments(arguments)
             except (json.JSONDecodeError, ValueError) as e:
-                return False, f"Invalid JSON in tool arguments for '{tool_name}': {str(e)}. Please ensure your JSON is properly formatted with double quotes."
+                return (
+                    False,
+                    f"Invalid JSON in tool arguments for '{tool_name}': {str(e)}. Please ensure your JSON is properly formatted with double quotes.",
+                )
 
         # Get parameters schema
         parameters = tool_definition.get("parameters", {})

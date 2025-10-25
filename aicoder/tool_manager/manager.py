@@ -23,8 +23,6 @@ class MCPToolManager:
         """Get tool definitions for the API."""
         return self.registry.get_tool_definitions()
 
-    
-
     def execute_tool(
         self,
         tool_name: str,

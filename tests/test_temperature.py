@@ -16,17 +16,18 @@ def test_default_temperature():
     # Clear any existing environment variables that might affect our tests
     if "TEMPERATURE" in os.environ:
         del os.environ["TEMPERATURE"]
-    
+
     # Check the os.environ.get call result directly
     temperature = float(os.environ.get("TEMPERATURE", "0.0"))
     assert temperature == 0.0
+
 
 def test_default_temperature_streaming_adapter():
     """Test that default temperature is 0.0 in streaming adapter when no environment variable is set."""
     # Clear any existing environment variables that might affect our tests
     if "TEMPERATURE" in os.environ:
         del os.environ["TEMPERATURE"]
-    
+
     # Import the streaming adapter module
     if "aicoder.streaming_adapter" in sys.modules:
         importlib.reload(sys.modules["aicoder.streaming_adapter"])
@@ -36,6 +37,7 @@ def test_default_temperature_streaming_adapter():
     # Check the os.environ.get call result
     temperature = float(os.environ.get("TEMPERATURE", "0.0"))
     assert temperature == 0.0
+
 
 @patch.dict(os.environ, {"TEMPERATURE": "0.7"})
 def test_temperature_from_env():
@@ -50,6 +52,7 @@ def test_temperature_from_env():
     temperature = float(os.environ.get("TEMPERATURE", "0.0"))
     assert temperature == 0.7
 
+
 @patch.dict(os.environ, {"TEMPERATURE": "0.7"})
 def test_temperature_from_env_streaming_adapter():
     """Test that temperature is loaded from environment variable in streaming adapter."""
@@ -63,6 +66,7 @@ def test_temperature_from_env_streaming_adapter():
     temperature = float(os.environ.get("TEMPERATURE", "0.0"))
     assert temperature == 0.7
 
+
 @patch.dict(os.environ, {"TEMPERATURE": "1.0"})
 def test_higher_temperature_from_env():
     """Test that higher temperature values are loaded from environment variable."""
@@ -75,6 +79,7 @@ def test_higher_temperature_from_env():
     # Check that the temperature in the request data would be 1.0
     temperature = float(os.environ.get("TEMPERATURE", "0.0"))
     assert temperature == 1.0
+
 
 @patch.dict(os.environ, {"TEMPERATURE": "1.0"})
 def test_higher_temperature_from_env_streaming_adapter():

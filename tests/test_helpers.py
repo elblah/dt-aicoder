@@ -9,7 +9,7 @@ from contextlib import contextmanager
 def temp_config(config_module, **kwargs):
     """
     Temporarily set configuration attributes for a test.
-    
+
     Usage:
         with temp_config(config, COMPACT_MIN_MESSAGES=4, DEBUG=True):
             # Test code here with modified config
@@ -18,16 +18,16 @@ def temp_config(config_module, **kwargs):
     """
     # Store original values
     original_values = {}
-    
+
     for key, value in kwargs.items():
         if hasattr(config_module, key):
             original_values[key] = getattr(config_module, key)
         else:
             original_values[key] = None
-        
+
         # Set the new value
         setattr(config_module, key, value)
-    
+
     try:
         yield
     finally:
@@ -46,7 +46,7 @@ def temp_config(config_module, **kwargs):
 def temp_env(**kwargs):
     """
     Temporarily set environment variables for a test.
-    
+
     Usage:
         with temp_env(DISABLE_PRUNING="1"):
             # Test code here with modified env
@@ -55,11 +55,11 @@ def temp_env(**kwargs):
     """
     # Store original values
     original_values = {}
-    
+
     for key, value in kwargs.items():
         original_values[key] = os.environ.get(key)
         os.environ[key] = str(value)
-    
+
     try:
         yield
     finally:
@@ -75,13 +75,16 @@ def temp_env(**kwargs):
 
 
 @contextmanager
-def temp_config_and_env(config_module, config_overrides: Dict[str, Any] = None, 
-                       env_overrides: Dict[str, str] = None):
+def temp_config_and_env(
+    config_module,
+    config_overrides: Dict[str, Any] = None,
+    env_overrides: Dict[str, str] = None,
+):
     """
     Temporarily set both config attributes and environment variables for a test.
-    
+
     Usage:
-        with temp_config_and_env(config, 
+        with temp_config_and_env(config,
                                config_overrides={'COMPACT_MIN_MESSAGES': 4},
                                env_overrides={'DISABLE_PRUNING': '1'}):
             # Test code here
@@ -89,7 +92,6 @@ def temp_config_and_env(config_module, config_overrides: Dict[str, Any] = None,
     """
     config_overrides = config_overrides or {}
     env_overrides = env_overrides or {}
-    
-    with temp_config(config_module, **config_overrides), \
-         temp_env(**env_overrides):
+
+    with temp_config(config_module, **config_overrides), temp_env(**env_overrides):
         yield

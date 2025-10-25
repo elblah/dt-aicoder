@@ -28,15 +28,16 @@ def clean_env():
 
     # Reload config module
     import aicoder.config
+
     importlib.reload(aicoder.config)
-    
+
     yield
-    
+
     # Clean up
     for var in ["AUTO_COMPACT_THRESHOLD", "CONTEXT_SIZE", "CONTEXT_COMPACT_PERCENTAGE"]:
         if var in os.environ:
             del os.environ[var]
-    
+
     # Restore original values
     if original_context_size is not None:
         os.environ["CONTEXT_SIZE"] = original_context_size
@@ -44,7 +45,7 @@ def clean_env():
         os.environ["CONTEXT_COMPACT_PERCENTAGE"] = original_context_compact_percentage
     if original_auto_compact_threshold is not None:
         os.environ["AUTO_COMPACT_THRESHOLD"] = original_auto_compact_threshold
-    
+
     # Reload config to restore
     importlib.reload(aicoder.config)
 
@@ -63,6 +64,7 @@ def test_auto_compact_threshold_custom_value(clean_env):
     os.environ["CONTEXT_COMPACT_PERCENTAGE"] = "20"  # 20% of 10000 = 2000
     # Reload config module
     import aicoder.config
+
     importlib.reload(aicoder.config)
     from aicoder.config import AUTO_COMPACT_THRESHOLD
 
@@ -75,6 +77,7 @@ def test_auto_compact_threshold_zero_disables(clean_env):
     os.environ["CONTEXT_COMPACT_PERCENTAGE"] = "0"
     # Reload config module
     import aicoder.config
+
     importlib.reload(aicoder.config)
     from aicoder.config import AUTO_COMPACT_THRESHOLD
 
@@ -88,6 +91,7 @@ def test_auto_compact_threshold_negative_value(clean_env):
     os.environ["CONTEXT_COMPACT_PERCENTAGE"] = "150"  # This should be capped at 100%
     # Reload config module
     import aicoder.config
+
     importlib.reload(aicoder.config)
     from aicoder.config import AUTO_COMPACT_THRESHOLD, CONTEXT_SIZE
 
@@ -102,6 +106,7 @@ def test_check_auto_compaction_disabled(mock_stats, mock_message_history, clean_
     os.environ["CONTEXT_COMPACT_PERCENTAGE"] = "0"  # Disable auto-compaction
     # Reload config module
     import aicoder.config
+
     importlib.reload(aicoder.config)
 
     from aicoder.app import AICoder
@@ -129,6 +134,7 @@ def test_check_auto_compaction_triggered(mock_stats, mock_message_history, clean
     os.environ["CONTEXT_COMPACT_PERCENTAGE"] = "50"  # 50% of 1000 = 500
     # Reload config module
     import aicoder.config
+
     importlib.reload(aicoder.config)
 
     from aicoder.app import AICoder
@@ -160,6 +166,7 @@ def test_check_auto_compaction_not_triggered(
     os.environ["CONTEXT_COMPACT_PERCENTAGE"] = "50"  # 50% of 2000 = 1000
     # Reload config module
     import aicoder.config
+
     importlib.reload(aicoder.config)
 
     from aicoder.app import AICoder

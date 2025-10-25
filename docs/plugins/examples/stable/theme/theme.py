@@ -16,7 +16,7 @@ Features:
 
 Commands:
 - /theme                    - Show current theme
-- /theme list              - List all available themes  
+- /theme list              - List all available themes
 - /theme <name>            - Apply specified theme
 - /theme random            - Apply a random theme
 - /theme next              - Apply next theme in list
@@ -261,7 +261,7 @@ def apply_theme(theme_name="default"):
             setattr(config, color_name, color_value)
 
         # Update other modules that import these colors directly
-        #_update_dependent_modules(theme)
+        # _update_dependent_modules(theme)
 
         print(f"✅ Applied theme: {theme_name}")
         return True
@@ -346,9 +346,10 @@ def get_current_theme():
     """Get the current applied theme name."""
     try:
         import aicoder.config as config
+
         # Try to determine current theme by checking if RED matches any theme
         for name, theme_colors in THEMES.items():
-            if hasattr(config, 'RED') and config.RED == theme_colors.get('RED'):
+            if hasattr(config, "RED") and config.RED == theme_colors.get("RED"):
                 return name
         return "default"  # Fallback
     except Exception:
@@ -367,15 +368,15 @@ def get_theme_index(theme_name):
 def handle_theme_command(aicoder_instance, args):
     """Handle the /theme command with various subcommands."""
     import aicoder.config as config
-    
+
     if not args:
         # Show current theme
         current = get_current_theme()
         print(f"\n{config.GREEN}Current theme: {current}{config.RESET}")
         return False, False
-    
+
     subcommand = args[0].lower()
-    
+
     if subcommand == "list":
         # List all available themes
         theme_list = list(THEMES.keys())
@@ -385,7 +386,7 @@ def handle_theme_command(aicoder_instance, args):
             marker = " (current)" if theme_name == current else ""
             print(f"  {theme_name}{marker}")
         return False, False
-    
+
     elif subcommand == "random":
         # Apply a random theme
         theme_list = list(THEMES.keys())
@@ -393,7 +394,7 @@ def handle_theme_command(aicoder_instance, args):
         print(f"\n{config.GREEN}Applying random theme: {random_theme}{config.RESET}")
         apply_theme(random_theme)
         return False, False
-    
+
     elif subcommand == "next":
         # Apply next theme in the list
         theme_list = list(THEMES.keys())
@@ -404,7 +405,7 @@ def handle_theme_command(aicoder_instance, args):
         print(f"\n{config.GREEN}Next theme: {next_theme}{config.RESET}")
         apply_theme(next_theme)
         return False, False
-    
+
     elif subcommand == "previous":
         # Apply previous theme in the list
         theme_list = list(THEMES.keys())
@@ -415,33 +416,49 @@ def handle_theme_command(aicoder_instance, args):
         print(f"\n{config.GREEN}Previous theme: {prev_theme}{config.RESET}")
         apply_theme(prev_theme)
         return False, False
-    
+
     elif subcommand == "help":
         # Show help
         print(f"\n{config.GREEN}Theme Command Help:{config.RESET}")
-        print(f"  {config.CYAN}/theme{config.RESET}                    - Show current theme")
-        print(f"  {config.CYAN}/theme list{config.RESET}              - List all available themes")
-        print(f"  {config.CYAN}/theme <name>{config.RESET}            - Apply specified theme")
-        print(f"  {config.CYAN}/theme random{config.RESET}            - Apply a random theme")
-        print(f"  {config.CYAN}/theme next{config.RESET}              - Apply next theme in list")
-        print(f"  {config.CYAN}/theme previous{config.RESET}          - Apply previous theme in list")
+        print(
+            f"  {config.CYAN}/theme{config.RESET}                    - Show current theme"
+        )
+        print(
+            f"  {config.CYAN}/theme list{config.RESET}              - List all available themes"
+        )
+        print(
+            f"  {config.CYAN}/theme <name>{config.RESET}            - Apply specified theme"
+        )
+        print(
+            f"  {config.CYAN}/theme random{config.RESET}            - Apply a random theme"
+        )
+        print(
+            f"  {config.CYAN}/theme next{config.RESET}              - Apply next theme in list"
+        )
+        print(
+            f"  {config.CYAN}/theme previous{config.RESET}          - Apply previous theme in list"
+        )
         print(f"  {config.CYAN}/theme help{config.RESET}              - Show this help")
         return False, False
-    
+
     else:
         # Try to apply the specified theme
         theme_name = subcommand
         if apply_theme(theme_name):
             return False, False
         else:
-            print(f"\n{config.RED}Theme '{theme_name}' not found. Use '/theme list' to see available themes.{config.RESET}")
+            print(
+                f"\n{config.RED}Theme '{theme_name}' not found. Use '/theme list' to see available themes.{config.RESET}"
+            )
             return False, False
 
 
 def on_aicoder_init(aicoder_instance):
     """Register the /theme command when AICoder is initialized."""
     # Register the theme command handler
-    aicoder_instance.command_handlers["/theme"] = lambda args: handle_theme_command(aicoder_instance, args)
+    aicoder_instance.command_handlers["/theme"] = lambda args: handle_theme_command(
+        aicoder_instance, args
+    )
 
 
 # Initialize plugin

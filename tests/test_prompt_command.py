@@ -72,7 +72,7 @@ class TestPromptCommand(unittest.TestCase):
         self.assertEqual(prompts[0][0], 1)  # number
         self.assertTrue(prompts[0][1].startswith("000-default"))  # original prompt
         self.assertIsNone(prompts[0][2])  # no file path for original
-        
+
         self.assertEqual(prompts[1][0], 2)  # number
         self.assertEqual(prompts[1][1], "001-gemini.txt")  # filename
         self.assertEqual(prompts[2][0], 3)
@@ -153,7 +153,7 @@ class TestPromptCommand(unittest.TestCase):
         handler = PromptCommand(mock_app)
 
         # Test prompt #1 (original) - should NOT set env var
-        with patch("builtins.print") as mock_print:
+        with patch("builtins.print"):
             with patch.dict(os.environ, {}, clear=False):
                 result = handler._handle_prompt_set(["set", "1"])
 
@@ -165,7 +165,7 @@ class TestPromptCommand(unittest.TestCase):
                 self.assertNotIn("AICODER_PROMPT_MAIN", os.environ)
 
         # Test prompt #2 (user file) - should set env var
-        with patch("builtins.print") as mock_print:
+        with patch("builtins.print"):
             with patch.dict(os.environ, {}, clear=False):
                 result = handler._handle_prompt_set(["set", "2"])
 

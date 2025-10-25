@@ -15,6 +15,7 @@ import tempfile
 def run_tmux_command(cmd):
     """Run a tmux command and return the output."""
     from subprocess import getstatusoutput
+
     try:
         # Use getstatusoutput for simpler interface
         status, output = getstatusoutput(f"tmux {cmd}")
@@ -26,15 +27,17 @@ def run_tmux_command(cmd):
 def test_tmux_available():
     """Check if tmux is available."""
     try:
-        result = subprocess.run(['tmux', '-V'], capture_output=True, text=True, timeout=5)
+        result = subprocess.run(
+            ["tmux", "-V"], capture_output=True, text=True, timeout=5
+        )
         return result.returncode == 0
-    except:
+    except Exception:
         return False
 
 
 def create_animation_test_script():
     """Create a test script that will test animation and ESC in tmux."""
-    script_content = '''
+    script_content = """
 #!/usr/bin/env python3
 import sys
 import time
@@ -137,10 +140,10 @@ def main():
 
 if __name__ == "__main__":
     main()
-'''
+"""
 
     # Write the script to a temporary file
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write(script_content)
         return f.name
 
@@ -164,14 +167,18 @@ def main():
         print(f"Creating tmux session: {session_name}")
 
         # Start tmux session with bash shell
-        stdout, stderr, rc = run_tmux_command(f"new-session -d -s {session_name} -n test bash")
+        stdout, stderr, rc = run_tmux_command(
+            f"new-session -d -s {session_name} -n test bash"
+        )
         if rc != 0:
             print(f"❌ Failed to create tmux session: {stderr}")
             return 1
 
         try:
             # Send the python command to the tmux session
-            run_tmux_command(f"send-keys -t {session_name} 'python3 {test_script}' Enter")
+            run_tmux_command(
+                f"send-keys -t {session_name} 'python3 {test_script}' Enter"
+            )
 
             # Wait a moment for the command to execute
             time.sleep(0.5)
@@ -185,24 +192,28 @@ def main():
             print("✅ Test running in tmux session")
             print(f"Session name: {session_name}")
             print(f"Script file: {test_script}")
-            
+
             # Wait and monitor the output to detect animation
             print("\\nMonitoring output for animation and ESC behavior...")
-            
+
             # Wait for the test to complete (timeout after 20 seconds to account for delays)
             for i in range(20):
-                stdout, stderr, rc = run_tmux_command(f"capture-pane -t {session_name} -p")
-                if stdout and ("SUCCESS:" in stdout or "FAILED:" in stdout or "ERROR:" in stdout):
+                stdout, stderr, rc = run_tmux_command(
+                    f"capture-pane -t {session_name} -p"
+                )
+                if stdout and (
+                    "SUCCESS:" in stdout or "FAILED:" in stdout or "ERROR:" in stdout
+                ):
                     break
                 time.sleep(1)
-            
+
             # Capture the final output
             stdout, stderr, rc = run_tmux_command(f"capture-pane -t {session_name} -p")
             print(f"\\nFinal output from test session:\\n{stdout}")
 
             if stderr:
                 print(f"\\nErrors from test session:\\n{stderr}")
-                
+
         finally:
             # Kill the tmux session
             run_tmux_command(f"kill-session -t {session_name}")
@@ -211,7 +222,7 @@ def main():
         # Clean up the test script
         try:
             os.unlink(test_script)
-        except:
+        except Exception:
             pass
 
     print("\\n" + "=" * 50)

@@ -98,7 +98,9 @@ class PlanningMode:
             if not build_content:
                 build_content = BUILD_SWITCH_CONTENT
             # Add mode marker for reliable detection
-            return f"<aicoder_active_mode>build</aicoder_active_mode>\n\n{build_content}"
+            return (
+                f"<aicoder_active_mode>build</aicoder_active_mode>\n\n{build_content}"
+            )
 
     def get_writing_tools(self) -> list:
         """Get list of writing tools that should be disabled in plan mode."""
@@ -113,12 +115,12 @@ class PlanningMode:
             # Try to load from mcp_tools.json
             mcp_file = os.path.join(os.path.dirname(__file__), "..", "mcp_tools.json")
             if os.path.exists(mcp_file):
-                with open(mcp_file, 'r') as f:
+                with open(mcp_file, "r") as f:
                     mcp_config = json.load(f)
                     for tool_config in mcp_config.get("tools", []):
                         if tool_config.get("name") == tool_name:
                             return tool_config
-        except:
+        except Exception:
             pass
 
         return {}
@@ -138,8 +140,10 @@ class PlanningMode:
         return [
             tool.get("function", {}).get("name")
             for tool in all_tools
-            if (tool.get("function", {}).get("name") and
-                tool.get("function", {}).get("name") not in writing_tools)
+            if (
+                tool.get("function", {}).get("name")
+                and tool.get("function", {}).get("name") not in writing_tools
+            )
         ]
 
     def should_disable_tool(self, tool_name: str) -> bool:

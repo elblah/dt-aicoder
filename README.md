@@ -30,7 +30,7 @@ AI Coder is a blazing-fast, resource-efficient CLI for AI-powered coding that br
 
 ### Install with UV (Recommended)
 ```bash
-uv tool install git+https://github.com/elblah/dt-aicoder
+uv tool install --python 3.13 git+https://github.com/elblah/dt-aicoder
 export OPENAI_API_KEY="your-api-key"
 uvx aicoder
 ```

@@ -37,12 +37,25 @@ def _search_with_rg(pattern: str, file_limit: int = DEFAULT_FILE_LIMIT) -> str:
     """Search for files using ripgrep with glob patterns."""
     try:
         # Use rg --files --glob for file listing with glob patterns (safe against injection)
-        cmd = ["bash", "-c", f'{{ "$1" --files --glob "$2"; }} | head -n {file_limit}', "_", "rg", pattern]
+        cmd = [
+            "bash",
+            "-c",
+            f'{{ "$1" --files --glob "$2"; }} | head -n {file_limit}',
+            "_",
+            "rg",
+            pattern,
+        ]
 
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-        if result.returncode == 0 or result.returncode == 1:  # 0 = files found, 1 = no files
+        if (
+            result.returncode == 0 or result.returncode == 1
+        ):  # 0 = files found, 1 = no files
             lines = result.stdout.strip().split("\n")
-            output = "\n".join(lines) if lines and lines[0] else "No files found matching pattern"
+            output = (
+                "\n".join(lines)
+                if lines and lines[0]
+                else "No files found matching pattern"
+            )
             # Check if we hit the limit
             if len(lines) >= file_limit:
                 output += f"\n... (showing first {file_limit} lines)"
@@ -55,18 +68,28 @@ def _search_with_rg(pattern: str, file_limit: int = DEFAULT_FILE_LIMIT) -> str:
         return f"Error executing rg: {e}"
 
 
-def _search_with_fd(pattern: str, file_limit: int = DEFAULT_FILE_LIMIT, command_name: str = "fd") -> str:
+def _search_with_fd(
+    pattern: str, file_limit: int = DEFAULT_FILE_LIMIT, command_name: str = "fd"
+) -> str:
     """Search for files using fd-find."""
     try:
         # Use fd/fdfind with --glob for glob patterns and file count limit
-        cmd = ["bash", "-c", f"{command_name} --glob '{pattern}' | head -n {file_limit}"]
+        cmd = [
+            "bash",
+            "-c",
+            f"{command_name} --glob '{pattern}' | head -n {file_limit}",
+        ]
 
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         if (
             result.returncode == 0 or result.returncode == 1
         ):  # 0 = matches found, 1 = no matches
             lines = result.stdout.strip().split("\n")
-            output = "\n".join(lines) if lines and lines[0] else "No files found matching pattern"
+            output = (
+                "\n".join(lines)
+                if lines and lines[0]
+                else "No files found matching pattern"
+            )
             # Check if we hit the limit
             if len(lines) >= file_limit:
                 output += f"\n... (showing first {file_limit} lines)"

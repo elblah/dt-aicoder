@@ -36,9 +36,7 @@ def test_write_file_tool():
         content = "Hello, World!"
 
         # Test writing a file
-        result = execute_write_file(
-            path=test_file, content=content, stats=mock_stats
-        )
+        result = execute_write_file(path=test_file, content=content, stats=mock_stats)
 
         # Verify the file was created with correct content
         assert os.path.exists(test_file)
@@ -102,9 +100,7 @@ def test_run_shell_command_tool():
     """Test the run_shell_command tool."""
     mock_stats = MockStats()
     # Test a simple command
-    result = execute_run_shell_command(
-        command="echo 'Hello World'", stats=mock_stats
-    )
+    result = execute_run_shell_command(command="echo 'Hello World'", stats=mock_stats)
 
     # Verify the command output is in the result (without Command: prefix)
     assert "Hello World" in result

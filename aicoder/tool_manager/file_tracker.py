@@ -10,13 +10,19 @@ from typing import Dict, Tuple, Optional
 file_read_times: Dict[str, float] = {}
 
 # Track read counts for efficiency optimization
-file_read_counts: Dict[str, Tuple[float, int]] = {}  # {file_path: (last_read_time, count)}
+file_read_counts: Dict[
+    str, Tuple[float, int]
+] = {}  # {file_path: (last_read_time, count)}
 
-# Track edit counts for efficiency optimization  
-file_edit_counts: Dict[str, Tuple[float, int]] = {}  # {file_path: (last_edit_time, count)}
+# Track edit counts for efficiency optimization
+file_edit_counts: Dict[
+    str, Tuple[float, int]
+] = {}  # {file_path: (last_edit_time, count)}
 
 # Configuration for efficiency detection
-MICRO_EDIT_DETECTION = os.environ.get("AICODER_MICRO_EDIT_DETECTION", "false").lower() == "true"
+MICRO_EDIT_DETECTION = (
+    os.environ.get("AICODER_MICRO_EDIT_DETECTION", "false").lower() == "true"
+)
 MICRO_EDIT_THRESHOLD = int(os.environ.get("AICODER_MICRO_EDIT_THRESHOLD", "3"))
 MICRO_EDIT_WINDOW = int(os.environ.get("AICODER_MICRO_EDIT_WINDOW", "300"))  # 5 minutes
 
@@ -27,7 +33,7 @@ READ_WINDOW = int(os.environ.get("AICODER_READ_WINDOW", "300"))  # 5 minutes
 
 def record_file_read(file_path: str):
     """Record when a file was last read.
-    
+
     This should be called for any successful file read operation,
     whether it's reading the entire file or just a portion.
     """
@@ -107,18 +113,18 @@ def check_file_modification_strict(file_path: str) -> str:
 
 def track_file_read(file_path: str, message_history=None) -> Optional[str]:
     """Track file reads and suggest efficiency improvements.
-    
+
     Returns an efficiency tip message if thresholds are exceeded.
     """
     if not READ_DETECTION:
         return None
-        
+
     current_time = time.time()
-    
+
     if file_path in file_read_counts:
         last_time, count = file_read_counts[file_path]
         time_diff = current_time - last_time
-        
+
         if time_diff <= READ_WINDOW:
             # Within the time window, increment count
             count += 1
@@ -128,43 +134,47 @@ def track_file_read(file_path: str, message_history=None) -> Optional[str]:
     else:
         # First time reading this file
         count = 1
-    
+
     # Update tracker
     file_read_counts[file_path] = (current_time, count)
-    
+
     # Check if we should suggest efficiency improvement
     if count > READ_THRESHOLD and message_history:
         # Inform user we're helping the AI
-        print(f"💡 Suggesting better reading strategy for {file_path} (read {count} times)")
-        
+        print(
+            f"💡 Suggesting better reading strategy for {file_path} (read {count} times)"
+        )
+
         efficiency_tip = (
             f"CONTEXT TIP: You've read {file_path} {count} times recently. "
             f"Consider keeping the file content in memory or reading larger sections at once to reduce API requests. "
             f"The file content stays in your context window for reference."
         )
-        
+
         # Add as system message to guide the AI
-        if hasattr(message_history, 'messages'):
-            message_history.messages.append({"role": "user", "content": f"💡 EFFICIENCY TIP: {efficiency_tip}"})
+        if hasattr(message_history, "messages"):
+            message_history.messages.append(
+                {"role": "user", "content": f"💡 EFFICIENCY TIP: {efficiency_tip}"}
+            )
         return efficiency_tip
-    
+
     return None
 
 
 def track_file_edit(file_path: str, message_history=None) -> Optional[str]:
     """Track file edits and suggest write_file for multiple micro-edits.
-    
+
     Returns an efficiency tip message if thresholds are exceeded.
     """
     if not MICRO_EDIT_DETECTION:
         return None
-    
+
     current_time = time.time()
-    
+
     if file_path in file_edit_counts:
         last_time, count = file_edit_counts[file_path]
         time_diff = current_time - last_time
-        
+
         if time_diff <= MICRO_EDIT_WINDOW:
             # Within the time window, increment count
             count += 1
@@ -174,15 +184,15 @@ def track_file_edit(file_path: str, message_history=None) -> Optional[str]:
     else:
         # First time editing this file
         count = 1
-    
+
     # Update tracker
     file_edit_counts[file_path] = (current_time, count)
-    
+
     # Check if we should suggest write_file
     if count > MICRO_EDIT_THRESHOLD and message_history:
         # Inform user we're helping the AI
         print(f"💡 Suggesting write_file for {file_path} (edited {count} times)")
-        
+
         efficiency_tip = (
             f"EFFICIENCY TIP: You've made multiple edits to {file_path} recently. "
             f"For multiple changes to the same file, consider using write_file instead - "
@@ -190,10 +200,12 @@ def track_file_edit(file_path: str, message_history=None) -> Optional[str]:
             f"If this is your final edit or you only have one more small change, continue using edit_file. "
             f"If you anticipate many more changes to this file, write_file would be more efficient."
         )
-        
+
         # Add as system message to guide the AI
-        if hasattr(message_history, 'messages'):
-            message_history.messages.append({"role": "user", "content": f"💡 EFFICIENCY TIP: {efficiency_tip}"})
+        if hasattr(message_history, "messages"):
+            message_history.messages.append(
+                {"role": "user", "content": f"💡 EFFICIENCY TIP: {efficiency_tip}"}
+            )
         return efficiency_tip
-    
+
     return None

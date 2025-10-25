@@ -9,9 +9,27 @@ from datetime import timedelta
 from . import config
 from .utils import imsg
 
+# Module-level singleton
+_stats_instance = None
+
+
+def get_stats():
+    """Get the singleton stats instance."""
+    global _stats_instance
+    if _stats_instance is None:
+        _stats_instance = Stats()
+    return _stats_instance
+
 
 @dataclass
 class Stats:
+    """Statistics tracking for the application."""
+
+    def __new__(cls):
+        if not hasattr(cls, "_instance") or cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
     """Statistics tracking for the application."""
 
     api_requests: int = 0
@@ -29,6 +47,9 @@ class Stats:
     completion_tokens: int = 0  # Cumulative output tokens for statistics
     current_prompt_size: int = (
         0  # Current conversation history size for auto-compaction
+    )
+    current_prompt_size_estimated: bool = (
+        False  # Whether current_prompt_size is estimated or from API
     )
 
     def print_stats(self, message_history=None):

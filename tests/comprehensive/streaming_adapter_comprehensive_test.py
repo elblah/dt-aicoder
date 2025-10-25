@@ -37,7 +37,7 @@ class TestAPIHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         """Handle POST requests."""
         content_length = int(self.headers["Content-Length"])
-        post_data = self.rfile.read(content_length)
+        self.rfile.read(content_length)
 
         scenario = os.environ.get("TEST_SCENARIO", "normal")
         print(f"Test server: {scenario} scenario - received request")
@@ -96,7 +96,7 @@ class TestAPIHandler(BaseHTTPRequestHandler):
         try:
             self.connection.shutdown(socket.SHUT_RDWR)
             self.connection.close()
-        except:
+        except Exception:
             pass
 
     def _send_tool_calls(self):
@@ -418,7 +418,7 @@ def run_scenario_test(name, scenario, expect_success=True):
                 import builtins
 
                 builtins.print = original_print
-            except:
+            except Exception:
                 pass
         server.shutdown()
 
@@ -459,4 +459,3 @@ def main():
 if __name__ == "__main__":
     success = main()
     sys.exit(0 if success else 1)
-

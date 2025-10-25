@@ -81,11 +81,14 @@ def test_prepare_api_request_data_with_tools(mock_stats):
     client = APIClient(stats=mock_stats)
 
     messages = [{"role": "user", "content": "Hello"}]
-    
+
     # Mock tool manager
     mock_tool_manager = Mock()
     mock_tools = [
-        {"type": "function", "function": {"name": "test_tool", "description": "Test tool"}}
+        {
+            "type": "function",
+            "function": {"name": "test_tool", "description": "Test tool"},
+        }
     ]
     mock_tool_manager.get_tool_definitions.return_value = mock_tools
 
@@ -103,11 +106,14 @@ def test_prepare_api_request_data_with_disable_tools():
     client = APIClient()
 
     messages = [{"role": "user", "content": "Hello"}]
-    
+
     # Mock tool manager
     mock_tool_manager = Mock()
     mock_tools = [
-        {"type": "function", "function": {"name": "test_tool", "description": "Test tool"}}
+        {
+            "type": "function",
+            "function": {"name": "test_tool", "description": "Test tool"},
+        }
     ]
     mock_tool_manager.get_tool_definitions.return_value = mock_tools
 
@@ -123,8 +129,14 @@ def test_validate_tool_definitions_with_valid_tools():
     client = APIClient()
 
     valid_tools = [
-        {"type": "function", "function": {"name": "tool1", "description": "Tool 1", "parameters": {}}},
-        {"type": "function", "function": {"name": "tool2", "description": "Tool 2", "parameters": {}}},
+        {
+            "type": "function",
+            "function": {"name": "tool1", "description": "Tool 1", "parameters": {}},
+        },
+        {
+            "type": "function",
+            "function": {"name": "tool2", "description": "Tool 2", "parameters": {}},
+        },
     ]
 
     # Should not raise an exception
@@ -146,42 +158,36 @@ def test_validate_tool_definitions_with_invalid_tools():
     client._validate_tool_definitions({"tools": valid_tools})
 
 
-def test_update_stats_on_success(mock_stats):
-    """Test updating statistics on successful API call."""
-    client = APIClient(stats=mock_stats)
-
 def test_update_stats_on_success():
     """Test updating statistics on successful API call."""
     from aicoder.stats import Stats
-    
+
     # Use real Stats object instead of Mock
     real_stats = Stats()
     client = APIClient(stats=real_stats)
 
     # Mock API response with usage data
     mock_response = {
-        "usage": {
-            "prompt_tokens": 10,
-            "completion_tokens": 20,
-            "total_tokens": 30
-        }
+        "usage": {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30}
     }
 
     # Test the actual method that exists
     import time
+
     api_start_time = time.time()
     client._update_stats_on_success(api_start_time, mock_response)
 
     # Check that stats were updated with real values
     assert real_stats.api_requests >= 0  # Should be incremented
-    assert real_stats.api_success >= 0   # Should be incremented
+    assert real_stats.api_success >= 0  # Should be incremented
     assert real_stats.prompt_tokens == 10
     assert real_stats.completion_tokens == 20
+
 
 def test_setup_and_restore_terminal():
     """Test setting up and restoring terminal settings."""
     client = APIClient()
-    
+
     # Test that we can call the ESC detection method
     # This should work in test mode without any terminal operations
     try:
@@ -195,7 +201,7 @@ def test_setup_and_restore_terminal():
 def test_handle_user_cancellation():
     """Test handling user cancellation (ESC key press)."""
     client = APIClient()
-    
+
     # Test that the method exists and returns a boolean
     result = client._handle_user_cancellation()
     assert isinstance(result, bool)

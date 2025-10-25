@@ -13,53 +13,54 @@ plugin_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, plugin_dir)
 
 try:
-    from planning_plugin import PlanningPlugin, Plan, PlanningStep, initialize_plugin
+    from planning_plugin import PlanningPlugin, Plan, PlanningStep
+
     print("✅ Plugin imports successful!")
-    
+
     # Test basic plugin creation
     plugin = PlanningPlugin()
     print(f"✅ Plugin created: {plugin.name} v{plugin.version}")
-    
+
     # Test data classes
     step = PlanningStep(
         step_number=1,
         description="Test step",
         dependencies=[],
         estimated_time="30 minutes",
-        tools_needed=["test_tool"]
+        tools_needed=["test_tool"],
     )
     print(f"✅ PlanningStep created: {step.description}")
-    
+
     plan = Plan(
         title="Test Plan",
         description="A test plan for validation",
         steps=[step],
-        success_criteria=["Test passes"]
+        success_criteria=["Test passes"],
     )
     print(f"✅ Plan created: {plan.title}")
-    
+
     # Test plan display
     plugin.current_plan = plan
     print("✅ Plan display test:")
     plugin._display_plan()
-    
+
     # Test execution context formatting
     execution_context = plugin._format_plan_for_execution()
     print("✅ Execution context formatted successfully")
     print(f"Context length: {len(execution_context)} characters")
-    
+
     # Test question detection
     test_questions = [
         "What are your requirements?",
         "I need clarification on the timeline.",
         "Please provide more information about the project.",
-        "Here is the plan you requested."
+        "Here is the plan you requested.",
     ]
-    
+
     for question in test_questions:
         is_question = plugin._is_asking_questions(question)
         print(f"✅ Question detection: '{question[:30]}...' -> {is_question}")
-    
+
     # Test plan parsing
     test_plan_content = """
 # PLAN: Test Web App
@@ -82,7 +83,7 @@ Build a test web application
 - User can register and login
 - Application is secure
 """
-    
+
     parsed_plan = plugin._parse_plan_from_response(test_plan_content)
     if parsed_plan:
         print(f"✅ Plan parsing successful: {parsed_plan.title}")
@@ -91,14 +92,15 @@ Build a test web application
             print(f"   - {step.step_number}: {step.description}")
     else:
         print("❌ Plan parsing failed")
-    
+
     print("\n🎉 All tests passed! Plugin is ready to use.")
-    
+
 except ImportError as e:
     print(f"❌ Import error: {e}")
     print("This is normal if running outside of AI Coder environment.")
-    
+
 except Exception as e:
     print(f"❌ Test failed: {e}")
     import traceback
+
     traceback.print_exc()

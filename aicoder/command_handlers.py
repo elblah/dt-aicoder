@@ -20,5 +20,5 @@ class CommandHandlerMixin:
         if not handler:
             emsg(f"\n *** Command not found: {command}")
             return False, False
-            
+
         return handler(args)

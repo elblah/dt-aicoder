@@ -595,7 +595,13 @@ def display_token_info(stats, auto_compact_threshold=None):
         else:
             return str(count)
 
-    current_size_formatted = format_token_count(stats.current_prompt_size)
+    # Add ~ prefix if the token count is estimated
+    estimated_prefix = (
+        "~" if getattr(stats, "current_prompt_size_estimated", False) else ""
+    )
+    current_size_formatted = (
+        f"{estimated_prefix}{format_token_count(stats.current_prompt_size)}"
+    )
     threshold_formatted = format_token_count(display_threshold)
     current_time = datetime.datetime.now().strftime("%H:%M:%S")
 

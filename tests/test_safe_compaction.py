@@ -17,10 +17,10 @@ def mock_config():
     """Set up test configuration."""
     # Store original config values
     original_config = {
-        'AUTO_COMPACT_THRESHOLD': getattr(config, 'AUTO_COMPACT_THRESHOLD', 131072),
-        'COMPACT_MIN_MESSAGES': getattr(config, 'COMPACT_MIN_MESSAGES', 6),
-        'COMPACT_RECENT_MESSAGES': getattr(config, 'COMPACT_RECENT_MESSAGES', 5),
-        'PRUNE_PROTECT_TOKENS': getattr(config, 'PRUNE_PROTECT_TOKENS', 1000),
+        "AUTO_COMPACT_THRESHOLD": getattr(config, "AUTO_COMPACT_THRESHOLD", 131072),
+        "COMPACT_MIN_MESSAGES": getattr(config, "COMPACT_MIN_MESSAGES", 6),
+        "COMPACT_RECENT_MESSAGES": getattr(config, "COMPACT_RECENT_MESSAGES", 5),
+        "PRUNE_PROTECT_TOKENS": getattr(config, "PRUNE_PROTECT_TOKENS", 1000),
     }
 
     # Override config for testing
@@ -49,14 +49,19 @@ def message_history_with_api(mock_config):
     # Mock the API handler
     mock_api_handler = Mock()
     mock_api_handler.stats = Mock()
-    mock_api_handler.stats.current_prompt_size = 150000  # High enough to trigger compaction
+    mock_api_handler.stats.current_prompt_size = (
+        150000  # High enough to trigger compaction
+    )
 
     # Create message history and set API handler
     message_history = MessageHistory()
     message_history.api_handler = mock_api_handler
 
     # Add some test messages (need at least COMPACT_MIN_MESSAGES=3 chat messages)
-    message_history.initial_system_prompt = {"role": "system", "content": "Test system prompt"}
+    message_history.initial_system_prompt = {
+        "role": "system",
+        "content": "Test system prompt",
+    }
     message_history.messages = [
         {"role": "system", "content": "Test system prompt"},
         {"role": "user", "content": "First message"},
@@ -66,14 +71,14 @@ def message_history_with_api(mock_config):
         {"role": "user", "content": "Third message"},
         {"role": "assistant", "content": "Third response"},
     ]
-    
+
     return message_history, mock_api_handler
 
 
 def test_compaction_raises_exception_on_api_error(message_history_with_api):
     """Test that compaction raises exception when API call fails."""
     message_history, mock_api_handler = message_history_with_api
-    
+
     # Mock the API request to raise an exception
     mock_api_handler._make_api_request.side_effect = Exception("API connection failed")
 
@@ -100,7 +105,10 @@ def test_compaction_raises_exception_when_no_api_handler(mock_config):
 
     # Create message history without API handler
     message_history = MessageHistory()
-    message_history.initial_system_prompt = {"role": "system", "content": "Test system prompt"}
+    message_history.initial_system_prompt = {
+        "role": "system",
+        "content": "Test system prompt",
+    }
     message_history.messages = [
         {"role": "system", "content": "Test system prompt"},
         {"role": "user", "content": "Test message"},
@@ -127,16 +135,10 @@ def test_compaction_raises_exception_when_no_api_handler(mock_config):
 def test_compaction_succeeds_when_api_works(message_history_with_api):
     """Test that compaction works normally when API succeeds."""
     message_history, mock_api_handler = message_history_with_api
-    
+
     # Mock successful API response
     mock_api_handler._make_api_request.return_value = {
-        "choices": [
-            {
-                "message": {
-                    "content": "Test summary of conversation"
-                }
-            }
-        ]
+        "choices": [{"message": {"content": "Test summary of conversation"}}]
     }
 
     # Store original message count
@@ -151,7 +153,9 @@ def test_compaction_succeeds_when_api_works(message_history_with_api):
     # Should contain the summary
     summary_found = False
     for msg in result:
-        if msg.get("role") == "system" and "Test summary of conversation" in msg.get("content", ""):
+        if msg.get("role") == "system" and "Test summary of conversation" in msg.get(
+            "content", ""
+        ):
             summary_found = True
             break
     assert summary_found
@@ -179,21 +183,24 @@ def app_with_compaction():
     app.message_history.api_handler = mock_api_handler
 
     # Add some test messages
-    app.message_history.initial_system_prompt = {"role": "system", "content": "Test system prompt"}
+    app.message_history.initial_system_prompt = {
+        "role": "system",
+        "content": "Test system prompt",
+    }
     app.message_history.messages = [
         {"role": "system", "content": "Test system prompt"},
         {"role": "user", "content": "Test message"},
         {"role": "assistant", "content": "Test response"},
     ]
-    
+
     return app, mock_api_handler
 
 
-@patch('builtins.print')
+@patch("builtins.print")
 def test_auto_compaction_handles_exception_gracefully(mock_print, app_with_compaction):
     """Test that auto-compaction handles exceptions gracefully and preserves user data."""
     app, mock_api_handler = app_with_compaction
-    
+
     # Set up environment to force AI summarization
     os.environ["DISABLE_PRUNING"] = "1"
 
@@ -228,5 +235,7 @@ def test_auto_compaction_handles_exception_gracefully(mock_print, app_with_compa
     error_found = any("❌ Compaction failed" in call for call in print_calls)
     assert error_found, "Should print compaction failed error"
 
-    preserved_found = any("Your conversation history has been preserved" in call for call in print_calls)
+    preserved_found = any(
+        "Your conversation history has been preserved" in call for call in print_calls
+    )
     assert preserved_found, "Should print that history was preserved"

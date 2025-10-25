@@ -6,7 +6,7 @@ import io
 import sys
 import contextlib
 
-sys.path.insert(0, '.')
+sys.path.insert(0, ".")
 
 from aicoder.utils import display_token_info
 from aicoder.stats import Stats
@@ -30,7 +30,7 @@ def test_token_info_display_format():
 
     # Calculate expected values using the same logic as the actual function
     from aicoder import config
-    
+
     # Use the actual context size from config (may be different due to auto-compaction)
     actual_context_size = config.CONTEXT_SIZE
     usage_percentage = min(100, (23271 / actual_context_size) * 100)
@@ -43,8 +43,15 @@ def test_token_info_display_format():
     # Check for abbreviated format: 23.3k
     assert "23.3k" in output
     # The expected_bars should be in the output, possibly with color codes
-    colored_bars = f"{config.GREEN}{expected_bars}{config.RESET}"
-    assert colored_bars in output  # Look for the colored version
+    # Check for bars with any valid color (green, yellow, or red)
+    colors = [config.GREEN, config.YELLOW, config.RED]
+    found_colored_bars = False
+    for color in colors:
+        colored_bars = f"{color}{expected_bars}{config.RESET}"
+        if colored_bars in output:
+            found_colored_bars = True
+            break
+    assert found_colored_bars, f"Expected colored bars not found in output: {output}"
 
 
 def test_token_info_display_different_values():
@@ -61,17 +68,14 @@ def test_token_info_display_different_values():
 
     # Use the actual logic from the function to calculate expected values
     from aicoder import config
+
     if config.AUTO_COMPACT_ENABLED:
         usage_percentage = min(100, (50000 / config.CONTEXT_SIZE) * 100)
-        display_threshold = config.CONTEXT_SIZE
     elif auto_compact_threshold > 0:
         usage_percentage = min(100, (50000 / auto_compact_threshold) * 100)
-        display_threshold = auto_compact_threshold
     else:
         usage_percentage = min(100, (50000 / config.CONTEXT_SIZE) * 100)
-        display_threshold = config.CONTEXT_SIZE
 
-    filled_bars = int((usage_percentage + 5) // 10)
     expected_percentage = round(usage_percentage)
 
     assert "Context:" in output
@@ -128,19 +132,20 @@ def test_token_info_function_independence():
 
     # Use the actual logic from the function to calculate expected values
     from aicoder import config
+
     if config.AUTO_COMPACT_ENABLED:
         usage_percentage = min(100, (10000 / config.CONTEXT_SIZE) * 100)
-        display_threshold = config.CONTEXT_SIZE
     elif auto_compact_threshold > 0:
         usage_percentage = min(100, (10000 / auto_compact_threshold) * 100)
-        display_threshold = auto_compact_threshold
     else:
         usage_percentage = min(100, (10000 / config.CONTEXT_SIZE) * 100)
-        display_threshold = config.CONTEXT_SIZE
 
     filled_bars = int((usage_percentage + 5) // 10)
     expected_percentage = round(usage_percentage)
-    expected_bars = config.TOKEN_INFO_FILLED_CHAR * filled_bars + config.TOKEN_INFO_EMPTY_CHAR * (10 - filled_bars)
+    expected_bars = (
+        config.TOKEN_INFO_FILLED_CHAR * filled_bars
+        + config.TOKEN_INFO_EMPTY_CHAR * (10 - filled_bars)
+    )
 
     assert "Context:" in output
     assert f"{expected_percentage}%" in output

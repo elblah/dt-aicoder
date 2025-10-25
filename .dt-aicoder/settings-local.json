@@ -1,3 +1,6 @@
 {
-  "todo.enabled": false
+  "todo.enabled": false,
+  "ruff.format_enabled": false,
+  "ruff.enabled": true,
+  "ruff.serious_only": true
 }

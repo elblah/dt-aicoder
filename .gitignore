@@ -11,6 +11,7 @@ downloads/
 eggs/
 .eggs/
 .dt-aicoder/
+.dt-aicoder/*
 lib/
 lib64/
 parts/

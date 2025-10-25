@@ -8,13 +8,6 @@ from .. import config
 from ..utils import format_tool_prompt, make_readline_safe, wmsg, imsg, emsg
 from ..readline_history_manager import prompt_history_manager
 
-# Import readline to enable readline functionality
-try:
-    import readline
-except ImportError:
-    # readline is not available on this platform
-    pass
-
 
 class ApprovalSystem:
     """Handles user approval for tool execution."""
@@ -25,7 +18,7 @@ class ApprovalSystem:
         self.tool_approvals_session = set()
         self.animator = animator
         # Get message_history from tool_registry
-        self.message_history = getattr(tool_registry, 'message_history', None)
+        self.message_history = getattr(tool_registry, "message_history", None)
         # Store diff-edit results
         self._diff_edit_result = None
 
@@ -82,9 +75,12 @@ class ApprovalSystem:
             # Notify plugins before approval prompt
             try:
                 from ..plugin_system.loader import notify_plugins_before_approval_prompt
+
                 # Access the main app instance through the stats object which should have reference
-                if hasattr(self.stats, '_app_instance'):
-                    notify_plugins_before_approval_prompt(self.stats._app_instance.loaded_plugins)
+                if hasattr(self.stats, "_app_instance"):
+                    notify_plugins_before_approval_prompt(
+                        self.stats._app_instance.loaded_plugins
+                    )
             except Exception as e:
                 # Don't let plugin notification errors break the approval process
                 if config.DEBUG:
@@ -96,7 +92,7 @@ class ApprovalSystem:
             # Show prompt with error handling
             try:
                 wmsg(f"\n{prompt_message}")
-                
+
                 # Show file path for file operations
                 if tool_name in ["edit_file", "write_file"] and "path" in arguments:
                     file_path = arguments["path"]
@@ -110,28 +106,27 @@ class ApprovalSystem:
                 try:
                     # Switch to tool approval mode for proper history
                     prompt_history_manager.setup_tool_approval_mode()
-                    
+
                     # Check if this is a file operation that supports external diff
                     has_diff_option = tool_name in ["edit_file", "write_file"]
-                    
+
                     approval_prompt = f"{config.RED}a) Allow once  s) Allow for session  d) Deny  c) Cancel all  YOLO) YOLO  help) Show help\nChoose (a/s/d/c/YOLO/help): {config.RESET}"
                     safe_approval_prompt = make_readline_safe(approval_prompt)
-                    
+
                     # Enter prompt mode to ensure echo and canonical mode
                     from ..terminal_manager import enter_prompt_mode, exit_prompt_mode
+
                     enter_prompt_mode()
-                    
+
                     try:
-                        raw_answer = (
-                            input(safe_approval_prompt)
-                            .lower()
-                            .strip()
-                        )
+                        raw_answer = input(safe_approval_prompt).lower().strip()
                     finally:
                         exit_prompt_mode()
-                    
+
                     # Extract just the letter before ")" (e.g., "a) Allow once" -> "a")
-                    answer = raw_answer.split(')')[0] if ')' in raw_answer else raw_answer
+                    answer = (
+                        raw_answer.split(")")[0] if ")" in raw_answer else raw_answer
+                    )
 
                     # Start cursor animation
                     self.animator.start_cursor_blinking()
@@ -162,6 +157,7 @@ class ApprovalSystem:
                         if has_diff_option:
                             # Ensure terminal is in prompt mode for external editor
                             from ..terminal_manager import enter_prompt_mode
+
                             enter_prompt_mode()
                             self._show_external_diff(tool_name, arguments)
                         else:
@@ -170,6 +166,7 @@ class ApprovalSystem:
                         if has_diff_option:
                             # Ensure terminal is in prompt mode for external editor
                             from ..terminal_manager import enter_prompt_mode
+
                             enter_prompt_mode()
                             result = self._show_interactive_diff(tool_name, arguments)
                             if result:  # User modified the diff
@@ -180,7 +177,7 @@ class ApprovalSystem:
                                     "message": f"File '{file_path}' was successfully modified by user during interactive diff editing. The user's changes have been applied directly.",
                                     "file_path": file_path,
                                     "status": "user_modified_via_diff_edit",
-                                    "ai_guidance": f"The user chose to edit '{file_path}' interactively. You should read the file again to see what changes were made."
+                                    "ai_guidance": f"The user chose to edit '{file_path}' interactively. You should read the file again to see what changes were made.",
                                 }
                                 # Store the success result for later retrieval
                                 self._diff_edit_result = success_result
@@ -193,9 +190,7 @@ class ApprovalSystem:
                         # Continue the loop to ask for input again
                         continue
                     else:
-                        wmsg(
-                            "Invalid choice. Please enter a, s, d, c, YOLO, or help."
-                        )
+                        wmsg("Invalid choice. Please enter a, s, d, c, YOLO, or help.")
                 except (EOFError, KeyboardInterrupt):
                     emsg("\nInput interrupted. Denying tool call.")
                     return (False, False)
@@ -251,7 +246,11 @@ class ApprovalSystem:
             return tool_name
 
     def format_tool_prompt(
-        self, tool_name: str, arguments: Dict[str, Any], tool_config: Dict[str, Any], raw_arguments: str = None
+        self,
+        tool_name: str,
+        arguments: Dict[str, Any],
+        tool_config: Dict[str, Any],
+        raw_arguments: str = None,
     ) -> str:
         """Format a user-friendly prompt for tool approval."""
         # Pre-validation for tools that have a validation function
@@ -267,49 +266,67 @@ class ApprovalSystem:
         elif tool_name == "edit_file" and "path" in arguments:
             path = arguments["path"]
 
-        return format_tool_prompt(tool_name, arguments, tool_config, path, raw_arguments)
+        return format_tool_prompt(
+            tool_name, arguments, tool_config, path, raw_arguments
+        )
 
     def _show_interactive_diff(self, tool_name: str, arguments: Dict[str, Any]) -> bool:
         """Show interactive diff editor and apply user modifications.
-        
+
         Returns:
             bool: True if user modified the file, False otherwise
         """
         import os
         import subprocess
         import tempfile
-        
+
         # Get file path
         file_path = arguments.get("path", "")
         if not file_path or not os.path.exists(file_path):
             wmsg("Cannot show diff: file not found or path not available")
             return False
-        
+
         # Determine diff tool
         diff_tool = os.environ.get("AICODER_DIFF_TOOL_BIN")
         if not diff_tool:
             # Check for common diff tools in order of preference (vimdiff first!)
             for tool in ["vimdiff", "nvim -d", "meld", "kdiff3", "diffuse", "code"]:
-                if tool.split()[0] == "vimdiff" and subprocess.run(["which", "vim"], capture_output=True).returncode == 0:
+                if (
+                    tool.split()[0] == "vimdiff"
+                    and subprocess.run(["which", "vim"], capture_output=True).returncode
+                    == 0
+                ):
                     diff_tool = "vimdiff"
                     break
-                elif tool.split()[0] == "nvim" and subprocess.run(["which", "nvim"], capture_output=True).returncode == 0:
+                elif (
+                    tool.split()[0] == "nvim"
+                    and subprocess.run(
+                        ["which", "nvim"], capture_output=True
+                    ).returncode
+                    == 0
+                ):
                     diff_tool = "nvim -d"
                     break
-                elif subprocess.run(["which", tool], capture_output=True).returncode == 0:
+                elif (
+                    subprocess.run(["which", tool], capture_output=True).returncode == 0
+                ):
                     diff_tool = tool
                     break
-        
+
         if not diff_tool:
             wmsg("No diff tool found. Install vimdiff or set AICODER_DIFF_TOOL_BIN")
             return False
-        
+
         # Create temporary file with the new content
         try:
-            with tempfile.NamedTemporaryFile(mode='w', suffix=os.path.basename(file_path), 
-                                           dir=os.getcwd(), delete=False) as tmp_file:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                suffix=os.path.basename(file_path),
+                dir=os.getcwd(),
+                delete=False,
+            ) as tmp_file:
                 tmp_path = tmp_file.name
-                
+
                 # Write new content based on tool type
                 if tool_name == "write_file":
                     new_content = arguments.get("content", "")
@@ -317,28 +334,30 @@ class ApprovalSystem:
                     # For edit_file, we need to simulate the edit to get the new content
                     old_content = ""
                     if os.path.exists(file_path):
-                        with open(file_path, 'r', encoding='utf-8') as f:
+                        with open(file_path, "r", encoding="utf-8") as f:
                             old_content = f.read()
-                    
+
                     old_string = arguments.get("old_string", "")
                     new_string = arguments.get("new_string", "")
                     if old_string in old_content:
                         new_content = old_content.replace(old_string, new_string, 1)
                     else:
                         new_content = old_content  # Fallback if no match
-                
+
                 tmp_file.write(new_content)
-            
+
             # Store original temp content for comparison
-            with open(tmp_path, 'r', encoding='utf-8') as f:
+            with open(tmp_path, "r", encoding="utf-8") as f:
                 original_temp_content = f.read()
-            
+
             # Run diff tool
-            print(f"\n{config.CYAN}📝 Opening {diff_tool} for interactive diff editing...{config.RESET}")
+            print(
+                f"\n{config.CYAN}📝 Opening {diff_tool} for interactive diff editing...{config.RESET}"
+            )
             wmsg(f"Original: {file_path}")
             wmsg(f"Temp file: {tmp_path}")
             imsg("💡 Edit the temp file as needed, then save and exit")
-            
+
             if diff_tool == "vimdiff":
                 subprocess.run([diff_tool, file_path, tmp_path])
             elif diff_tool == "nvim -d":
@@ -347,24 +366,26 @@ class ApprovalSystem:
                 subprocess.run([diff_tool, "--diff", file_path, tmp_path])
             else:
                 subprocess.run([diff_tool, file_path, tmp_path])
-            
+
             # Check if user modified the temp file
-            with open(tmp_path, 'r', encoding='utf-8') as f:
+            with open(tmp_path, "r", encoding="utf-8") as f:
                 modified_temp_content = f.read()
-            
+
             if modified_temp_content != original_temp_content:
                 # User modified the file!
                 imsg("\n✨ User modifications detected!")
-                
+
                 # Apply user changes to original file
-                with open(file_path, 'w', encoding='utf-8') as f:
+                with open(file_path, "w", encoding="utf-8") as f:
                     f.write(modified_temp_content)
-                
+
                 imsg(f"✅ Applied user modifications to {file_path}")
-                
+
                 # Notify user
-                print(f"{config.CYAN}🎯 Your changes have been applied successfully!{config.RESET}")
-                
+                print(
+                    f"{config.CYAN}🎯 Your changes have been applied successfully!{config.RESET}"
+                )
+
                 # Store notification to be added after tool result
                 notification = (
                     f"USER MODIFICATION: {file_path} was edited by user during interactive diff editing. "
@@ -373,16 +394,16 @@ class ApprovalSystem:
                 )
 
                 # Store the notification in a separate attribute since _diff_edit_result might be reset
-                if not hasattr(self, '_diff_edit_notification'):
+                if not hasattr(self, "_diff_edit_notification"):
                     self._diff_edit_notification = notification
                 else:
                     self._diff_edit_notification = notification
-                
+
                 return True
             else:
                 print(f"\n{config.BLUE}ℹ️  No modifications detected{config.RESET}")
                 return False
-            
+
         except Exception as e:
             emsg(f"Error running interactive diff: {e}")
             return False
@@ -396,38 +417,54 @@ class ApprovalSystem:
         import os
         import subprocess
         import tempfile
-        
+
         # Get file path
         file_path = arguments.get("path", "")
         if not file_path or not os.path.exists(file_path):
             wmsg("Cannot show diff: file not found or path not available")
             return
-        
+
         # Determine diff tool
         diff_tool = os.environ.get("AICODER_DIFF_TOOL_BIN")
         if not diff_tool:
             # Check for common diff tools in order of preference (vimdiff first!)
             for tool in ["vimdiff", "nvim -d", "meld", "kdiff3", "diffuse", "code"]:
-                if tool.split()[0] == "vimdiff" and subprocess.run(["which", "vim"], capture_output=True).returncode == 0:
+                if (
+                    tool.split()[0] == "vimdiff"
+                    and subprocess.run(["which", "vim"], capture_output=True).returncode
+                    == 0
+                ):
                     diff_tool = "vimdiff"
                     break
-                elif tool.split()[0] == "nvim" and subprocess.run(["which", "nvim"], capture_output=True).returncode == 0:
+                elif (
+                    tool.split()[0] == "nvim"
+                    and subprocess.run(
+                        ["which", "nvim"], capture_output=True
+                    ).returncode
+                    == 0
+                ):
                     diff_tool = "nvim -d"
                     break
-                elif subprocess.run(["which", tool], capture_output=True).returncode == 0:
+                elif (
+                    subprocess.run(["which", tool], capture_output=True).returncode == 0
+                ):
                     diff_tool = tool
                     break
-        
+
         if not diff_tool:
             wmsg("No diff tool found. Install meld or set AICODER_DIFF_TOOL_BIN")
             return
-        
+
         # Create temporary file with the new content
         try:
-            with tempfile.NamedTemporaryFile(mode='w', suffix=os.path.basename(file_path), 
-                                           dir=os.getcwd(), delete=False) as tmp_file:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                suffix=os.path.basename(file_path),
+                dir=os.getcwd(),
+                delete=False,
+            ) as tmp_file:
                 tmp_path = tmp_file.name
-                
+
                 # Write new content based on tool type
                 if tool_name == "write_file":
                     new_content = arguments.get("content", "")
@@ -435,32 +472,32 @@ class ApprovalSystem:
                     # For edit_file, we need to simulate the edit to get the new content
                     old_content = ""
                     if os.path.exists(file_path):
-                        with open(file_path, 'r', encoding='utf-8') as f:
+                        with open(file_path, "r", encoding="utf-8") as f:
                             old_content = f.read()
-                    
+
                     old_string = arguments.get("old_string", "")
                     new_string = arguments.get("new_string", "")
                     if old_string in old_content:
                         new_content = old_content.replace(old_string, new_string, 1)
                     else:
                         new_content = old_content  # Fallback if no match
-                
+
                 tmp_file.write(new_content)
-            
+
             # Run diff tool
             print(f"\n{config.CYAN}Opening {diff_tool} to show diff...{config.RESET}")
             wmsg(f"Original: {file_path}")
             wmsg(f"Modified: {tmp_path}")
-            
+
             if diff_tool == "meld":
                 subprocess.run([diff_tool, file_path, tmp_path])
             elif diff_tool == "code":
                 subprocess.run([diff_tool, "--diff", file_path, tmp_path])
             else:
                 subprocess.run([diff_tool, file_path, tmp_path])
-            
+
             imsg("\nDiff viewer closed")
-            
+
         except Exception as e:
             emsg(f"Error running diff tool: {e}")
         finally:
@@ -471,20 +508,17 @@ class ApprovalSystem:
     def _show_approval_help(self):
         """Display help information for approval options."""
         imsg("\nApproval Options:")
-        wmsg(
-            "a) Allow once - Execute this tool call just this one time"
-        )
+        wmsg("a) Allow once - Execute this tool call just this one time")
         wmsg(
             "s) Allow for session - Allow this type of tool call for the rest of this session"
         )
         wmsg("d) Deny - Reject this tool call")
-        wmsg(
-            "c) Cancel all - Cancel all pending tool calls and return to user input"
-        )
-        if any(tool_name in ["edit_file", "write_file"] for tool_name in ["edit_file", "write_file"]):
-            wmsg(
-                "diff) Show external diff - View diff of proposed changes"
-            )
+        wmsg("c) Cancel all - Cancel all pending tool calls and return to user input")
+        if any(
+            tool_name in ["edit_file", "write_file"]
+            for tool_name in ["edit_file", "write_file"]
+        ):
+            wmsg("diff) Show external diff - View diff of proposed changes")
             wmsg(
                 "diff-edit) Interactive diff edit - Edit proposed changes in diff tool"
             )

@@ -229,23 +229,25 @@ def format_cost_for_file(
     avg_cost_per_request = total_cost / requests if requests > 0 else 0
     avg_input_tokens = prompt_tokens / requests if requests > 0 else 0
     avg_output_tokens = completion_tokens / requests if requests > 0 else 0
-    
+
     # Calculate session duration
     session_duration = ""
     if session_start:
         duration = datetime.now() - session_start
         session_duration = str(timedelta(seconds=int(duration.total_seconds())))
-    
+
     # Calculate TPS (tokens per second) based on API call duration - using output tokens only
     tps = 0
     if api_time_spent > 0:
         tps = completion_tokens / api_time_spent
-    
-    return (f"[{model_name}] Total Costs: {input_cost:.6f} input / {output_cost:.6f} output = {total_cost:.6f} total "
-            f"({prompt_tokens} input tokens, {completion_tokens} output tokens, {requests} requests, "
-            f"avg: {avg_cost_per_request:.6f}/request, {avg_input_tokens:.0f} input tokens/request, {avg_output_tokens:.0f} output tokens/request"
-            f"{f', duration: {session_duration}' if session_duration else ''}"
-            f"{f', TPS: {tps:.1f}' if tps > 0 else ''})")
+
+    return (
+        f"[{model_name}] Total Costs: {input_cost:.6f} input / {output_cost:.6f} output = {total_cost:.6f} total "
+        f"({prompt_tokens} input tokens, {completion_tokens} output tokens, {requests} requests, "
+        f"avg: {avg_cost_per_request:.6f}/request, {avg_input_tokens:.0f} input tokens/request, {avg_output_tokens:.0f} output tokens/request"
+        f"{f', duration: {session_duration}' if session_duration else ''}"
+        f"{f', TPS: {tps:.1f}' if tps > 0 else ''})"
+    )
 
 
 def save_cost_data():
@@ -256,9 +258,11 @@ def save_cost_data():
     # Get stats instance
     if _stats_instance is None:
         _try_get_stats_instance()
-    
+
     # Only save if there were actual tokens processed (either input or output tokens > 0)
-    if _stats_instance is None or (_stats_instance.prompt_tokens <= 0 and _stats_instance.completion_tokens <= 0):
+    if _stats_instance is None or (
+        _stats_instance.prompt_tokens <= 0 and _stats_instance.completion_tokens <= 0
+    ):
         if os.environ.get("DEBUG", "0") == "1":
             print("ℹ️  No costs to save (no tokens processed)")
         return
@@ -273,7 +277,7 @@ def save_cost_data():
         # Format the total costs line with full precision for file storage
         model_name = get_model_name()
         session_start = datetime.fromtimestamp(_stats_instance.session_start_time)
-        api_time_spent = getattr(_stats_instance, 'api_time_spent', 0.0)
+        api_time_spent = getattr(_stats_instance, "api_time_spent", 0.0)
         total_cost_display = format_cost_for_file(
             _accumulated_costs["input_cost"],
             _accumulated_costs["output_cost"],
@@ -305,6 +309,7 @@ atexit.register(save_cost_data)
 
 # Store reference to stats instance
 _stats_instance = None
+
 
 def on_before_user_prompt():
     """Called before user prompt is displayed - show cost information."""
@@ -383,9 +388,7 @@ def on_before_user_prompt():
                 )  # Yellow color for visibility
             elif total_cost == 0:
                 # Model price not found
-                print(
-                    f"\n\033[93m💰 Model price not found for [{model_name}]\033[0m"
-                )
+                print(f"\n\033[93m💰 Model price not found for [{model_name}]\033[0m")
 
 
 def _try_get_stats_instance():
@@ -394,7 +397,7 @@ def _try_get_stats_instance():
 
     # Try to find stats instance in common places
     import gc
-    
+
     # Import stats class safely
     try:
         from aicoder.stats import Stats
@@ -402,6 +405,7 @@ def _try_get_stats_instance():
         # In plugin context, might need different import
         try:
             import aicoder.stats as stats_module
+
             Stats = stats_module.Stats
         except ImportError:
             # Can't find stats class, skip

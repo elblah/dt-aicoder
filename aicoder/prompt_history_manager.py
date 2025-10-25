@@ -26,13 +26,14 @@ class PromptHistoryManager:
         # Import config here to avoid circular imports
         try:
             from . import config
+
             if max_history is None:
-                max_history = getattr(config, 'PROMPT_HISTORY_MAX_SIZE', 100)
-            self.enabled = getattr(config, 'PROMPT_HISTORY_ENABLED', True)
+                max_history = getattr(config, "PROMPT_HISTORY_MAX_SIZE", 100)
+            self.enabled = getattr(config, "PROMPT_HISTORY_ENABLED", True)
         except ImportError:
             max_history = max_history or 100
             self.enabled = True
-            
+
         self.project_dir = Path(project_dir) if project_dir else Path.cwd()
         self.history_file = self.project_dir / ".dt-aicoder" / "history"
         self.max_history = max_history
@@ -57,14 +58,14 @@ class PromptHistoryManager:
 
         try:
             # First, try to read the entire file to detect format
-            with open(self.history_file, 'r', encoding='utf-8') as f:
+            with open(self.history_file, "r", encoding="utf-8") as f:
                 content = f.read().strip()
-            
+
             if not content:
                 return []
-            
+
             # Check if it's an old format JSON array (starts with [)
-            if content.startswith('['):
+            if content.startswith("["):
                 try:
                     # Old format - parse as JSON array
                     data = json.loads(content)
@@ -72,23 +73,27 @@ class PromptHistoryManager:
                         prompts = data
                         # Migrate to new format
                         self._save_history(prompts)
-                        return prompts[-self.max_history:] if len(prompts) > self.max_history else prompts
+                        return (
+                            prompts[-self.max_history :]
+                            if len(prompts) > self.max_history
+                            else prompts
+                        )
                 except json.JSONDecodeError:
                     pass  # Fall through to line-by-line parsing
-            
+
             # New JSONL format - parse line by line
             prompts = []
-            lines = content.split('\n')
+            lines = content.split("\n")
             for line_num, line in enumerate(lines, 1):
                 line = line.strip()
                 if not line:
                     continue
-                
+
                 try:
                     # Parse each line as JSON
                     data = json.loads(line)
-                    if isinstance(data, dict) and 'prompt' in data:
-                        prompts.append(data['prompt'])
+                    if isinstance(data, dict) and "prompt" in data:
+                        prompts.append(data["prompt"])
                     elif isinstance(data, str):
                         # Handle migration from old format or simple string lines
                         prompts.append(data)
@@ -97,10 +102,14 @@ class PromptHistoryManager:
                 except json.JSONDecodeError:
                     # Handle non-JSON lines (migration from old format)
                     prompts.append(line)
-            
+
             # Return only the most recent prompts (up to max_history)
-            return prompts[-self.max_history:] if len(prompts) > self.max_history else prompts
-                
+            return (
+                prompts[-self.max_history :]
+                if len(prompts) > self.max_history
+                else prompts
+            )
+
         except (IOError, OSError) as e:
             emsg(f"Warning: Could not load prompt history: {e}")
             return []
@@ -115,39 +124,41 @@ class PromptHistoryManager:
         Returns:
             True if successful, False otherwise.
         """
-        if not self.enabled or not prompt.strip():  # Don't save empty prompts or if disabled
+        if (
+            not self.enabled or not prompt.strip()
+        ):  # Don't save empty prompts or if disabled
             return True
 
         try:
             self._ensure_history_dir()
-            
+
             # Check if this is a duplicate of the last prompt
             last_prompt = self._get_last_prompt()
             if last_prompt == prompt:
                 return True  # Duplicate, but that's fine
-            
+
             # Append prompt as a single JSON line (efficient append-only operation)
             history_entry = {
-                'prompt': prompt,
-                'timestamp': str(Path().resolve()),  # Current directory as context
-                'ts': __import__('time').time()  # Unix timestamp for ordering
+                "prompt": prompt,
+                "timestamp": str(Path().resolve()),  # Current directory as context
+                "ts": __import__("time").time(),  # Unix timestamp for ordering
             }
-            
-            with open(self.history_file, 'a', encoding='utf-8') as f:
-                f.write(json.dumps(history_entry) + '\n')
-            
+
+            with open(self.history_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps(history_entry) + "\n")
+
             # Periodically clean up old entries to prevent file from growing indefinitely
             # Clean up every 50 saves to balance performance and file size
-            if hasattr(self, '_save_count'):
+            if hasattr(self, "_save_count"):
                 self._save_count += 1
             else:
                 self._save_count = 1
-                
+
             if self._save_count % 50 == 0:
                 self._cleanup_old_entries()
-            
+
             return True
-            
+
         except Exception as e:
             emsg(f"Error saving prompt to history: {e}")
             return False
@@ -155,33 +166,35 @@ class PromptHistoryManager:
     def _get_last_prompt(self) -> Optional[str]:
         """
         Get the last prompt from history without loading the entire file.
-        
+
         Returns:
             The last prompt string, or None if no history exists.
         """
         if not self.history_file.exists():
             return None
-        
+
         try:
-            with open(self.history_file, 'rb') as f:
+            with open(self.history_file, "rb") as f:
                 # Seek to end of file and read backwards to find last line
                 f.seek(0, 2)  # Go to end
                 file_size = f.tell()
-                
+
                 if file_size == 0:
                     return None
-                
+
                 # Read last line efficiently
                 f.seek(max(0, file_size - 4096))  # Read last 4KB max
-                lines = f.read().decode('utf-8').splitlines()
+                lines = f.read().decode("utf-8").splitlines()
                 if lines:
                     last_line = lines[-1]
                     try:
                         data = json.loads(last_line)
-                        return data.get('prompt') if isinstance(data, dict) else last_line
+                        return (
+                            data.get("prompt") if isinstance(data, dict) else last_line
+                        )
                     except json.JSONDecodeError:
                         return last_line
-                
+
             return None
         except Exception:
             return None
@@ -189,27 +202,27 @@ class PromptHistoryManager:
     def _save_history(self, prompts: List[str]) -> bool:
         """
         Save prompts to history file in JSONL format.
-        
+
         Args:
             prompts: List of prompts to save.
-            
+
         Returns:
             True if successful, False otherwise.
         """
         try:
             self._ensure_history_dir()
-            
-            with open(self.history_file, 'w', encoding='utf-8') as f:
+
+            with open(self.history_file, "w", encoding="utf-8") as f:
                 for prompt in prompts:
                     history_entry = {
-                        'prompt': prompt,
-                        'timestamp': str(Path().resolve()),
-                        'ts': __import__('time').time()
+                        "prompt": prompt,
+                        "timestamp": str(Path().resolve()),
+                        "ts": __import__("time").time(),
                     }
-                    f.write(json.dumps(history_entry) + '\n')
-            
+                    f.write(json.dumps(history_entry) + "\n")
+
             return True
-            
+
         except (IOError, OSError) as e:
             emsg(f"Error saving history file: {e}")
             return False
@@ -218,7 +231,7 @@ class PromptHistoryManager:
         """
         Clean up old history entries to keep file size manageable.
         This rewrites the file with only the most recent max_history entries.
-        
+
         Returns:
             True if successful, False otherwise.
         """
@@ -226,22 +239,22 @@ class PromptHistoryManager:
             prompts = self.load_history()
             if len(prompts) <= self.max_history:
                 return True  # No cleanup needed
-            
+
             # Keep only the most recent prompts
-            recent_prompts = prompts[-self.max_history:]
-            
+            recent_prompts = prompts[-self.max_history :]
+
             # Rewrite file with only recent prompts
-            with open(self.history_file, 'w', encoding='utf-8') as f:
+            with open(self.history_file, "w", encoding="utf-8") as f:
                 for prompt in recent_prompts:
                     history_entry = {
-                        'prompt': prompt,
-                        'timestamp': str(Path().resolve()),
-                        'ts': __import__('time').time()
+                        "prompt": prompt,
+                        "timestamp": str(Path().resolve()),
+                        "ts": __import__("time").time(),
                     }
-                    f.write(json.dumps(history_entry) + '\n')
-            
+                    f.write(json.dumps(history_entry) + "\n")
+
             return True
-            
+
         except Exception as e:
             emsg(f"Error cleaning up history file: {e}")
             return False
@@ -257,8 +270,8 @@ class PromptHistoryManager:
             if self.history_file.exists():
                 self.history_file.unlink()
                 # Reset save count
-                if hasattr(self, '_save_count'):
-                    delattr(self, '_save_count')
+                if hasattr(self, "_save_count"):
+                    delattr(self, "_save_count")
             return True
         except OSError as e:
             emsg(f"Error clearing history file: {e}")
@@ -278,14 +291,14 @@ class PromptHistoryManager:
                 file_size = self.history_file.stat().st_size
             except OSError:
                 pass
-        
+
         return {
-            'total_prompts': len(prompts),
-            'max_history': self.max_history,
-            'history_file': str(self.history_file),
-            'file_exists': self.history_file.exists(),
-            'file_size_bytes': file_size,
-            'format': 'JSONL (one JSON object per line)'
+            "total_prompts": len(prompts),
+            "max_history": self.max_history,
+            "history_file": str(self.history_file),
+            "file_exists": self.history_file.exists(),
+            "file_size_bytes": file_size,
+            "format": "JSONL (one JSON object per line)",
         }
 
 

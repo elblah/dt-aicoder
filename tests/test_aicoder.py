@@ -13,20 +13,23 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 # Import config first and set YOLO_MODE directly
-import aicoder.config as config
+import aicoder.config as config  # noqa: E402
+
 config.YOLO_MODE = True
 
-from aicoder.app import AICoder
-from aicoder.tool_manager.manager import MCPToolManager
+from aicoder.app import AICoder  # noqa: E402
+from aicoder.tool_manager.manager import MCPToolManager  # noqa: E402
 
 
 def test_application_run_loop_with_tool_call():
     """Test the main application run loop with a tool call."""
     app = AICoder()
-    
-    with patch("aicoder.app.AICoder._get_multiline_input") as mock_get_multiline_input, \
-         patch("aicoder.app.AICoder._make_api_request") as mock_make_api_request:
-        
+
+    with patch(
+        "aicoder.app.AICoder._get_multiline_input"
+    ) as mock_get_multiline_input, patch(
+        "aicoder.app.AICoder._make_api_request"
+    ) as mock_make_api_request:
         # Mock user input and API response
         mock_get_multiline_input.side_effect = ["use the shell to echo hello", "/quit"]
         mock_make_api_request.side_effect = [
@@ -75,7 +78,7 @@ def test_tool_execution_with_approval():
     config.YOLO_MODE = True
     stats = MagicMock()
     tool_manager = MCPToolManager(stats)
-    
+
     # Mock a tool call
     tool_call = {
         "id": "call_123",

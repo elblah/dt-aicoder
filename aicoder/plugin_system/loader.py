@@ -25,11 +25,11 @@ def load_plugins(plugin_dir=None):
     # Skip plugin loading if disabled
     if os.environ.get("AICODER_DISABLE_PLUGINS"):
         return []
-    
+
     if plugin_dir is None:
         # Check for environment variable to override plugin directory
         plugin_dir = os.environ.get("AICODER_PLUGIN_DIR")
-        
+
         if plugin_dir is None:
             config_home = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser(
                 "~/.config"
@@ -49,10 +49,11 @@ def load_plugins(plugin_dir=None):
     plugin_files = [
         f for f in os.listdir(plugin_dir) if f.endswith(".py") and not f.startswith("_")
     ]
+
     # Sort: numbered first (ascending numerical), then non-numbered (alphabetical)
     def sort_key(f):
         stem = Path(f).stem
-        match = re.match(r'^(\d+)', stem)
+        match = re.match(r"^(\d+)", stem)
         if match:
             return (0, int(match.group(1)))  # Priority 0, numerical sort
         else:
