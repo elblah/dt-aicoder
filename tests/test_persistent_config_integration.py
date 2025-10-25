@@ -41,7 +41,7 @@ class TestPersistentConfigIntegration(unittest.TestCase):
         self.assertIsInstance(app.persistent_config, PersistentConfig)
 
         # Check that config file was created
-        config_file = Path(".dt-aicoder/settings-local.json")
+        config_file = Path(".aicoder/settings-local.json")
         self.assertTrue(config_file.exists())
 
     def test_settings_command_available(self):

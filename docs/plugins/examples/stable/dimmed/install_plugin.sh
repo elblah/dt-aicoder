@@ -80,7 +80,7 @@ fi
 
 # Create example config
 print_status "Creating example configuration..."
-EXAMPLE_CONFIG_DIR="$(pwd)/.dt-aicoder"
+EXAMPLE_CONFIG_DIR="$(pwd)/.aicoder"
 mkdir -p "$EXAMPLE_CONFIG_DIR"
 
 cat > "$EXAMPLE_CONFIG_DIR/dimmed.conf" << 'EOF'
@@ -119,10 +119,10 @@ echo ""
 echo "📖 Usage:"
 echo "   1. Restart AI Coder"
 echo "   2. Use /dimmed command to configure patterns"
-echo "   3. Copy .dt-aicoder/dimmed.conf to your projects as needed"
+echo "   3. Copy .aicoder/dimmed.conf to your projects as needed"
 echo ""
 echo "🔧 Configuration options:"
-echo "   - Project config: .dt-aicoder/dimmed.conf"
+echo "   - Project config: .aicoder/dimmed.conf"
 echo "   - Global config: ~/.config/aicoder/dimmed.conf"
 echo "   - Environment: AICODER_DIMMED_PATTERNS='pattern1,pattern2'"
 echo ""

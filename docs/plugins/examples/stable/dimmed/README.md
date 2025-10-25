@@ -43,14 +43,14 @@ The plugin affects **standard Python `print()` calls** in AI Coder, including:
 
 The plugin loads patterns in this priority order:
 
-1. **Project-local config** (`.dt-aicoder/dimmed.conf`) - Highest priority
+1. **Project-local config** (`.aicoder/dimmed.conf`) - Highest priority
 2. **Global config** (`~/.config/aicoder/dimmed.conf`) - Fallback
 3. **Environment variables** (`AICODER_DIMMED_PATTERNS`) - Final fallback
 4. **Default pattern** (`r'\[.*?\]'`) - Ultimate fallback
 
 ### Config File Format
 
-Create `.dt-aicoder/dimmed.conf` in your project:
+Create `.aicoder/dimmed.conf` in your project:
 
 ```
 # Dimmed Plugin Configuration
@@ -92,7 +92,7 @@ Use `/dimmed` command in AI Coder:
 /dimmed add <pattern>      # Add a new pattern (temporary)
 /dimmed remove <pattern>   # Remove a pattern (temporary)
 /dimmed clear              # Clear all patterns (temporary)
-/dimmed save               # Save to project config (.dt-aicoder/dimmed.conf)
+/dimmed save               # Save to project config (.aicoder/dimmed.conf)
 /dimmed save global        # Save to global config (~/.config/aicoder/dimmed.conf)
 /dimmed reload             # Reload from config files
 /dimmed on                 # Enable dimmed output
@@ -178,7 +178,7 @@ print("Normal output")                    # Normal
 
 ### Project-Specific Configuration
 
-Create `.dt-aicoder/dimmed.conf` in your project:
+Create `.aicoder/dimmed.conf` in your project:
 
 ```
 # Python-specific patterns

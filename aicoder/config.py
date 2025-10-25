@@ -232,6 +232,40 @@ AUTO_COMPACT_ENABLED = AUTO_COMPACT_THRESHOLD > 0
 # Truncation settings
 DEFAULT_TRUNCATION_LIMIT = int(os.environ.get("DEFAULT_TRUNCATION_LIMIT", "300"))
 
+
+# Global reference to app instance for config access
+_app_instance = None
+
+
+def set_app_instance(app):
+    """Set the global app instance for config access."""
+    global _app_instance
+    _app_instance = app
+
+
+def get_effective_truncation_limit():
+    """Get the effective truncation limit, checking persistent config first, then env var."""
+    # Try to get from persistent config if available
+    global _app_instance
+    if (
+        _app_instance
+        and hasattr(_app_instance, "persistent_config")
+        and "truncation" in _app_instance.persistent_config
+    ):
+        truncation_value = _app_instance.persistent_config["truncation"]
+        # Ensure it's an integer
+        if isinstance(truncation_value, str):
+            try:
+                return int(truncation_value)
+            except ValueError:
+                pass  # Fall back to default
+        elif isinstance(truncation_value, (int, float)):
+            return int(truncation_value)
+
+    # Fall back to environment variable
+    return DEFAULT_TRUNCATION_LIMIT
+
+
 # Tool result size limits
 MAX_TOOL_RESULT_SIZE = int(
     os.environ.get("MAX_TOOL_RESULT_SIZE", "300000")

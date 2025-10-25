@@ -17,7 +17,7 @@ class TestPersistentConfig(unittest.TestCase):
     def setUp(self):
         """Set up test environment."""
         self.test_dir = tempfile.mkdtemp()
-        self.config_file = Path(self.test_dir) / ".dt-aicoder" / "settings-local.json"
+        self.config_file = Path(self.test_dir) / ".aicoder" / "settings-local.json"
 
     def tearDown(self):
         """Clean up test environment."""
@@ -147,7 +147,7 @@ class TestPersistentConfig(unittest.TestCase):
             config = PersistentConfig()
 
             # Should create in current directory
-            expected_file = Path.cwd() / ".dt-aicoder" / "settings-local.json"
+            expected_file = Path.cwd() / ".aicoder" / "settings-local.json"
             self.assertEqual(str(config.config_file), str(expected_file))
 
         finally:

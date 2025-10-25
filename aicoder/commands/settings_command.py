@@ -27,6 +27,9 @@ class SettingsCommand(BaseCommand):
             else:
                 # Show specific setting
                 self._show_setting(args[0])
+        elif len(args) == 2 and args[0] == "delete":
+            # Delete setting: /settings delete <key>
+            self._delete_setting(args[1])
         elif len(args) >= 2:
             # Set setting: /settings key value [more values...]
             key = args[0]
@@ -73,6 +76,17 @@ class SettingsCommand(BaseCommand):
         else:
             imsg(f"Set {key}: {parsed_value}")
 
+    def _delete_setting(self, key):
+        """Delete a setting."""
+        config = self.app.persistent_config
+
+        if key in config:
+            old_value = config[key]
+            del config[key]
+            imsg(f"Deleted setting: {key} (was: {old_value})")
+        else:
+            emsg(f"Setting '{key}' not found.")
+
     def _parse_value(self, value):
         """Parse string value to appropriate Python type."""
         # Handle boolean values
@@ -100,13 +114,16 @@ class SettingsCommand(BaseCommand):
         imsg("  /settings show               - Show all settings")
         imsg("  /settings <key>              - Show specific setting")
         imsg("  /settings <key> <value>      - Set a setting")
+        imsg("  /settings delete <key>       - Delete a setting")
         imsg("")
         imsg("Examples:")
         imsg("  /settings todo.enabled true")
         imsg("  /settings todo.enabled false")
         imsg("  /settings ui.theme dark")
+        imsg("  /settings delete todo.enabled")
         imsg("")
         imsg("Common settings:")
         imsg("  todo.enabled - Enable/disable todo functionality")
         imsg("  ui.theme - UI theme name")
         imsg("  tools.auto_approve - Auto-approve tool execution")
+        imsg("  truncation - Override truncation limit for tool outputs")

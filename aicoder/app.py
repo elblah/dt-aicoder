@@ -90,6 +90,11 @@ class AICoder(
         # Initialize persistent config before plugins
         self.persistent_config = PersistentConfig()
 
+        # Set this app instance as global for config access
+        from . import config
+
+        config.set_app_instance(self)
+
         # Load plugins first, before anything else
         self.loaded_plugins = load_plugins()
         loaded_plugins = self.loaded_plugins
@@ -393,7 +398,12 @@ class AICoder(
                             continue
 
                     if not run_api_call:
-                        self.message_history.add_user_message(user_input)
+                        # Check if the user input contains image references
+                        from .image_utils import create_user_message
+
+                        # Create appropriate user message (text-only or multimodal) based on image references
+                        user_message = create_user_message(user_input)
+                        self.message_history.messages.append(user_message)
 
                     # Exit prompt mode before making API call or continuing
                     from .terminal_manager import exit_prompt_mode

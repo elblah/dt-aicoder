@@ -312,9 +312,9 @@ def format_tool_prompt(
                 elif (
                     truncated_chars == 0
                     and isinstance(value, str)
-                    and len(value) > config.DEFAULT_TRUNCATION_LIMIT
+                    and len(value) > config.get_effective_truncation_limit()
                 ):
-                    value = value[: config.DEFAULT_TRUNCATION_LIMIT] + "... [truncated]"
+                    value = value[: config.get_effective_truncation_limit()] + "... [truncated]"
 
                 prompt_lines.append(f"    {key}: {value}")
 

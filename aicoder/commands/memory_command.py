@@ -24,9 +24,9 @@ class MemoryCommand(BaseCommand):
         if not args:
             # Default behavior: open editor
             return self._open_editor()
-        
+
         subcommand = args[0].lower()
-        
+
         if subcommand in ["estimate", "est", "tokens"]:
             return self._estimate_tokens()
         elif subcommand in ["help", "-h", "--help"]:
@@ -36,7 +36,7 @@ class MemoryCommand(BaseCommand):
         else:
             wmsg(f"*** Unknown subcommand: {subcommand}")
             self._show_help()
-        
+
         return False, False
 
     def _estimate_tokens(self) -> Tuple[bool, bool]:
@@ -44,24 +44,25 @@ class MemoryCommand(BaseCommand):
         try:
             messages = self.app.message_history.messages
             estimated_tokens = estimate_messages_tokens(messages)
-            
-            imsg(f"\n>>> Session token estimation:")
+
+            imsg("\n>>> Session token estimation:")
             imsg(f"    Messages: {len(messages)}")
             imsg(f"    Estimated tokens: ~{estimated_tokens}")
-            
+
             # Additional breakdown if helpful
             if messages:
                 total_chars = sum(len(msg.get("content", "")) for msg in messages)
                 avg_chars = total_chars / len(messages) if messages else 0
                 imsg(f"    Total characters: {total_chars}")
                 imsg(f"    Average chars per message: {avg_chars:.1f}")
-            
+
         except Exception as e:
             emsg(f"*** Error estimating tokens: {e}")
             if config.DEBUG:
                 import traceback
+
                 traceback.print_exc()
-        
+
         return False, False
 
     def _open_editor(self) -> Tuple[bool, bool]:

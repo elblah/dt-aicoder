@@ -156,11 +156,54 @@ class TestSettingsCommand(unittest.TestCase):
         new_config = PersistentConfig(self.test_dir)
         self.assertEqual(new_config["persistent.test"], "value123")
 
+    def test_delete_setting_exists(self):
+        """Test deleting a setting that exists."""
+        # Set a value first
+        self.persistent_config["test.key"] = "value123"
+        self.assertEqual(self.persistent_config["test.key"], "value123")
+
+        # Delete it
+        self.command.execute(["delete", "test.key"])
+        self.assertNotIn("test.key", self.persistent_config)
+        output = self.get_output()
+        self.assertIn("Deleted setting: test.key (was: value123)", output)
+
+    def test_delete_setting_not_exists(self):
+        """Test deleting a setting that doesn't exist."""
+        self.command.execute(["delete", "nonexistent.key"])
+        output = self.get_output()
+        self.assertIn("Setting 'nonexistent.key' not found.", output)
+
+    def test_delete_return_values(self):
+        """Test that delete command returns correct values."""
+        # Set a value first
+        self.persistent_config["test.key"] = "value123"
+
+        should_quit, run_api_call = self.command.execute(["delete", "test.key"])
+        self.assertFalse(should_quit)
+        self.assertFalse(run_api_call)
+
     def test_return_values(self):
         """Test that execute returns correct values."""
         should_quit, run_api_call = self.command.execute(["test.key", "value"])
         self.assertFalse(should_quit)
         self.assertFalse(run_api_call)
+
+    def test_truncation_setting_persistence(self):
+        """Test that truncation setting persists and can be retrieved."""
+        # Set truncation value
+        self.command.execute(["truncation", "500"])
+        self.assertEqual(self.persistent_config["truncation"], 500)
+
+        # Create new config instance to test persistence
+        new_config = PersistentConfig(self.test_dir)
+        self.assertEqual(new_config["truncation"], 500)
+
+    def test_truncation_setting_string_conversion(self):
+        """Test that truncation setting converts string to int."""
+        self.command.execute(["truncation", "1000"])
+        self.assertEqual(self.persistent_config["truncation"], 1000)
+        self.assertIsInstance(self.persistent_config["truncation"], int)
 
 
 if __name__ == "__main__":

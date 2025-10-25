@@ -10,8 +10,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-.dt-aicoder/
-.dt-aicoder/*
+.aicoder/
+.aicoder/*
 lib/
 lib64/
 parts/

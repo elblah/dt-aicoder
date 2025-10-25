@@ -346,7 +346,7 @@ def initialize_dimmed_plugin():
     _original_print = __builtins__.get("print", print)
 
     # Set up config paths
-    _project_config_path = Path.cwd() / ".dt-aicoder" / "dimmed.conf"
+    _project_config_path = Path.cwd() / ".aicoder" / "dimmed.conf"
     config_home = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
     _global_config_path = Path(config_home) / "aicoder" / "dimmed.conf"
 

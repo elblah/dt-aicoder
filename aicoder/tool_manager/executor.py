@@ -315,10 +315,10 @@ class ToolExecutor:
                     if (
                         key not in hidden_parameters
                         and isinstance(value, str)
-                        and len(value) > config.DEFAULT_TRUNCATION_LIMIT
+                        and len(value) > config.get_effective_truncation_limit()
                     ):
                         display_args[key] = (
-                            value[: config.DEFAULT_TRUNCATION_LIMIT] + "... [truncated]"
+                            value[: config.get_effective_truncation_limit()] + "... [truncated]"
                         )
 
             # Check if arguments should be hidden completely
@@ -376,11 +376,11 @@ class ToolExecutor:
                     result_display = str(result)
                     # Don't truncate if guidance is enabled - user needs full output for context
                     if (
-                        len(result_display) > config.DEFAULT_TRUNCATION_LIMIT
+                        len(result_display) > config.get_effective_truncation_limit()
                         and not guidance_requested
                     ):
                         result_display = (
-                            result_display[: config.DEFAULT_TRUNCATION_LIMIT]
+                            result_display[: config.get_effective_truncation_limit()]
                             + "... [truncated]"
                         )
                     print(f"   - Result: {result_display}")

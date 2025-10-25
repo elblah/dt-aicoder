@@ -262,9 +262,19 @@ class MessageHistory:
         machine = platform.machine()
         return f"This is a {system} system on {machine} architecture"
 
-    def add_user_message(self, content: str):
-        """Add a user message to the history."""
-        self.messages.append({"role": "user", "content": content})
+    def add_user_message(self, content):
+        """Add a user message to the history. Content can be a string or a multimodal message dict."""
+        if isinstance(content, str):
+            # Simple text message
+            message = {"role": "user", "content": content}
+        elif isinstance(content, dict) and "role" in content and "content" in content:
+            # Already formatted message (could be multimodal)
+            message = content
+        else:
+            # Convert to string if it's something else
+            message = {"role": "user", "content": str(content)}
+
+        self.messages.append(message)
         self.stats.messages_sent += 1
         # Clear compaction flag since we added a new message
         self._compaction_performed = False

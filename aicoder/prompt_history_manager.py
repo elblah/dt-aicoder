@@ -35,12 +35,12 @@ class PromptHistoryManager:
             self.enabled = True
 
         self.project_dir = Path(project_dir) if project_dir else Path.cwd()
-        self.history_file = self.project_dir / ".dt-aicoder" / "history"
+        self.history_file = self.project_dir / ".aicoder" / "history"
         self.max_history = max_history
         self._ensure_history_dir()
 
     def _ensure_history_dir(self):
-        """Ensure the .dt-aicoder directory exists."""
+        """Ensure the .aicoder directory exists."""
         try:
             self.history_file.parent.mkdir(exist_ok=True)
         except OSError as e:

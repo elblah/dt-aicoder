@@ -17,7 +17,7 @@ class TestPromptHistoryManager(unittest.TestCase):
     def setUp(self):
         """Set up test environment."""
         self.test_dir = Path(tempfile.mkdtemp())
-        self.history_file = self.test_dir / ".dt-aicoder" / "history"
+        self.history_file = self.test_dir / ".aicoder" / "history"
         self.manager = PromptHistoryManager(project_dir=self.test_dir, max_history=5)
 
     def tearDown(self):
@@ -29,7 +29,7 @@ class TestPromptHistoryManager(unittest.TestCase):
             self.history_file.parent.rmdir()
 
     def test_init_creates_directory(self):
-        """Test that initialization creates the .dt-aicoder directory."""
+        """Test that initialization creates the .aicoder directory."""
         self.assertTrue(self.history_file.parent.exists())
 
     def test_save_prompt_creates_file(self):

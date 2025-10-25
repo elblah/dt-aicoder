@@ -1,7 +1,7 @@
 """
 Simple persistent configuration for AI Coder.
 
-A basic dict that loads from and saves to .dt-aicoder/settings-local.json
+A basic dict that loads from and saves to .aicoder/settings-local.json
 """
 
 import json
@@ -20,7 +20,7 @@ class PersistentConfig(dict):
         """
         super().__init__()
         self.project_dir = Path(project_dir) if project_dir else Path.cwd()
-        self.config_file = self.project_dir / ".dt-aicoder" / "settings-local.json"
+        self.config_file = self.project_dir / ".aicoder" / "settings-local.json"
         self.load()
 
     def load(self):
