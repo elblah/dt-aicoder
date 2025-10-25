@@ -33,18 +33,18 @@ class TestTruncationIntegration(unittest.TestCase):
             # Change to temp directory to avoid existing config
             original_cwd = os.getcwd()
             os.chdir(temp_dir)
-            
+
             try:
                 # Create app
                 app = AICoder()
-                
+
                 # Check that config has the app instance
                 limit = config.get_effective_truncation_limit()
                 self.assertEqual(limit, 300)  # Default from env
-                
+
                 # Set truncation in persistent config
                 app.persistent_config["truncation"] = "500"
-                
+
                 # Check that config now uses the override
                 limit = config.get_effective_truncation_limit()
                 self.assertEqual(limit, 500)
@@ -55,10 +55,10 @@ class TestTruncationIntegration(unittest.TestCase):
         """Test that invalid truncation value falls back to env."""
         with tempfile.TemporaryDirectory():
             app = AICoder()
-            
+
             # Set invalid truncation value
             app.persistent_config["truncation"] = "invalid"
-            
+
             # Should fall back to environment
             limit = config.get_effective_truncation_limit()
             self.assertEqual(limit, 300)
@@ -67,12 +67,12 @@ class TestTruncationIntegration(unittest.TestCase):
         """Test that numeric truncation values work correctly."""
         with tempfile.TemporaryDirectory():
             app = AICoder()
-            
+
             # Test integer
             app.persistent_config["truncation"] = 1000
             limit = config.get_effective_truncation_limit()
             self.assertEqual(limit, 1000)
-            
+
             # Test float
             app.persistent_config["truncation"] = 750.5
             limit = config.get_effective_truncation_limit()

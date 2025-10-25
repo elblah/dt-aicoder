@@ -318,7 +318,8 @@ class ToolExecutor:
                         and len(value) > config.get_effective_truncation_limit()
                     ):
                         display_args[key] = (
-                            value[: config.get_effective_truncation_limit()] + "... [truncated]"
+                            value[: config.get_effective_truncation_limit()]
+                            + "... [truncated]"
                         )
 
             # Check if arguments should be hidden completely

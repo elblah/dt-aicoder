@@ -314,7 +314,10 @@ def format_tool_prompt(
                     and isinstance(value, str)
                     and len(value) > config.get_effective_truncation_limit()
                 ):
-                    value = value[: config.get_effective_truncation_limit()] + "... [truncated]"
+                    value = (
+                        value[: config.get_effective_truncation_limit()]
+                        + "... [truncated]"
+                    )
 
                 prompt_lines.append(f"    {key}: {value}")
 

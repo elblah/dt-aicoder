@@ -65,6 +65,11 @@ def get_top_k():
     return _get_mode_config("TOP_K", 0, int)
 
 
+def get_repetition_penalty():
+    """Get repetition penalty based on current mode."""
+    return _get_mode_config("REPETITION_PENALTY", 1.0, float)
+
+
 def get_max_tokens():
     """Get max tokens based on current mode."""
     return _get_mode_config("MAX_TOKENS", None, int)
@@ -88,6 +93,9 @@ TOP_P = get_top_p()
 
 # Top-K configuration (now uses function for mode-aware values)
 TOP_K = get_top_k()
+
+# Repetition penalty configuration (now uses function for mode-aware values)
+REPETITION_PENALTY = get_repetition_penalty()
 
 # Max tokens configuration (now uses function for mode-aware values)
 MAX_TOKENS = get_max_tokens()
@@ -142,6 +150,12 @@ if ("TOP_K" in os.environ and TOP_K != 0) or (
     "PLAN_TOP_K" in os.environ and TOP_K != 0
 ):
     print(f"{GREEN}*** Top-K is {TOP_K}{RESET}")
+
+# Print repetition_penalty if set as environment variable
+if ("REPETITION_PENALTY" in os.environ and REPETITION_PENALTY != 1.0) or (
+    "PLAN_REPETITION_PENALTY" in os.environ and REPETITION_PENALTY != 1.0
+):
+    print(f"{GREEN}*** Repetition penalty is {REPETITION_PENALTY}{RESET}")
 
 # Print max_tokens if set as environment variable
 if "MAX_TOKENS" in os.environ or "PLAN_MAX_TOKENS" in os.environ:

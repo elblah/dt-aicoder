@@ -1,0 +1,13 @@
+# Commands that can be auto-approved
+ls
+cat
+grep
+head
+tail
+wc
+# Allow sed but NOT sed -i (destructive)
+sed
+!sed.*-i
+# Allow git but NOT git push
+git
+!git.*push

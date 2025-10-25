@@ -1,0 +1,22 @@
+# Commands that should NEVER be allowed, even in YOLO mode
+sudo
+rm.*-rf.*/
+fdisk
+mkfs
+dd.*if=.*of=/dev/
+curl.*sudo
+wget.*sudo
+curl
+wget
+gorl
+lynx
+python.*rm.*-rf
+sed.*-i
+git\s
+git.*push
+git.*add
+git.*commit
+git.*reset
+git.*revert
+^(?i)\s*git(?=\s|$)
+^(?i)\s*(?:.*[\\/])git(?=\s|$)

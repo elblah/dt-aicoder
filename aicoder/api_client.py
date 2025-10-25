@@ -57,6 +57,13 @@ class APIClient:
         ) and config.get_top_k() != 0:
             api_data["top_k"] = config.get_top_k()
 
+        # Repetition penalty settings
+        if (
+            "REPETITION_PENALTY" in os.environ
+            or "PLAN_REPETITION_PENALTY" in os.environ
+        ) and config.get_repetition_penalty() != 1.0:
+            api_data["repetition_penalty"] = config.get_repetition_penalty()
+
         # Max tokens
         if config.get_max_tokens() is not None:
             api_data["max_tokens"] = config.get_max_tokens()
