@@ -16,7 +16,7 @@ def on_aicoder_init(app):
         oauth_file = Path.home() / ".qwen" / "oauth_creds.json"
 
         if not oauth_file.exists():
-            print(f"\n❌ Qwen OAuth credentials file not found at {oauth_file}")
+            print(f"\n[X] Qwen OAuth credentials file not found at {oauth_file}")
             print("   Make sure you've authenticated with Qwen first.")
             return False, False
 
@@ -26,7 +26,7 @@ def on_aicoder_init(app):
 
             access_token = creds.get("access_token")
             if not access_token:
-                print(f"\n❌ No access_token found in {oauth_file}")
+                print(f"\n[X] No access_token found in {oauth_file}")
                 return False, False
 
             # Update the API key in the config module
@@ -34,16 +34,16 @@ def on_aicoder_init(app):
 
             aicoder.config.API_KEY = access_token
 
-            print(f"\n✅ Qwen API key refreshed from {oauth_file}")
+            print(f"\n[✓] Qwen API key refreshed from {oauth_file}")
             print(f"   Key length: {len(access_token)} characters")
 
             return False, False
 
         except json.JSONDecodeError as e:
-            print(f"\n❌ Failed to parse JSON from {oauth_file}: {e}")
+            print(f"\n[X] Failed to parse JSON from {oauth_file}: {e}")
             return False, False
         except Exception as e:
-            print(f"\n❌ Failed to read Qwen OAuth credentials: {e}")
+            print(f"\n[X] Failed to read Qwen OAuth credentials: {e}")
             return False, False
 
     # Register the command handler

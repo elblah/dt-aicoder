@@ -360,16 +360,16 @@ The command displays:
 ║                        CURRENT PROMPTS                          ║
 ╚══════════════════════════════════════════════════════════════╝
 
-📋 MAIN SYSTEM PROMPT
+MAIN SYSTEM PROMPT
    Source: Environment Variable (literal)
    Length: 4800 characters
    ──────────────────────────────────────────────────────────────
    Custom prompt content preview...
 
-📄 PROJECT CONTEXT FILE
+PROJECT CONTEXT FILE
    File: CLAUDE.md
    Source: Environment Variable → CLAUDE.md
-   Status: ✅ Found
+   Status: [✓] Found
    Length: 4356 characters
 ```
 

@@ -97,7 +97,7 @@ For more advanced retry functionality:
 ## Error Types Handled
 
 ### Core Enhancement Handles:
-- 500 errors with "429 Too Many Requests" content ✅ **(Your specific case)**
+- 500 errors with "429 Too Many Requests" content **(Your specific case)**
 - 500, 502, 503, 504, 429 HTTP errors
 - Any error containing rate limiting keywords
 
@@ -114,7 +114,7 @@ When you encounter the error, you'll now see:
 API Error: 500 Internal Server Error
 {"error":"429 Too Many Requests","status":500}
 
-🔄 Rate limiting error detected. Retrying in 10s (attempt 1/3) (Press ESC to cancel)
+Rate limiting error detected. Retrying in 10s (attempt 1/3) (Press ESC to cancel)
 ```
 
 And it will automatically retry the request after the delay.
@@ -123,10 +123,10 @@ And it will automatically retry the request after the delay.
 
 Both solutions have been tested:
 
-1. **Core Enhancement**: ✅ Tested and working
-2. **Plugin**: ✅ Installation and basic functionality tested
-3. **Import Tests**: ✅ All modules import successfully
-4. **Environment Variables**: ✅ Configuration variables work correctly
+1. **Core Enhancement**: [✓] Tested and working
+2. **Plugin**: [✓] Installation and basic functionality tested
+3. **Import Tests**: [✓] All modules import successfully
+4. **Environment Variables**: [✓] Configuration variables work correctly
 
 ## Recommendation
 

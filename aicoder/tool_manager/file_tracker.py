@@ -142,7 +142,7 @@ def track_file_read(file_path: str, message_history=None) -> Optional[str]:
     if count > READ_THRESHOLD and message_history:
         # Inform user we're helping the AI
         print(
-            f"💡 Suggesting better reading strategy for {file_path} (read {count} times)"
+            f"[i] Suggesting better reading strategy for {file_path} (read {count} times)"
         )
 
         efficiency_tip = (
@@ -154,7 +154,7 @@ def track_file_read(file_path: str, message_history=None) -> Optional[str]:
         # Add as system message to guide the AI
         if hasattr(message_history, "messages"):
             message_history.messages.append(
-                {"role": "user", "content": f"💡 EFFICIENCY TIP: {efficiency_tip}"}
+                {"role": "user", "content": f"EFFICIENCY TIP: {efficiency_tip}"}
             )
         return efficiency_tip
 
@@ -191,7 +191,7 @@ def track_file_edit(file_path: str, message_history=None) -> Optional[str]:
     # Check if we should suggest write_file
     if count > MICRO_EDIT_THRESHOLD and message_history:
         # Inform user we're helping the AI
-        print(f"💡 Suggesting write_file for {file_path} (edited {count} times)")
+        print(f"[i] Suggesting write_file for {file_path} (edited {count} times)")
 
         efficiency_tip = (
             f"EFFICIENCY TIP: You've made multiple edits to {file_path} recently. "
@@ -204,7 +204,7 @@ def track_file_edit(file_path: str, message_history=None) -> Optional[str]:
         # Add as system message to guide the AI
         if hasattr(message_history, "messages"):
             message_history.messages.append(
-                {"role": "user", "content": f"💡 EFFICIENCY TIP: {efficiency_tip}"}
+                {"role": "user", "content": f"EFFICIENCY TIP: {efficiency_tip}"}
             )
         return efficiency_tip
 

@@ -111,7 +111,7 @@ def _quick_word_search(content: str, search_text: str) -> str | None:
         # Sort by relevance and return the best
         best_matches.sort(reverse=True)
         score, line_num, line, word = best_matches[0]
-        confidence = "🎯" if score > 0.8 else "💡"
+        confidence = "[HIGH]" if score > 0.8 else "[MEDIUM]"
         return f"{confidence} Found '{word}' near line {line_num}: {line[:60]}..."
 
     return None
@@ -168,7 +168,7 @@ def _fuzzy_search(content: str, search_text: str) -> str | None:
 
     if best_match:
         line_num, similar_content = best_match
-        confidence = "🔥" if best_ratio > 0.8 else "🎯"
+        confidence = "[HIGH]" if best_ratio > 0.8 else "[MEDIUM]"
         return f"{confidence} {best_ratio:.0%} similar content at line {line_num}: {similar_content[:60]}..."
 
     return None
@@ -204,17 +204,17 @@ def _generate_not_found_error(content: str, old_string: str, path: str) -> str:
     # Phase 1: Quick word search for common cases
     word_result = _quick_word_search(content, old_string)
     if word_result:
-        return f"Error: ❌ Match not found. {word_result}"
+        return f"Error: [X] Match not found. {word_result}"
 
     # Phase 2: Fuzzy search only for substantial searches
     if _should_use_fuzzy_search(old_string):
         fuzzy_result = _fuzzy_search(content, old_string)
         if fuzzy_result:
-            return f"Error: ❌ Match not found. {fuzzy_result}"
+            return f"Error: [X] Match not found. {fuzzy_result}"
 
     # Phase 3: Basic suggestion
     return (
-        f"Error: ❌ Match not found. 🔧 Try read_file('{path}') to see current content"
+        f"Error: [X] Match not found. Try read_file('{path}') to see current content"
     )
 
 
@@ -239,22 +239,22 @@ def _generate_multiple_matches_error(content: str, old_string: str, path: str) -
         occurrences.append(line_num)
         pos += 1
 
-    error_msg = f"Error: ❌ MULTIPLE MATCHES in '{path}'\n"
+    error_msg = f"Error: [X] MULTIPLE MATCHES in '{path}'\n"
     error_msg += (
-        f"🔍 Found {len(occurrences)}+ occurrences (showing first {len(occurrences)})\n"
+        f"Found {len(occurrences)}+ occurrences (showing first {len(occurrences)})\n"
     )
-    error_msg += f"📍 Lines: {', '.join(map(str, occurrences[:10]))}"
+    error_msg += f"Lines: {', '.join(map(str, occurrences[:10]))}"
     if len(occurrences) > 10:
         error_msg += " (and more...)"
     error_msg += "\n\n"
 
-    error_msg += "💡 TO FIX: Add unique context to identify the specific match\n"
+    error_msg += "TO FIX: Add unique context to identify the specific match\n"
     error_msg += "   • Include 2-3 lines before your change\n"
     error_msg += "   • Include 2-3 lines after your change\n"
     error_msg += "   • Choose a more specific part of the text\n\n"
 
     # Show minimal context for first 2 matches only
-    error_msg += "📄 Example contexts (pick one and add surrounding lines):\n"
+    error_msg += "Example contexts (pick one and add surrounding lines):\n"
     for i, line_num in enumerate(occurrences[:2]):
         start = max(0, line_num - 2)
         end = min(len(lines), line_num + len(old_lines))
@@ -275,7 +275,7 @@ def _generate_multiple_matches_error(content: str, old_string: str, path: str) -
     if len(occurrences) > 2:
         error_msg += f"... and {len(occurrences) - 2} more matches\n"
 
-    error_msg += "\n🛠️  ALTERNATIVE: Use write_file for multi-location changes:\n"
+    error_msg += "\nALTERNATIVE: Use write_file for multi-location changes:\n"
     error_msg += f"   1. read_file('{path}')\n"
     error_msg += "   2. Make all changes\n"
     error_msg += f"   3. write_file('{path}', modified_content)"

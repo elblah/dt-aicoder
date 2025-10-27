@@ -176,11 +176,11 @@ The tool will return search results that you can use in your response.
                 if "Web Search Capability" not in system_prompt["content"]:
                     system_prompt["content"] += web_search_info
 
-        print("✅ Web search plugin loaded successfully")
+        print("[✓] Web search plugin loaded successfully")
         print("   - Custom web_search tool registered")
         print("   - AI instructions added to system prompt")
         return True
 
     except Exception as e:
-        print(f"❌ Failed to load web search plugin: {e}")
+        print(f"[X] Failed to load web search plugin: {e}")
         return False

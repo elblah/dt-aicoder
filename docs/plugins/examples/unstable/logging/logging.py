@@ -38,4 +38,4 @@ def logged_execute_tool_calls(self, message):
 # Monkey patch the class
 MCPToolManager.execute_tool_calls = logged_execute_tool_calls
 
-print("✅ Logging plugin loaded - all tool executions will be logged")
+print("[✓] Logging plugin loaded - all tool executions will be logged")

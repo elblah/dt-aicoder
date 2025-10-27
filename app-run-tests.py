@@ -178,13 +178,13 @@ print(f'✓ Tool manager working, {len(tools)} tools available')
         # Clean up any test files that might have been created
         cleaned = cleanup_test_files()
         if cleaned:
-            print(f"🧹 Cleaned up {len(cleaned)} test files: {', '.join(cleaned)}")
-        print("🎉 All quick tests passed!")
+            print(f"Cleaned up {len(cleaned)} test files: {', '.join(cleaned)}")
+        print("*** All quick tests passed!")
         return True
     else:
         # Still clean up even on failure
         cleanup_test_files()
-        print("❌ Some quick tests failed.")
+        print("[X] Some quick tests failed.")
         return False
 
 
@@ -333,7 +333,7 @@ print(f'✓ Tool manager working, {len(tools)} tools available')
     if success:
         print("✓ Syntax check passed")
     else:
-        print("⚠ Syntax check found issues (not critical for functionality)")
+        print("[!] Syntax check found issues (not critical for functionality)")
     results.append(("Syntax check", True))  # Not critical for functionality
 
     # 7. Python compilation check
@@ -433,13 +433,13 @@ print('✓ Current prompt size tracking works')
         # Clean up any test files that might have been created
         cleaned = cleanup_test_files()
         if cleaned:
-            print(f"\n🧹 Cleaned up {len(cleaned)} test files: {', '.join(cleaned)}")
-        print("\n🎉 ALL TESTS PASSED! Application is working correctly.")
+            print(f"\nCleaned up {len(cleaned)} test files: {', '.join(cleaned)}")
+        print("\n*** ALL TESTS PASSED! Application is working correctly.")
         return True
     else:
         # Still clean up even on failure
         cleanup_test_files()
-        print(f"\n⚠️  {total - passed} tests failed. Please review the issues above.")
+        print(f"\n[!]  {total - passed} tests failed. Please review the issues above.")
         return False
 
 

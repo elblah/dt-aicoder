@@ -6,6 +6,7 @@ A basic dict that loads from and saves to .aicoder/settings-local.json
 
 import json
 from pathlib import Path
+from .utils import emsg
 
 
 class PersistentConfig(dict):
@@ -21,12 +22,20 @@ class PersistentConfig(dict):
         super().__init__()
         self.project_dir = Path(project_dir) if project_dir else Path.cwd()
         self.config_file = self.project_dir / ".aicoder" / "settings-local.json"
+        self._read_only = False
         self.load()
 
     def load(self):
         """Load config from JSON file."""
-        # Ensure directory exists
-        self.config_file.parent.mkdir(exist_ok=True)
+        try:
+            # Ensure directory exists
+            self.config_file.parent.mkdir(exist_ok=True)
+        except OSError as e:
+            # Read-only filesystem, continue with in-memory config
+            emsg(f"Warning: Could not create history directory: {e}")
+            self._read_only = True
+            self.clear()
+            return
 
         # Load if file exists
         if self.config_file.exists():
@@ -43,12 +52,23 @@ class PersistentConfig(dict):
 
     def save(self):
         """Save config to JSON file."""
-        self.config_file.parent.mkdir(exist_ok=True)
+        if self._read_only:
+            # Silently skip save operations in read-only mode
+            return
+            
+        try:
+            self.config_file.parent.mkdir(exist_ok=True)
+        except Exception:
+            # Can't create directory, mark as read-only and return early
+            self._read_only = True
+            return
+            
         try:
             with open(self.config_file, "w") as f:
                 json.dump(dict(self), f, indent=2)
-        except IOError:
-            pass  # Silently fail on save errors
+        except (IOError, TypeError):
+            # Silently fail on other save errors
+            pass
 
     def __setitem__(self, key, value):
         """Override to save after any change."""

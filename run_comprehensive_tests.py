@@ -13,7 +13,7 @@ import shutil
 
 def run_test(name, script, timeout=60):
     """Run a test script and return success/failure."""
-    print(f"🧪 Running {name}...")
+    print(f"Running {name}...")
     try:
         # Set environment for subprocess
         env = os.environ.copy()
@@ -37,24 +37,24 @@ def run_test(name, script, timeout=60):
         )
         success = result.returncode == 0
         if success:
-            print(f"✅ {name} PASSED")
+            print(f"[✓] {name} PASSED")
         else:
-            print(f"❌ {name} FAILED")
+            print(f"[X] {name} FAILED")
             print(f"   stdout: {result.stdout}")
             print(f"   stderr: {result.stderr}")
         return success
     except subprocess.TimeoutExpired:
-        print(f"⏰ {name} TIMED OUT")
+        print(f"[!] {name} TIMED OUT")
         return False
     except Exception as e:
-        print(f"💥 {name} ERROR: {e}")
+        print(f"[X] {name} ERROR: {e}")
         return False
 
 
 def main():
-    print("🚀 AI Coder - Comprehensive Integration Test Runner")
+    print("AI Coder - Comprehensive Integration Test Runner")
     print("=" * 50)
-    print("⚠️  NOTE: This runs comprehensive INTEGRATION tests only")
+    print("[!]  NOTE: This runs comprehensive INTEGRATION tests only")
     print("   NOT the main unit test suite (use 'bash run-tests.sh' for that)")
     print()
 
@@ -89,14 +89,14 @@ def main():
 
     results = []
 
-    print("\\n📋 Running Comprehensive Integration Tests...")
+    print("\nRunning Comprehensive Integration Tests...")
     print("-" * 30)
 
     for name, script, timeout in tests:
         success = run_test(name, script, timeout)
         results.append((name, success))
 
-    print("\\n📊 Comprehensive Test Results:")
+    print("\nComprehensive Test Results:")
     print("-" * 30)
     comprehensive_passed = 0
     comprehensive_total = len(results)
@@ -113,7 +113,7 @@ def main():
     tmux_available = shutil.which("tmux") is not None
 
     if tmux_available:
-        print("\\n📋 Running Advanced Tests (TMUX available)...")
+        print("\nRunning Advanced Tests (TMUX available)...")
         print("-" * 30)
 
         advanced_results = []
@@ -121,7 +121,7 @@ def main():
             success = run_test(name, script, timeout)
             advanced_results.append((name, success))
 
-        print("\\n📊 Advanced Test Results:")
+        print("\nAdvanced Test Results:")
         print("-" * 30)
         advanced_passed = 0
         advanced_total = len(advanced_results)
@@ -132,14 +132,14 @@ def main():
             if success:
                 advanced_passed += 1
 
-        print(f"\\nAdvanced Tests: {advanced_passed}/{advanced_total}")
+        print(f"\nAdvanced Tests: {advanced_passed}/{advanced_total}")
     else:
-        print("\\n⏭️  TMUX not found, skipping advanced tests")
+        print("\nTMUX not found, skipping advanced tests")
         advanced_passed = 0
         advanced_total = 0
 
-    print("\\n" + "=" * 50)
-    print("🏁 Test Runner Complete")
+    print("\n" + "=" * 50)
+    print("Test Runner Complete")
 
     total_passed = comprehensive_passed + advanced_passed
     total_tests = comprehensive_total + advanced_total
@@ -150,10 +150,10 @@ def main():
     print(f"Overall: {total_passed}/{total_tests}")
 
     if comprehensive_passed == comprehensive_total:
-        print("\\n🎉 All comprehensive tests PASSED! Application is working correctly.")
+        print("\nAll comprehensive tests PASSED! Application is working correctly.")
         return 0
     else:
-        print("\\n❌ Some comprehensive tests FAILED! Application may have issues.")
+        print("\n[X] Some comprehensive tests FAILED! Application may have issues.")
         return 1
 
 

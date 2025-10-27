@@ -23,14 +23,14 @@ def on_aicoder_init(aicoder_instance):
         # Add /tools command to the command registry
         aicoder_instance.command_handlers["/tools"] = _handle_tools_command
 
-        print("✅ Tools manager plugin loaded successfully")
+        print("[✓] Tools manager plugin loaded successfully")
         print("   - /tools command available")
         print(
             "   - Use /tools to list tools, /tools enable/disable <tool> to manage them"
         )
         return True
     except Exception as e:
-        print(f"❌ Failed to load tools manager plugin: {e}")
+        print(f"[X] Failed to load tools manager plugin: {e}")
         return False
 
 
@@ -39,13 +39,13 @@ def _handle_tools_command(args):
     global _aicoder_ref, _disabled_tools
 
     if not _aicoder_ref:
-        print("❌ Tools functionality not available")
+        print("[X] Tools functionality not available")
         return False, False
 
     if not hasattr(_aicoder_ref, "tool_manager") or not hasattr(
         _aicoder_ref.tool_manager, "registry"
     ):
-        print("❌ Tool registry not available")
+        print("[X] Tool registry not available")
         return False, False
 
     if not args:
@@ -60,24 +60,24 @@ def _handle_tools_command(args):
         return False, False
     elif command == "enable":
         if len(args) < 2:
-            print("❌ Usage: /tools enable <tool_name>")
+            print("[X] Usage: /tools enable <tool_name>")
             return False, False
         _enable_tool(args[1])
         return False, False
     elif command == "disable":
         if len(args) < 2:
-            print("❌ Usage: /tools disable <tool_name>")
+            print("[X] Usage: /tools disable <tool_name>")
             return False, False
         _disable_tool(args[1])
         return False, False
     elif command == "info":
         if len(args) < 2:
-            print("❌ Usage: /tools info <tool_name>")
+            print("[X] Usage: /tools info <tool_name>")
             return False, False
         _tool_info(args[1])
         return False, False
     else:
-        print(f"❌ Unknown command: {command}")
+        print(f"[X] Unknown command: {command}")
         print("Available commands: list, enable, disable, info")
         return False, False
 
@@ -89,7 +89,7 @@ def _list_tools():
     if not hasattr(_aicoder_ref, "tool_manager") or not hasattr(
         _aicoder_ref.tool_manager, "registry"
     ):
-        print("❌ Tool registry not available")
+        print("[X] Tool registry not available")
         return
 
     # Get currently loaded tools
@@ -99,7 +99,7 @@ def _list_tools():
         print("No tools available")
         return
 
-    print("\n📋 Available Tools:")
+    print("\nAvailable Tools:")
     print("=" * 80)
 
     # Combine active and disabled tools
@@ -107,11 +107,11 @@ def _list_tools():
 
     # Add active tools
     for tool_name, tool_config in current_tools.items():
-        all_tools[tool_name] = {"config": tool_config, "status": "✅ Enabled"}
+        all_tools[tool_name] = {"config": tool_config, "status": "[✓] Enabled"}
 
     # Add disabled tools
     for tool_name, tool_data in _disabled_tools.items():
-        all_tools[tool_name] = {"config": tool_data["config"], "status": "❌ Disabled"}
+        all_tools[tool_name] = {"config": tool_data["config"], "status": "[X] Disabled"}
 
     # Sort tools by name
     sorted_tools = sorted(all_tools.items())
@@ -135,7 +135,7 @@ def _disable_tool(tool_name):
     if not hasattr(_aicoder_ref, "tool_manager") or not hasattr(
         _aicoder_ref.tool_manager, "registry"
     ):
-        print("❌ Tool registry not available")
+        print("[X] Tool registry not available")
         return
 
     # Check if tool is currently enabled
@@ -143,9 +143,9 @@ def _disable_tool(tool_name):
     if tool_name not in current_tools:
         # Check if already disabled
         if tool_name in _disabled_tools:
-            print(f"❌ Tool '{tool_name}' is already disabled")
+            print(f"[X] Tool '{tool_name}' is already disabled")
         else:
-            print(f"❌ Tool '{tool_name}' not found")
+            print(f"[X] Tool '{tool_name}' not found")
         return
 
     # Move tool to disabled dict
@@ -155,8 +155,8 @@ def _disable_tool(tool_name):
     # Remove from active tools
     del current_tools[tool_name]
 
-    print(f"✅ Tool '{tool_name}' disabled successfully")
-    print("💡 Note: This is temporary for this session only")
+    print(f"[✓] Tool '{tool_name}' disabled successfully")
+    print("[i] Note: This is temporary for this session only")
 
 
 def _enable_tool(tool_name):
@@ -166,7 +166,7 @@ def _enable_tool(tool_name):
     if not hasattr(_aicoder_ref, "tool_manager") or not hasattr(
         _aicoder_ref.tool_manager, "registry"
     ):
-        print("❌ Tool registry not available")
+        print("[X] Tool registry not available")
         return
 
     # Check if tool is currently disabled
@@ -174,9 +174,9 @@ def _enable_tool(tool_name):
         # Check if already enabled
         current_tools = _aicoder_ref.tool_manager.registry.mcp_tools
         if tool_name in current_tools:
-            print(f"❌ Tool '{tool_name}' is already enabled")
+            print(f"[X] Tool '{tool_name}' is already enabled")
         else:
-            print(f"❌ Tool '{tool_name}' not found")
+            print(f"[X] Tool '{tool_name}' not found")
         return
 
     # Move tool back to active tools
@@ -186,7 +186,7 @@ def _enable_tool(tool_name):
     # Remove from disabled tools
     del _disabled_tools[tool_name]
 
-    print(f"✅ Tool '{tool_name}' enabled successfully")
+    print(f"[✓] Tool '{tool_name}' enabled successfully")
 
 
 def _tool_info(tool_name):
@@ -196,7 +196,7 @@ def _tool_info(tool_name):
     if not hasattr(_aicoder_ref, "tool_manager") or not hasattr(
         _aicoder_ref.tool_manager, "registry"
     ):
-        print("❌ Tool registry not available")
+        print("[X] Tool registry not available")
         return
 
     # Get tools from registry
@@ -208,16 +208,16 @@ def _tool_info(tool_name):
 
     if tool_name in current_tools:
         tool_config = current_tools[tool_name]
-        status = "✅ Enabled"
+        status = "[✓] Enabled"
     elif tool_name in _disabled_tools:
         tool_config = _disabled_tools[tool_name]["config"]
-        status = "❌ Disabled"
+        status = "[X] Disabled"
 
     if not tool_config:
-        print(f"❌ Tool '{tool_name}' not found")
+        print(f"[X] Tool '{tool_name}' not found")
         return
 
-    print(f"\n🔍 Tool Information: {tool_name}")
+    print(f"\nTool Information: {tool_name}")
     print("=" * 50)
     print(f"Description: {tool_config.get('description', 'No description')}")
     print(f"Type: {tool_config.get('type', 'Unknown')}")

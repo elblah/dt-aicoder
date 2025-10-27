@@ -67,7 +67,7 @@ class CodeQualityGuardian:
             return issues
 
         except Exception as e:
-            print(f"⚠️ Quality check failed for {file_path}: {e}")
+            print(f"[!] Quality check failed for {file_path}: {e}")
             return []
 
     def _check_python_quality(self, file_path):
@@ -164,7 +164,7 @@ class CodeQualityGuardian:
                 return result.returncode == 0
 
         except Exception as e:
-            print(f"⚠️ Auto-format failed for {file_path}: {e}")
+            print(f"[!] Auto-format failed for {file_path}: {e}")
             return False
 
     def get_quality_score(self, file_path):
@@ -207,9 +207,9 @@ def quality_monitored_write_file(path, content, **kwargs):
         def check_quality():
             issues = quality_guardian.check_file_quality(path)
             if issues and QUALITY_CONFIG["show_issues"]:
-                print(f"\n🔍 Code Quality Issues in {path}:")
+                print(f"\nCode Quality Issues in {path}:")
                 for issue in issues[:5]:  # Show first 5 issues
-                    print(f"   ⚠️ {issue['tool']}: {issue['issue']}")
+                    print(f"   [!] {issue['tool']}: {issue['issue']}")
                 if len(issues) > 5:
                     print(f"   ... and {len(issues) - 5} more issues")
 
@@ -217,7 +217,7 @@ def quality_monitored_write_file(path, content, **kwargs):
             if QUALITY_CONFIG["auto_fix_formatting"]:
                 formatted = quality_guardian.format_file(path)
                 if formatted:
-                    print(f"   ✨ Auto-formatted {path}")
+                    print(f"   [*] Auto-formatted {path}")
 
         # Run in background thread
         thread = threading.Thread(target=check_quality, daemon=True)
@@ -238,10 +238,10 @@ def quality_check_tool(file_path: str) -> str:
         score = quality_guardian.get_quality_score(file_path)
 
         if not issues:
-            return f"✅ {file_path} - Quality score: {score}/100 - No issues found"
+            return f"[✓] {file_path} - Quality score: {score}/100 - No issues found"
 
-        result = [f"📊 {file_path} - Quality score: {score}/100"]
-        result.append(f"⚠️ {len(issues)} issues found:")
+        result = [f"{file_path} - Quality score: {score}/100"]
+        result.append(f"[!] {len(issues)} issues found:")
 
         for issue in issues[:10]:  # Show first 10 issues
             result.append(f"   - {issue['tool']}: {issue['issue']}")
@@ -252,7 +252,7 @@ def quality_check_tool(file_path: str) -> str:
         return "\n".join(result)
 
     except Exception as e:
-        return f"❌ Quality check failed: {str(e)}"
+        return f"[X] Quality check failed: {str(e)}"
 
 
 # Register the quality check tool
@@ -284,7 +284,7 @@ def quality_command(self, args):
     if not args or args.strip().lower() == "status":
         # Show overall quality status
         if not quality_guardian.issues_history:
-            return "✅ No quality issues detected"
+            return "[✓] No quality issues detected"
 
         total_issues = len(quality_guardian.issues_history)
         files_with_issues = len(
@@ -326,21 +326,21 @@ def format_command(self, args):
         for py_file in Path(".").rglob("*.py"):
             if quality_guardian.format_file(str(py_file)):
                 formatted_count += 1
-        return f"✅ Formatted {formatted_count} Python files"
+        return f"[✓] Formatted {formatted_count} Python files"
 
     else:
         # Format specific file
         if quality_guardian.format_file(target):
-            return f"✅ Formatted {target}"
+            return f"[✓] Formatted {target}"
         else:
-            return f"❌ Failed to format {target}"
+            return f"[X] Failed to format {target}"
 
 
 # Add the commands
 CommandHandler.quality = quality_command
 CommandHandler.format = format_command
 
-print("✅ Code Quality Guardian plugin loaded")
+print("[✓] Code Quality Guardian plugin loaded")
 print("   - Automatic code quality checks enabled")
 print("   - Auto-formatting enabled")
 print("   - Use '/quality' to view quality status")

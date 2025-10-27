@@ -22,7 +22,7 @@ from smart_edit import (
 
 def test_validation():
     """Test the validation function."""
-    print("🧪 Testing validation function...")
+    print("Testing validation function...")
 
     # Test valid arguments
     valid_args = {
@@ -32,12 +32,12 @@ def test_validation():
 
     result = validate_smart_edit(valid_args)
     assert result is True, f"Expected True, got {result}"
-    print("✅ Validation test passed")
+    print("[✓] Validation test passed")
 
 
 def test_edit_strategies():
     """Test the edit strategy manager."""
-    print("🧪 Testing edit strategies...")
+    print("Testing edit strategies...")
 
     manager = EditStrategyManager()
 
@@ -47,7 +47,7 @@ def test_edit_strategies():
 
     new_content, results = manager.apply_changes(content, changes)
     assert "new_line" in new_content, "Context edit failed"
-    print("✅ Context edit test passed")
+    print("[✓] Context edit test passed")
 
     # Test line-based edit
     content = "line1\nline2\nline3\nline4"
@@ -57,12 +57,12 @@ def test_edit_strategies():
 
     new_content, results = manager.apply_changes(content, changes)
     assert "replaced_line" in new_content, "Line edit failed"
-    print("✅ Line edit test passed")
+    print("[✓] Line edit test passed")
 
 
 def test_diff_visualizer():
     """Test the diff visualizer."""
-    print("🧪 Testing diff visualizer...")
+    print("Testing diff visualizer...")
 
     visualizer = DiffVisualizer()
     original = "line1\nline2\nline3"
@@ -70,12 +70,12 @@ def test_diff_visualizer():
 
     diff = visualizer.show_rich_diff("test.txt", original, modified)
     assert "modified_line2" in diff, "Diff visualization failed"
-    print("✅ Diff visualizer test passed")
+    print("[✓] Diff visualizer test passed")
 
 
 def test_backup_manager():
     """Test the backup manager."""
-    print("🧪 Testing backup manager...")
+    print("Testing backup manager...")
 
     with tempfile.TemporaryDirectory() as temp_dir:
         with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
@@ -87,14 +87,14 @@ def test_backup_manager():
             backup_path = manager.create_backup(temp_file)
             assert backup_path is not None, "Backup creation failed"
             assert os.path.exists(backup_path), "Backup file not created"
-            print("✅ Backup manager test passed")
+            print("[✓] Backup manager test passed")
         finally:
             os.unlink(temp_file)
 
 
 def test_full_workflow():
     """Test a complete smart edit workflow."""
-    print("🧪 Testing full workflow...")
+    print("Testing full workflow...")
 
     # Create a temporary test file
     with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
@@ -124,7 +124,7 @@ def test_full_workflow():
             assert "new_function" in content, "Changes not applied"
             assert "return True" in content, "Changes not applied"
 
-        print("✅ Full workflow test passed")
+        print("[✓] Full workflow test passed")
 
     finally:
         os.unlink(temp_file)
@@ -132,7 +132,7 @@ def test_full_workflow():
 
 def main():
     """Run all tests."""
-    print("🚀 Running Smart Edit Tool Plugin Tests\n")
+    print("Running Smart Edit Tool Plugin Tests\n")
 
     try:
         test_validation()
@@ -141,22 +141,22 @@ def main():
         test_backup_manager()
         test_full_workflow()
 
-        print("\n🎉 All tests passed! The Smart Edit Tool Plugin is working correctly.")
+        print("\n*** All tests passed! The Smart Edit Tool Plugin is working correctly.")
 
-        print("\n📋 Plugin Features:")
-        print("   ✅ Multiple editing strategies (context, line, pattern, semantic)")
-        print("   ✅ Rich diff visualization with color coding")
-        print("   ✅ Automatic backup creation with rollback")
-        print("   ✅ Comprehensive validation and error handling")
-        print("   ✅ Integration with AI Coder's tool system")
+        print("\nPlugin Features:")
+        print("   [✓] Multiple editing strategies (context, line, pattern, semantic)")
+        print("   [✓] Rich diff visualization with color coding")
+        print("   [✓] Automatic backup creation with rollback")
+        print("   [✓] Comprehensive validation and error handling")
+        print("   [✓] Integration with AI Coder's tool system")
 
-        print("\n🔧 Installation Instructions:")
+        print("\nInstallation Instructions:")
         print("   1. Copy smart_edit.py to ~/.config/aicoder/plugins/")
         print("   2. Restart AI Coder")
         print("   3. Use the smart_edit tool with your file operations")
 
     except Exception as e:
-        print(f"\n❌ Test failed: {e}")
+        print(f"\n[X] Test failed: {e}")
         sys.exit(1)
 
 

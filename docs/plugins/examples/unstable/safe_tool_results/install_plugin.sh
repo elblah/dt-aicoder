@@ -10,7 +10,7 @@ mkdir -p "$PLUGIN_DIR"
 # Copy the plugin file
 cp "safe_tool_results.py" "$PLUGIN_DIR/"
 
-echo "✅ $PLUGIN_NAME plugin installed to $PLUGIN_DIR/"
+echo "[✓] $PLUGIN_NAME plugin installed to $PLUGIN_DIR/"
 echo ""
 echo "To use the plugin, restart AI Coder or run:"
 echo "AICODER_SAFE_TOOL_RESULTS=1 aicoder"

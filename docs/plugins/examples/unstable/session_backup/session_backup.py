@@ -70,7 +70,7 @@ class SessionBackupManager:
             with open(backup_file, "w", encoding="utf-8") as f:
                 json.dump(backup_data, f, indent=2, default=str)
 
-            print(f"✅ Session backed up to {backup_file}")
+            print(f"[✓] Session backed up to {backup_file}")
 
             # Reset counter
             self.message_count = 0
@@ -79,7 +79,7 @@ class SessionBackupManager:
             return backup_file
 
         except Exception as e:
-            print(f"❌ Failed to create backup: {e}")
+            print(f"[X] Failed to create backup: {e}")
             return None
 
 
@@ -138,21 +138,21 @@ def backup_command(self, args):
     """Manually trigger a session backup."""
     try:
         if not hasattr(self, "message_history") or not hasattr(self, "stats"):
-            return "❌ Cannot create backup - missing session data"
+            return "[X] Cannot create backup - missing session data"
 
         backup_file = backup_manager.create_backup(self.message_history, self.stats)
         if backup_file:
-            return f"✅ Session manually backed up to {backup_file}"
+            return f"[✓] Session manually backed up to {backup_file}"
         else:
-            return "❌ Failed to create manual backup"
+            return "[X] Failed to create manual backup"
     except Exception as e:
-        return f"❌ Error during manual backup: {e}"
+        return f"[X] Error during manual backup: {e}"
 
 
 # Add the new command
 CommandHandler.backup = backup_command
 
-print("✅ Session backup plugin loaded - automatic backups enabled")
+print("[✓] Session backup plugin loaded - automatic backups enabled")
 print(f"   - Backup every {BACKUP_INTERVAL} messages")
 print(f"   - Backup directory: {BACKUP_DIR}")
 print("   - Use '/backup' to manually trigger a backup")

@@ -19,9 +19,9 @@ def test_cost_display_functionality():
     try:
         from docs.examples.unstable.cost_display import cost_display
 
-        print("✅ Cost display plugin imported successfully")
+        print("[✓] Cost display plugin imported successfully")
     except Exception as e:
-        print(f"❌ Failed to import cost display plugin: {e}")
+        print(f"[X] Failed to import cost display plugin: {e}")
         return False
 
     # Create mock classes to simulate the AICoder environment
@@ -64,7 +64,7 @@ def test_cost_display_functionality():
         )
 
         if cost_display_found:
-            print("✅ Cost display functionality working correctly")
+            print("[✓] Cost display functionality working correctly")
             # Print the actual cost display line
             for line in captured_output:
                 if "Cost:" in line and "input" in line and "output" in line:
@@ -72,7 +72,7 @@ def test_cost_display_functionality():
             success = True
         else:
             print(
-                "❌ Cost display functionality not working - no cost information shown"
+                "[X] Cost display functionality not working - no cost information shown"
             )
             print("Captured output:")
             for line in captured_output:
@@ -80,7 +80,7 @@ def test_cost_display_functionality():
             success = False
 
     except Exception as e:
-        print(f"❌ Error testing cost display functionality: {e}")
+        print(f"[X] Error testing cost display functionality: {e}")
         success = False
     finally:
         # Restore original print function
@@ -92,6 +92,6 @@ def test_cost_display_functionality():
 if __name__ == "__main__":
     success = test_cost_display_functionality()
     if success:
-        print("\n🎉 Cost display functionality is working correctly!")
+        print("\n*** Cost display functionality is working correctly!")
     else:
-        print("\n❌ Cost display functionality tests failed.")
+        print("\n[X] Cost display functionality tests failed.")

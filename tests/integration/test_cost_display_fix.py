@@ -18,9 +18,9 @@ def test_cost_display_plugin():
     try:
         from docs.examples.unstable.cost_display import cost_display
 
-        print("✅ Cost display plugin imported successfully")
+        print("[✓] Cost display plugin imported successfully")
     except Exception as e:
-        print(f"❌ Failed to import cost display plugin: {e}")
+        print(f"[X] Failed to import cost display plugin: {e}")
         return False
 
     # Create mock classes to simulate the AICoder environment
@@ -39,9 +39,9 @@ def test_cost_display_plugin():
 
     # Test 2: Verify the main_aicoder_instance is set correctly
     if cost_display.main_aicoder_instance == mock_aicoder:
-        print("✅ main_aicoder_instance set correctly")
+        print("[✓] main_aicoder_instance set correctly")
     else:
-        print("❌ main_aicoder_instance not set correctly")
+        print("[X] main_aicoder_instance not set correctly")
         return False
 
     # Test 3: Verify token access
@@ -49,9 +49,9 @@ def test_cost_display_plugin():
         cost_display.main_aicoder_instance.stats.prompt_tokens == 2500
         and cost_display.main_aicoder_instance.stats.completion_tokens == 1800
     ):
-        print("✅ Token access working correctly")
+        print("[✓] Token access working correctly")
     else:
-        print("❌ Token access not working correctly")
+        print("[X] Token access not working correctly")
         return False
 
     # Test 4: Set environment variable for model
@@ -77,20 +77,20 @@ def test_cost_display_plugin():
         and abs(output_cost - expected_output) < 0.000001
         and abs(total_cost - expected_total) < 0.000001
     ):
-        print("✅ Cost calculation working correctly")
+        print("[✓] Cost calculation working correctly")
     else:
         print(
-            f"❌ Cost calculation incorrect. Expected: {expected_input:.6f}/{expected_output:.6f}/{expected_total:.6f}, Got: {input_cost:.6f}/{output_cost:.6f}/{total_cost:.6f}"
+            f"[X] Cost calculation incorrect. Expected: {expected_input:.6f}/{expected_output:.6f}/{expected_total:.6f}, Got: {input_cost:.6f}/{output_cost:.6f}/{total_cost:.6f}"
         )
         return False
 
-    print("✅ All cost display plugin tests passed!")
+    print("[✓] All cost display plugin tests passed!")
     return True
 
 
 if __name__ == "__main__":
     success = test_cost_display_plugin()
     if success:
-        print("\n🎉 Cost display plugin fix is working correctly!")
+        print("\n*** Cost display plugin fix is working correctly!")
     else:
-        print("\n❌ Cost display plugin tests failed.")
+        print("\n[X] Cost display plugin tests failed.")

@@ -217,6 +217,7 @@ class TestMemoryTool(unittest.TestCase):
             content="Test content",
             tags=["test"],
             stats=stats,
+            project_path=self.test_dir,
         )
 
         self.assertIn("Created memory note: test_note", result)
@@ -241,6 +242,7 @@ class TestMemoryTool(unittest.TestCase):
             content="Updated content",
             tags=["updated"],
             stats=stats,
+            project_path=self.test_dir,
         )
 
         self.assertIn("Updated memory note: test_note", result)
@@ -263,7 +265,9 @@ class TestMemoryTool(unittest.TestCase):
             tool_errors = 0
 
         stats = MockStats()
-        result = execute_memory(operation="read", name="test_note", stats=stats)
+        result = execute_memory(operation="read", name="test_note", stats=stats,
+            project_path=self.test_dir,
+        )
 
         self.assertIn("Memory Note: test_note", result)
         self.assertIn("Test content", result)
@@ -282,7 +286,9 @@ class TestMemoryTool(unittest.TestCase):
             tool_errors = 0
 
         stats = MockStats()
-        result = execute_memory(operation="search", query="API", stats=stats)
+        result = execute_memory(operation="search", query="API", stats=stats,
+            project_path=self.test_dir,
+        )
 
         self.assertIn("Found 1 memory notes matching 'API'", result)
         self.assertIn("api_note", result)
@@ -301,7 +307,9 @@ class TestMemoryTool(unittest.TestCase):
             tool_errors = 0
 
         stats = MockStats()
-        result = execute_memory(operation="list", stats=stats)
+        result = execute_memory(operation="list", stats=stats,
+            project_path=self.test_dir,
+        )
 
         self.assertIn("Memory notes (sorted by updated_at)", result)
         self.assertIn("note1", result)
@@ -321,7 +329,9 @@ class TestMemoryTool(unittest.TestCase):
             tool_errors = 0
 
         stats = MockStats()
-        result = execute_memory(operation="stats", stats=stats)
+        result = execute_memory(operation="stats", stats=stats,
+            project_path=self.test_dir,
+        )
 
         self.assertIn("Memory Statistics:", result)
         self.assertIn("Total notes: 2", result)
@@ -339,7 +349,9 @@ class TestMemoryTool(unittest.TestCase):
             tool_errors = 0
 
         stats = MockStats()
-        result = execute_memory(operation="delete", name="test_note", stats=stats)
+        result = execute_memory(operation="delete", name="test_note", stats=stats,
+            project_path=self.test_dir,
+        )
 
         self.assertIn("Deleted memory note: test_note", result)
         self.assertEqual(stats.tool_calls, 1)
@@ -359,12 +371,16 @@ class TestMemoryTool(unittest.TestCase):
         stats = MockStats()
 
         # Test missing required parameters
-        result = execute_memory(operation="create", stats=stats)
+        result = execute_memory(operation="create", stats=stats,
+            project_path=self.test_dir,
+        )
         self.assertIn("Error:", result)
         self.assertEqual(stats.tool_errors, 1)
 
         # Test unknown operation
-        result = execute_memory(operation="unknown", stats=stats)
+        result = execute_memory(operation="unknown", stats=stats,
+            project_path=self.test_dir,
+        )
         self.assertIn("Unknown operation", result)
         self.assertEqual(stats.tool_errors, 2)
 

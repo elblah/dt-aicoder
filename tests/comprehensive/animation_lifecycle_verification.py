@@ -57,9 +57,9 @@ def test_animation_lifecycle():
         success = has_start_indicators  # Basic check that animation appeared
 
         if success:
-            print("✅ Animation lifecycle test PASSED")
+            print("[✓] Animation lifecycle test PASSED")
         else:
-            print("❌ Animation lifecycle test FAILED")
+            print("[X] Animation lifecycle test FAILED")
 
         return success
 
@@ -80,10 +80,10 @@ def main():
 
     print("\\n" + "=" * 30)
     if success:
-        print("✅ Animation lifecycle test completed successfully!")
+        print("[✓] Animation lifecycle test completed successfully!")
         print("Animation appears during processing and disappears after completion.")
     else:
-        print("❌ Animation lifecycle test failed.")
+        print("[X] Animation lifecycle test failed.")
 
     return 0 if success else 1
 

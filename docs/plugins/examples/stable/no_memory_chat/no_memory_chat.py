@@ -34,7 +34,7 @@ def on_aicoder_init(aicoder_instance):
         if os.environ.get("NO_MEMORY_CHAT", "0") != "1":
             return True
 
-        print("✅ No Memory Chat plugin loaded - minimal mode enabled")
+        print("[✓] No Memory Chat plugin loaded - minimal mode enabled")
         print("   - System prompt removed")
         print("   - Message history disabled")
         print("   - Tool definitions removed")
@@ -115,5 +115,5 @@ def on_aicoder_init(aicoder_instance):
 
         return True
     except Exception as e:
-        print(f"❌ Failed to load No Memory Chat plugin: {e}")
+        print(f"[X] Failed to load No Memory Chat plugin: {e}")
         return False

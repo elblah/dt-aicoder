@@ -78,8 +78,8 @@ You have access to files and can execute commands in the current directory conte
 [User: "Looks good, proceed"]
 
 ## Executing Plan...
-Phase 1: ✓ Completed [brief result]
-Phase 2: ✓ Completed [brief result]
+Phase 1: [✓] Completed [brief result]
+Phase 2: [✓] Completed [brief result]
 
 ## Summary
 [Final status: working as expected, any notes]

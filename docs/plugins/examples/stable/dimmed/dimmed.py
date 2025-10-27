@@ -128,7 +128,7 @@ def load_patterns_from_config(config_path: Path) -> List[str]:
                 if line and not line.startswith("#"):
                     patterns.append(line)
     except Exception as e:
-        print(f"⚠️ Warning: Failed to read config file {config_path}: {e}")
+        print(f"[!] Warning: Failed to read config file {config_path}: {e}")
 
     return patterns
 
@@ -155,7 +155,7 @@ def save_patterns_to_config(patterns: List[str], config_path: Path) -> bool:
                 f.write(f"{pattern}\n")
         return True
     except Exception as e:
-        print(f"❌ Failed to save config file {config_path}: {e}")
+        print(f"[X] Failed to save config file {config_path}: {e}")
         return False
 
 
@@ -175,7 +175,7 @@ def compile_patterns(pattern_strings: List[str]) -> List[Pattern]:
             compiled_pattern = re.compile(pattern_str, re.ASCII)
             compiled.append(compiled_pattern)
         except re.error as e:
-            print(f"⚠️ Warning: Invalid regex pattern '{pattern_str}': {e}")
+            print(f"[!] Warning: Invalid regex pattern '{pattern_str}': {e}")
     return compiled
 
 
@@ -216,7 +216,7 @@ def add_dimmed_pattern(pattern: str) -> bool:
         _dimmed_patterns.append(compiled_pattern)
         return True
     except re.error as e:
-        print(f"❌ Invalid regex pattern '{pattern}': {e}")
+        print(f"[X] Invalid regex pattern '{pattern}': {e}")
         return False
 
 
@@ -300,7 +300,7 @@ def load_all_patterns() -> List[str]:
             patterns.extend(project_patterns)
             debug = os.environ.get("DEBUG", "0") == "1"
             if debug:
-                print(f"🔅 Loaded {len(project_patterns)} patterns from project config")
+                print(f"Loaded {len(project_patterns)} patterns from project config")
 
     # 2. Try global config (only if no project patterns)
     if not patterns:
@@ -311,7 +311,7 @@ def load_all_patterns() -> List[str]:
                 debug = os.environ.get("DEBUG", "0") == "1"
                 if debug:
                     print(
-                        f"🔅 Loaded {len(global_patterns)} patterns from global config"
+                        f"Loaded {len(global_patterns)} patterns from global config"
                     )
 
     # 3. Fallback to environment variables
@@ -322,13 +322,13 @@ def load_all_patterns() -> List[str]:
             patterns = [p.strip() for p in env_patterns.split(",") if p.strip()]
             debug = os.environ.get("DEBUG", "0") == "1"
             if debug:
-                print(f"🔅 Loaded {len(patterns)} patterns from environment variables")
+                print(f"Loaded {len(patterns)} patterns from environment variables")
 
     # 4. No default fallback - require explicit configuration
     if not patterns:
         debug = os.environ.get("DEBUG", "0") == "1"
         if debug:
-            print("🔅 No patterns configured - dimmed output disabled")
+            print("No patterns configured - dimmed output disabled")
 
     return patterns
 
@@ -368,7 +368,7 @@ def initialize_dimmed_plugin():
     if debug:
         status = "enabled" if _dimmed_enabled else "disabled"
         patterns = get_current_patterns()
-        _original_print(f"🔅 Dimmed plugin loaded ({status})")
+        _original_print(f"Dimmed plugin loaded ({status})")
         _original_print(f"   Patterns ({len(patterns)}): {', '.join(patterns)}")
         _original_print(f"   Project config: {_project_config_path}")
         _original_print(f"   Global config: {_global_config_path}")
@@ -415,51 +415,51 @@ def handle_dimmed_command(aicoder_instance, args):
 
     elif subcommand == "add":
         if len(args) < 2:
-            print("\n❌ Usage: /dimmed add <pattern>")
+            print("\n[X] Usage: /dimmed add <pattern>")
             return False, False
 
         pattern = " ".join(args[1:])  # Allow spaces in pattern
         if add_dimmed_pattern(pattern):
-            print(f"\n✅ Added pattern: {pattern}")
+            print(f"\n[✓] Added pattern: {pattern}")
             set_dimmed_enabled(True)  # Auto-enable when pattern is added
         return False, False
 
     elif subcommand == "remove":
         if len(args) < 2:
-            print("\n❌ Usage: /dimmed remove <pattern>")
+            print("\n[X] Usage: /dimmed remove <pattern>")
             return False, False
 
         pattern = " ".join(args[1:])  # Allow spaces in pattern
         if remove_dimmed_pattern(pattern):
-            print(f"\n✅ Removed pattern: {pattern}")
+            print(f"\n[✓] Removed pattern: {pattern}")
         else:
-            print(f"\n❌ Pattern not found: {pattern}")
+            print(f"\n[X] Pattern not found: {pattern}")
         return False, False
 
     elif subcommand == "clear":
         clear_dimmed_patterns()
-        print("\n✅ Cleared all patterns")
+        print("\n[✓] Cleared all patterns")
         return False, False
 
     elif subcommand == "save":
         patterns = get_current_patterns()
         if not patterns:
-            print("\n⚠️ No patterns to save")
+            print("\n[!] No patterns to save")
             return False, False
 
         if save_patterns_to_config(patterns, _project_config_path):
-            print(f"\n✅ Saved {len(patterns)} patterns to project config:")
+            print(f"\n[✓] Saved {len(patterns)} patterns to project config:")
             print(f"   {_project_config_path}")
         return False, False
 
     elif subcommand == "save" and len(args) > 1 and args[1].lower() == "global":
         patterns = get_current_patterns()
         if not patterns:
-            print("\n⚠️ No patterns to save")
+            print("\n[!] No patterns to save")
             return False, False
 
         if save_patterns_to_config(patterns, _global_config_path):
-            print(f"\n✅ Saved {len(patterns)} patterns to global config:")
+            print(f"\n[✓] Saved {len(patterns)} patterns to global config:")
             print(f"   {_global_config_path}")
         return False, False
 
@@ -467,7 +467,7 @@ def handle_dimmed_command(aicoder_instance, args):
         pattern_strings = load_all_patterns()
         set_dimmed_patterns(pattern_strings)
         patterns = get_current_patterns()
-        print(f"\n✅ Reloaded {len(patterns)} patterns from config files")
+        print(f"\n[✓] Reloaded {len(patterns)} patterns from config files")
         return False, False
 
     elif subcommand in ("off", "disable"):
@@ -486,10 +486,10 @@ def handle_dimmed_command(aicoder_instance, args):
         # Treat as a new pattern (backward compatibility)
         new_pattern = subcommand
         if add_dimmed_pattern(new_pattern):
-            print(f"\n✅ Added pattern: {new_pattern}")
+            print(f"\n[✓] Added pattern: {new_pattern}")
             set_dimmed_enabled(True)  # Auto-enable when pattern is set
         else:
-            print(f"\n❌ Invalid regex pattern: {new_pattern}")
+            print(f"\n[X] Invalid regex pattern: {new_pattern}")
         return False, False
 
 

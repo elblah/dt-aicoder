@@ -119,7 +119,7 @@ def safe_execute_tool_wrapper(original_func):
 
     def wrapper(self, tool_name: str, arguments: Dict[str, Any], *args, **kwargs):
         if ENABLED:
-            print(f"🔒 Safe mode: Converting {tool_name} results to text format")
+            print(f"Safe mode: Converting {tool_name} results to text format")
 
         return original_func(self, tool_name, arguments, *args, **kwargs)
 
@@ -141,10 +141,10 @@ def on_plugin_load():
 
     if ENABLED:
         print(
-            "✅ Safe tool results plugin loaded - converting tool outputs to text format"
+            "[✓] Safe tool results plugin loaded - converting tool outputs to text format"
         )
     else:
-        print("✅ Safe tool results plugin loaded (disabled via environment variable)")
+        print("[✓] Safe tool results plugin loaded (disabled via environment variable)")
 
     return True
 
@@ -175,13 +175,13 @@ def on_aicoder_init(aicoder_instance):
         # Add /safetool command
         aicoder_instance.command_handlers["/safetool"] = _handle_safetool_command
 
-        print("🔒 Safe tool results mode activated")
+        print("Safe tool results mode activated")
         print("   - Tool outputs converted to plain text format")
         print("   - Use /safetool to toggle or check status")
 
         return True
     except Exception as e:
-        print(f"❌ Failed to activate safe tool results: {e}")
+        print(f"[X] Failed to activate safe tool results: {e}")
         return False
 
 
@@ -192,7 +192,7 @@ def _handle_safetool_command(args):
     if not args:
         # Show status
         status = "ENABLED" if ENABLED else "DISABLED"
-        print(f"🔒 Safe tool results mode is currently: {status}")
+        print(f"Safe tool results mode is currently: {status}")
         print("Usage: /safetool [on|off|toggle]")
         return False, False
 
@@ -200,16 +200,16 @@ def _handle_safetool_command(args):
 
     if command == "on":
         ENABLED = True
-        print("✅ Safe tool results mode ENABLED")
+        print("[✓] Safe tool results mode ENABLED")
     elif command == "off":
         ENABLED = False
-        print("✅ Safe tool results mode DISABLED")
+        print("[✓] Safe tool results mode DISABLED")
     elif command == "toggle":
         ENABLED = not ENABLED
         status = "ENABLED" if ENABLED else "DISABLED"
-        print(f"✅ Safe tool results mode TOGGLED: {status}")
+        print(f"[✓] Safe tool results mode TOGGLED: {status}")
     else:
-        print("❌ Unknown command. Use: /safetool [on|off|toggle]")
+        print("[X] Unknown command. Use: /safetool [on|off|toggle]")
 
     return False, False
 
@@ -224,6 +224,6 @@ def on_plugin_unload():
 
         ToolExecutor.execute_tool_calls = _original_execute_tool_calls
         ToolExecutor.execute_tool = _original_execute_tool
-        print("✅ Safe tool results plugin unloaded - original behavior restored")
+        print("[✓] Safe tool results plugin unloaded - original behavior restored")
 
     return True

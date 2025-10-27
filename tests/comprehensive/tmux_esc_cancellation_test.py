@@ -149,10 +149,10 @@ def main():
     print("=" * 50)
 
     if not test_tmux_available():
-        print("❌ tmux is not available. Please install tmux to run this test.")
+        print("[X] tmux is not available. Please install tmux to run this test.")
         return 1
 
-    print("✅ tmux is available")
+    print("[✓] tmux is available")
 
     # Create the test script with longer delay
     test_script = create_cancellable_test_script()
@@ -167,7 +167,7 @@ def main():
             f"new-session -d -s {session_name} -n test bash"
         )
         if rc != 0:
-            print(f"❌ Failed to create tmux session: {stderr}")
+            print(f"[X] Failed to create tmux session: {stderr}")
             return 1
 
         try:
@@ -188,13 +188,13 @@ def main():
                 )
 
                 if stdout and "Working..." in stdout:
-                    print("✅ Animation detected!")
+                    print("[✓] Animation detected!")
                     animation_detected = True
                     break
                 time.sleep(1)
 
             if not animation_detected:
-                print("⚠️  Animation not detected in time")
+                print("[!]  Animation not detected in time")
 
             # Send ESC to cancel the request
             print("Sending ESC to cancel the request...")
@@ -216,10 +216,10 @@ def main():
             print(f"\\nCancellation detected: {cancellation_detected}")
 
             if cancellation_detected:
-                print("✅ ESC cancellation test PASSED!")
+                print("[✓] ESC cancellation test PASSED!")
             else:
                 print(
-                    "⚠️  ESC cancellation may not have been detected, but that's OK for this test"
+                    "[!]  ESC cancellation may not have been detected, but that's OK for this test"
                 )
 
         finally:

@@ -101,11 +101,11 @@ def highlight_terminal(message):
         # Use ANSI escape codes to make text more visible
         from aicoder.config import YELLOW, RESET
 
-        highlighted = f"{YELLOW}🔔 {message} 🔔{RESET}"
+        highlighted = f"{YELLOW}[!] {message} [!]{RESET}"
         print(highlighted, file=sys.stderr)
     except Exception:
         # Fallback to regular print
-        print(f"🔔 {message} 🔔", file=sys.stderr)
+        print(f"[!] {message} [!]", file=sys.stderr)
 
 
 # Store original method
@@ -160,15 +160,15 @@ def notify_test_command(self, args):
         highlight_terminal(
             "TEST NOTIFICATION - This is a test of the notification system"
         )
-        return "✅ Notification test completed"
+        return "[✓] Notification test completed"
     except Exception as e:
-        return f"❌ Notification test failed: {e}"
+        return f"[X] Notification test failed: {e}"
 
 
 # Add the command
 CommandHandler.notify_test = notify_test_command
 
-print("✅ Attention notification plugin loaded")
+print("[✓] Attention notification plugin loaded")
 print("   - Desktop notifications enabled")
 print("   - Sound alerts enabled")
 print("   - Terminal highlighting enabled")

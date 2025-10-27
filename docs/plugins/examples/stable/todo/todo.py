@@ -110,7 +110,7 @@ def _display_todo(todo_text: str, explanation: str = None) -> None:
 
     # Display formatted todo
     print("\n" + "=" * 60)
-    print(f"📋 {title}")
+    print(f"{title}")
     print("=" * 60)
 
     # Show progress bar
@@ -128,12 +128,12 @@ def _display_todo(todo_text: str, explanation: str = None) -> None:
             stripped = line.strip()
             if stripped.startswith("- [x]") or stripped.startswith("- [X]"):
                 # Completed item
-                checkbox = "✅"
+                checkbox = "[✓]"
                 content = stripped[5:].strip()  # Remove "- [x] " prefix
                 print(f"  {checkbox} {content}")
             elif stripped.startswith("- [ ]"):
                 # Pending item
-                checkbox = "⏳"
+                checkbox = "[ ]"
                 content = stripped[5:].strip()  # Remove "- [ ] " prefix
                 print(f"  {checkbox} {content}")
             elif stripped.startswith("#"):
@@ -146,9 +146,9 @@ def _display_todo(todo_text: str, explanation: str = None) -> None:
                         break
                 header_text = stripped[level:].strip()
                 if level == 1:
-                    print(f"\n📁 {header_text}")
+                    print(f"\n{header_text}")
                 elif level == 2:
-                    print(f"\n📂 {header_text}")
+                    print(f"\n{header_text}")
                 else:
                     print(f"\n{header_text}")
             elif stripped:
@@ -159,13 +159,13 @@ def _display_todo(todo_text: str, explanation: str = None) -> None:
 
     # Show explanation if provided
     if explanation and explanation.strip():
-        print(f"\n💭 Note: {explanation}")
+        print(f"\nNote: {explanation}")
 
     # Show last updated time
     import datetime
 
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"\n🕒 Last updated: {now}")
+    print(f"\nLast updated: {now}")
 
 
 # Global reference to store the aicoder instance
@@ -244,20 +244,20 @@ def on_aicoder_init(aicoder_instance):
         _add_todo_system_prompt()
 
         if todo_enabled:
-            print("✅ Todo plugin loaded successfully")
+            print("[✓] Todo plugin loaded successfully")
             print("   - /todo command available")
             print("   - Custom update_todo tool registered")
             print("   - AI instructions added to system prompt")
             print("   - Use /todo to view todos, /todo update to force updates")
         else:
-            print("✅ Todo plugin loaded successfully")
+            print("[✓] Todo plugin loaded successfully")
             print("   - /todo command available for management")
             print("   - Custom update_todo tool registered but disabled")
             print("   - Use '/todo on' to enable functionality")
 
         return True
     except Exception as e:
-        print(f"❌ Failed to load todo plugin: {e}")
+        print(f"[X] Failed to load todo plugin: {e}")
         return False
 
 
@@ -399,7 +399,7 @@ def _set_todo_enabled(enabled):
     global _aicoder_ref
 
     if not _aicoder_ref or not hasattr(_aicoder_ref, "persistent_config"):
-        print("❌ Cannot modify todo settings: persistent config not available")
+        print("[X] Cannot modify todo settings: persistent config not available")
         return
 
     # Update the persistent config
@@ -409,11 +409,11 @@ def _set_todo_enabled(enabled):
         # Add system prompt info if not already added
         _add_todo_system_prompt()
 
-        print("✅ Todo functionality enabled")
+        print("[✓] Todo functionality enabled")
         print("   - /todo command available")
         print("   - AI can use update_todo tool")
     else:
-        print("❌ Todo functionality disabled")
+        print("[X] Todo functionality disabled")
         print("   - /todo command unavailable")
         print("   - AI cannot use update_todo tool")
 
@@ -423,7 +423,7 @@ def _handle_todo_command(args):
     global _aicoder_ref, _last_todo_storage
 
     if not _aicoder_ref:
-        print("❌ Todo functionality not available")
+        print("[X] Todo functionality not available")
         return False, False
 
     # Handle subcommands

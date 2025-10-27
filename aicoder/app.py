@@ -259,6 +259,42 @@ class AICoder(
             ):
                 approval_system._diff_edit_result = None  # Clear it
 
+    def _execute_shell_command(self, user_input):
+        """Execute a shell command when user input starts with '!'."""
+        import subprocess
+        import sys
+
+        command = user_input[1:].strip()  # Remove the "!" prefix
+
+        try:
+            # Execute the command and capture output
+            result = subprocess.run(
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=30,  # 30 second timeout
+            )
+
+            # Print the command being executed
+            print(f"$ {command}")
+
+            # Print stdout if present
+            if result.stdout:
+                print(result.stdout, end="")
+
+            # Print stderr if present
+            if result.stderr:
+                print(result.stderr, end="", file=sys.stderr)
+
+            # Print the exit code
+            print(f"exit code: {result.returncode}")
+
+        except subprocess.TimeoutExpired:
+            print(f"Command timed out: {command}", file=sys.stderr)
+        except Exception as e:
+            print(f"Error executing command: {e}", file=sys.stderr)
+
     def _check_auto_compaction(self):
         """Check if auto-compaction should be triggered based on context percentage."""
         # If auto-compaction is disabled, return early
@@ -288,7 +324,7 @@ class AICoder(
                     )
                 except Exception as e:
                     # CRITICAL: Compaction failed - preserve user data and inform user
-                    emsg(f"\n ❌ Compaction failed: {str(e)}")
+                    emsg(f"\n [X] Compaction failed: {str(e)}")
                     wmsg(" *** Your conversation history has been preserved.")
                     wmsg(
                         " *** Options: Try '/compact' again, save with '/save', or continue with a new message."
@@ -383,6 +419,15 @@ class AICoder(
 
                     # Handle planning mode content
                     user_input = self._handle_planning_mode_content(user_input)
+
+                    # Check if the input is a shell command (starts with "!")
+                    if user_input.startswith("!"):
+                        self._execute_shell_command(user_input)
+                        # Exit prompt mode since no API call will be made
+                        from .terminal_manager import exit_prompt_mode
+
+                        exit_prompt_mode()
+                        continue
 
                     if user_input.startswith("/"):
                         should_quit, run_api_call = self._handle_command(user_input)

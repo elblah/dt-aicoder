@@ -21,7 +21,7 @@ __version__ = "1.0.0"
 
 def on_plugin_load():
     """Called when the plugin is loaded"""
-    print(f"🚀 Smart Edit Tool Plugin v{__version__} loaded")
+    print(f"Smart Edit Tool Plugin v{__version__} loaded")
 
 
 def on_aicoder_init(aicoder_instance):
@@ -29,7 +29,7 @@ def on_aicoder_init(aicoder_instance):
     global _aicoder_ref
     try:
         _aicoder_ref = aicoder_instance
-        print("🔧 DEBUG: Smart Edit plugin on_aicoder_init called")
+        print("DEBUG: Smart Edit plugin on_aicoder_init called")
 
         # Register the smart_edit tool
         tool_definition = {
@@ -104,7 +104,7 @@ smart_edit(path="example.py", changes=[{
             "validate_function": "validate_smart_edit",
         }
 
-        print("🔧 DEBUG: About to register smart_edit tool")
+        print("DEBUG: About to register smart_edit tool")
 
         # Register the tool
         aicoder_instance.tool_manager.registry.mcp_tools["smart_edit"] = tool_definition
@@ -115,17 +115,17 @@ smart_edit(path="example.py", changes=[{
 
             INTERNAL_TOOL_FUNCTIONS["smart_edit"] = execute_smart_edit
             print(
-                "🔧 DEBUG: Implementation function registered in INTERNAL_TOOL_FUNCTIONS"
+                "DEBUG: Implementation function registered in INTERNAL_TOOL_FUNCTIONS"
             )
         except ImportError as e:
-            print(f"🔧 DEBUG: Failed to import INTERNAL_TOOL_FUNCTIONS: {e}")
+            print(f"DEBUG: Failed to import INTERNAL_TOOL_FUNCTIONS: {e}")
             return False
 
-        print("✅ Smart Edit Tool plugin registered successfully")
+        print("[✓] Smart Edit Tool plugin registered successfully")
         return True
 
     except Exception as e:
-        print(f"❌ Failed to load Smart Edit Tool plugin: {e}")
+        print(f"[X] Failed to load Smart Edit Tool plugin: {e}")
         import traceback
 
         traceback.print_exc()
@@ -187,17 +187,17 @@ class DiffVisualizer:
         additions = len(mod_lines) - len(orig_lines)
         deletions = len(orig_lines) - len(mod_lines)
 
-        summary = f"\n📊 Changes Summary for {os.path.basename(file_path)}:\n"
+        summary = f"\nChanges Summary for {os.path.basename(file_path)}:\n"
         summary += "=" * 60 + "\n"
 
         if additions > 0:
-            summary += f"➕ {additions} line{'s' if additions != 1 else ''} added\n"
+            summary += f"[+] {additions} line{'s' if additions != 1 else ''} added\n"
         if deletions > 0:
-            summary += f"➖ {deletions} line{'s' if deletions != 1 else ''} removed\n"
+            summary += f"[-] {deletions} line{'s' if deletions != 1 else ''} removed\n"
         if additions == 0 and deletions == 0:
-            summary += "✨ Content modified (no line count change)\n"
+            summary += "[*] Content modified (no line count change)\n"
 
-        summary += f"📝 Total lines: {len(mod_lines)}\n"
+        summary += f"Total lines: {len(mod_lines)}\n"
         return summary
 
 
@@ -237,21 +237,21 @@ class BackupManager:
     def rollback(self, file_path: str) -> bool:
         """Rollback file to last backup."""
         if file_path not in self.backups:
-            print("❌ No backup found for rollback")
+            print("[X] No backup found for rollback")
             return False
 
         backup_path = self.backups[file_path]
 
         if not os.path.exists(backup_path):
-            print(f"❌ Backup file not found: {backup_path}")
+            print(f"[X] Backup file not found: {backup_path}")
             return False
 
         try:
             shutil.copy2(backup_path, file_path)
-            print(f"✅ Successfully rolled back {file_path}")
+            print(f"[✓] Successfully rolled back {file_path}")
             return True
         except Exception as e:
-            print(f"❌ Rollback failed: {e}")
+            print(f"[X] Rollback failed: {e}")
             return False
 
 
@@ -465,7 +465,7 @@ def get_preview(
         encoding = arguments.get("encoding", "utf-8")
 
         if not path or not changes:
-            return f"\n{config.YELLOW}{tool_name} tool called{config.RESET}\n{config.CYAN}📁 Path: {path or 'Not specified'}{config.RESET}\n"
+            return f"\n{config.YELLOW}{tool_name} tool called{config.RESET}\n{config.CYAN}Path: {path or 'Not specified'}{config.RESET}\n"
 
         # Read current file content
         original_content = ""
@@ -474,7 +474,7 @@ def get_preview(
                 with open(path, "r", encoding=encoding) as f:
                     original_content = f.read()
             except Exception as e:
-                return f"\n{config.YELLOW}{tool_name} tool called{config.RESET}\n{config.CYAN}📁 File: {path}{config.RESET}\n{config.RED}Error reading file: {e}{config.RESET}\n"
+                return f"\n{config.YELLOW}{tool_name} tool called{config.RESET}\n{config.CYAN}File: {path}{config.RESET}\n{config.RED}Error reading file: {e}{config.RESET}\n"
 
         # Apply changes to preview
         strategy_manager = EditStrategyManager()
@@ -484,7 +484,7 @@ def get_preview(
 
         # Build preview text
         preview_lines = [f"\n{config.YELLOW}{tool_name} tool called{config.RESET}"]
-        preview_lines.append(f"{config.CYAN}📁 File: {path}{config.RESET}")
+        preview_lines.append(f"{config.CYAN}File: {path}{config.RESET}")
 
         # Show diff if there are changes
         if modified_content != original_content:
@@ -520,7 +520,7 @@ def get_preview(
         from aicoder import config
 
         path = arguments.get("path", "")
-        return f"\n{config.YELLOW}{tool_name} tool called{config.RESET}\n{config.CYAN}📁 Path: {path}{config.RESET}\n{config.RED}Preview error: {e}{config.RESET}\n"
+        return f"\n{config.YELLOW}{tool_name} tool called{config.RESET}\n{config.CYAN}Path: {path}{config.RESET}\n{config.RED}Preview error: {e}{config.RESET}\n"
 
 
 def execute_smart_edit(
@@ -536,7 +536,7 @@ def execute_smart_edit(
 ) -> str:
     """Main smart_edit tool implementation."""
     try:
-        print(f"🔧 DEBUG: Processing file {path} with {len(changes)} changes")
+        print(f"DEBUG: Processing file {path} with {len(changes)} changes")
 
         # Initialize components
         backup_manager = BackupManager()
@@ -548,7 +548,7 @@ def execute_smart_edit(
                 with open(path, "r", encoding=encoding) as f:
                     original_content = f.read()
             except Exception as e:
-                return f"❌ Error reading file '{path}': {e}"
+                return f"[X] Error reading file '{path}': {e}"
         else:
             original_content = ""
 
@@ -559,7 +559,7 @@ def execute_smart_edit(
 
         # Check if any changes were actually made
         if modified_content == original_content:
-            return "ℹ️  No changes were applied to the file"
+            return "[i] No changes were applied to the file"
 
         # Create backup if requested
         backup_path = None
@@ -584,34 +584,34 @@ def execute_smart_edit(
             except ImportError:
                 pass
 
-            result = f"✅ Successfully edited '{path}'\n"
+            result = f"[✓] Successfully edited '{path}'\n"
 
             if backup_path:
-                result += f"💾 Backup created: {backup_path}\n"
+                result += f"Backup created: {backup_path}\n"
 
-            result += "\n📋 Applied changes:\n"
+            result += "\nApplied changes:\n"
             for change_result in change_results:
                 result += f"   • {change_result}\n"
 
-            print("🔧 DEBUG: smart_edit completed successfully")
+            print("DEBUG: smart_edit completed successfully")
             return result
 
         except Exception as e:
             # Attempt rollback if we have a backup
             if backup_path:
-                print("⚠️  Write failed, attempting rollback...")
+                print("[!] Write failed, attempting rollback...")
                 if backup_manager.rollback(path):
-                    return f"❌ Error writing file '{path}': {e}\n✅ Successfully rolled back from backup"
+                    return f"[X] Error writing file '{path}': {e}\n[✓] Successfully rolled back from backup"
                 else:
                     return (
-                        f"❌ Error writing file '{path}': {e}\n❌ Rollback also failed"
+                        f"[X] Error writing file '{path}': {e}\n[X] Rollback also failed"
                     )
             else:
-                return f"❌ Error writing file '{path}': {e}"
+                return f"[X] Error writing file '{path}': {e}"
 
     except Exception as e:
-        print(f"🔧 DEBUG: Exception in execute_smart_edit: {e}")
+        print(f"DEBUG: Exception in execute_smart_edit: {e}")
         import traceback
 
         traceback.print_exc()
-        return f"❌ Error in smart_edit: {str(e)}"
+        return f"[X] Error in smart_edit: {str(e)}"

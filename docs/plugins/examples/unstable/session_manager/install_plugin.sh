@@ -15,10 +15,10 @@ mkdir -p "$INSTALL_DIR"
 cp -r "$PLUGIN_DIR/$PLUGIN_NAME" "$INSTALL_DIR/"
 
 if [ $? -eq 0 ]; then
-    echo "✅ $PLUGIN_NAME plugin installed successfully!"
+    echo "[✓] $PLUGIN_NAME plugin installed successfully!"
     echo "   The plugin will be automatically loaded when you run AI Coder"
     echo "   To uninstall, run: rm -rf \"$INSTALL_DIR/$PLUGIN_NAME\""
 else
-    echo "❌ Failed to install $PLUGIN_NAME plugin"
+    echo "[X] Failed to install $PLUGIN_NAME plugin"
     exit 1
 fi

@@ -31,7 +31,7 @@ def on_plugin_load():
     _debug_mode = os.environ.get("DEBUG", "0") == "1"
 
     if _debug_mode:
-        print("🤖 Anthropic Adapter plugin loading...")
+        print("Anthropic Adapter plugin loading...")
 
 
 def on_aicoder_init(aicoder_instance):
@@ -43,13 +43,13 @@ def on_aicoder_init(aicoder_instance):
         try:
             import anthropic
         except ImportError:
-            print("❌ Anthropic library not found. Install with: pip install anthropic")
+            print("[X] Anthropic library not found. Install with: pip install anthropic")
             return False
 
         # Get Anthropic API key from environment
         _anthropic_api_key = os.environ.get("ANTHROPIC_API_KEY")
         if not _anthropic_api_key:
-            print("⚠️  ANTHROPIC_API_KEY not set. Plugin will not be active.")
+            print("[!]  ANTHROPIC_API_KEY not set. Plugin will not be active.")
             return False
 
         # Get model from environment or use default
@@ -67,16 +67,16 @@ def on_aicoder_init(aicoder_instance):
         aicoder_instance._make_api_request = _make_anthropic_api_request
 
         if _debug_mode:
-            print("✅ Anthropic Adapter plugin loaded successfully")
+            print("[✓] Anthropic Adapter plugin loaded successfully")
             print(f"   - Model: {_anthropic_model}")
             print(
                 f"   - API Key: {'*' * len(_anthropic_api_key) if _anthropic_api_key else 'None'}"
             )
 
-        print("✅ Anthropic Adapter plugin loaded successfully")
+        print("[✓] Anthropic Adapter plugin loaded successfully")
         return True
     except Exception as e:
-        print(f"❌ Failed to load Anthropic Adapter plugin: {e}")
+        print(f"[X] Failed to load Anthropic Adapter plugin: {e}")
         return False
 
 
@@ -184,7 +184,7 @@ def _make_anthropic_api_request(
 
     try:
         if _debug_mode:
-            print("🔄 Converting OpenAI request to Anthropic format...")
+            print("*** Converting OpenAI request to Anthropic format...")
 
         # Convert messages
         anthropic_messages = _convert_openai_to_anthropic_messages(messages)
@@ -213,24 +213,24 @@ def _make_anthropic_api_request(
             request_params["temperature"] = aicoder_instance.TEMPERATURE
 
         if _debug_mode:
-            print(f"📤 Anthropic API Request: {json.dumps(request_params, indent=2)}")
+            print(f"*** Anthropic API Request: {json.dumps(request_params, indent=2)}")
 
         # Make the API call
         response = _anthropic_client.messages.create(**request_params)
 
         if _debug_mode:
-            print(f"📥 Anthropic API Response: {response}")
+            print(f"*** Anthropic API Response: {response}")
 
         # Convert Anthropic response back to OpenAI format
         openai_response = _convert_anthropic_to_openai_response(response)
 
         if _debug_mode:
-            print(f"🔄 Converted Response: {json.dumps(openai_response, indent=2)}")
+            print(f"*** Converted Response: {json.dumps(openai_response, indent=2)}")
 
         return openai_response
 
     except Exception as e:
-        print(f"❌ Error in Anthropic API request: {e}")
+        print(f"[X] Error in Anthropic API request: {e}")
         # Fall back to original OpenAI request
         original_make_api_request = aicoder_instance.__class__._make_api_request
         return original_make_api_request(

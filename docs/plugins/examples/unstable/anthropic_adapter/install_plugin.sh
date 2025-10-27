@@ -30,7 +30,7 @@ echo "Anthropic library installed successfully!"
 
 # Show installation instructions
 echo ""
-echo "✅ Installation complete!"
+echo "[✓] Installation complete!"
 echo ""
 echo "To use this plugin:"
 echo "1. Copy this directory to your AI Coder plugins directory:"

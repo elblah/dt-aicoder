@@ -91,7 +91,7 @@ class PromptCommand(BaseCommand):
                 main_source = "Environment Variable (literal)"
 
         main_prompt = get_main_prompt()
-        imsg(f"{config.BOLD}📋 MAIN SYSTEM PROMPT")
+        imsg(f"{config.BOLD}MAIN SYSTEM PROMPT")
         wmsg(f"   Source: {main_source}")
         wmsg(f"   Length: {len(main_prompt)} characters")
         print(
@@ -125,11 +125,11 @@ class PromptCommand(BaseCommand):
                 except Exception:
                     continue
 
-        imsg(f"{config.BOLD}📄 PROJECT CONTEXT FILE")
+        imsg(f"{config.BOLD}PROJECT CONTEXT FILE")
         wmsg(f"   File: {project_file}")
         wmsg(f"   Source: {project_source}")
         if project_content:
-            wmsg("   Status: ✅ Found")
+            wmsg("   Status: [✓] Found")
             wmsg(f"   Length: {len(project_content)} characters")
             print(
                 f"{config.CYAN}   ──────────────────────────────────────────────────────────────{config.RESET}"
@@ -141,7 +141,7 @@ class PromptCommand(BaseCommand):
                     f"{config.WHITE}{project_content[:300]}{'...' if len(project_content) > 300 else ''}{config.RESET}\n"
                 )
         else:
-            wmsg("   Status: ❌ Not found\n")
+            wmsg("   Status: [X] Not found\n")
 
         # Planning Mode Prompts
         from ..planning_mode import get_planning_mode
@@ -161,10 +161,10 @@ class PromptCommand(BaseCommand):
             else:
                 plan_source = "Environment Variable (literal)"
 
-        imsg(f"{config.BOLD}🎯 PLANNING MODE PROMPT")
+        imsg(f"{config.BOLD}PLANNING MODE PROMPT")
         wmsg(f"   Source: {plan_source}")
         wmsg(
-            f"   Status: {'🟢 ACTIVE' if planning_mode.is_plan_mode_active() else '⚪ INACTIVE'}"
+            f"   Status: {'[ACTIVE]' if planning_mode.is_plan_mode_active() else '[INACTIVE]'}"
         )
         wmsg(f"   Length: {len(plan_prompt)} characters")
         print(
@@ -191,7 +191,7 @@ class PromptCommand(BaseCommand):
             else:
                 build_source = "Environment Variable (literal)"
 
-        imsg(f"{config.BOLD}🔧 BUILD SWITCH PROMPT")
+        imsg(f"{config.BOLD}BUILD SWITCH PROMPT")
         wmsg(f"   Source: {build_source}")
         wmsg(f"   Length: {len(build_prompt)} characters")
         print(
@@ -222,7 +222,7 @@ class PromptCommand(BaseCommand):
             if not compaction_prompt:
                 compaction_source = "Hardcoded Fallback"
 
-        imsg(f"{config.BOLD}🗜️  COMPACTION PROMPT")
+        imsg(f"{config.BOLD}COMPACTION PROMPT")
         wmsg(f"   Source: {compaction_source}")
         wmsg(
             f"   Length: {len(compaction_prompt) if compaction_prompt else 0} characters"
@@ -239,7 +239,7 @@ class PromptCommand(BaseCommand):
                 )
 
         # Environment Variables Summary
-        print(f"{config.BOLD}{config.MAGENTA}⚙️  ENVIRONMENT VARIABLES{config.RESET}")
+        print(f"{config.BOLD}{config.MAGENTA}ENVIRONMENT VARIABLES{config.RESET}")
         env_vars = [
             ("AICODER_PROMPT_MAIN", os.environ.get("AICODER_PROMPT_MAIN")),
             ("AICODER_PROMPT_PROJECT", os.environ.get("AICODER_PROMPT_PROJECT")),

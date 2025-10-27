@@ -279,7 +279,7 @@ def run_scenario_test(name, scenario, expect_success=True):
     import os
     import sys
 
-    print(f"\n🧪 {name}:")
+    print(f"\n{name}:")
     print("-" * 30)
 
     # IMPORTANT: Start test server BEFORE any imports that might load config
@@ -349,17 +349,17 @@ def run_scenario_test(name, scenario, expect_success=True):
             normalized_output = all_output.replace(" ", "")  # Remove spaces
             if "Hello" in normalized_output:
                 if "you" in normalized_output:
-                    print("✅ Success: Got expected content with 'Hello' and 'you'")
+                    print("[✓] Success: Got expected content with 'Hello' and 'you'")
                     return True
                 else:
                     print(
-                        "❌ Failed: Found 'Hello' but not all 'you' characters in output"
+                        "[X] Failed: Found 'Hello' but not all 'you' characters in output"
                     )
                     print(f"   Output (last 200): {all_output[-200:]}")
                     return False
             else:
                 print(
-                    f"❌ Failed: Expected 'Hello' characters in output, got: {all_output[-200:]}"
+                    f"[X] Failed: Expected 'Hello' characters in output, got: {all_output[-200:]}"
                 )
                 return False
         elif scenario == "tool_calls":
@@ -375,41 +375,41 @@ def run_scenario_test(name, scenario, expect_success=True):
                         tc.get("function", {}).get("name", "") for tc in tool_calls
                     ]
                     if any(name in tool_names for name in ["read_file", "pwd"]):
-                        print(f"✅ Success: Tool calls found in response: {tool_names}")
+                        print(f"[✓] Success: Tool calls found in response: {tool_names}")
                         return True
                     else:
                         print(
-                            f"❌ Failed: Tool calls found but unexpected names: {tool_names}"
+                            f"[X] Failed: Tool calls found but unexpected names: {tool_names}"
                         )
                         return False
                 else:
                     # Check the output instead - might see the tool call result
                     if "pwd" in all_output or "test.txt" in all_output:
-                        print("✅ Success: Tool execution detected in output")
+                        print("[✓] Success: Tool execution detected in output")
                         return True
-                    print("❌ Failed: No tool calls or tool execution detected")
+                    print("[X] Failed: No tool calls or tool execution detected")
                     print(f"   Response: {response}")
                     print(f"   Output (last 200): {all_output[-200:]}")
                     return False
             else:
-                print("❌ Failed: No valid response for tool calls scenario")
+                print("[X] Failed: No valid response for tool calls scenario")
                 return False
         elif scenario in ["connection_drop", "timeout", "error", "empty"]:
             # Should handle gracefully without crashing
-            print("✅ Success: Handled gracefully as expected")
+            print("[✓] Success: Handled gracefully as expected")
             return True
         else:
-            print("✅ Success: Request completed")
+            print("[✓] Success: Request completed")
             return True
 
     except Exception as e:
         # Restore original print in case of exception
         builtins.print = original_print
         if expect_success:
-            print(f"❌ Failed with unexpected exception: {e}")
+            print(f"[X] Failed with unexpected exception: {e}")
             return False
         else:
-            print(f"✅ Exception handled gracefully as expected: {type(e).__name__}")
+            print(f"[✓] Exception handled gracefully as expected: {type(e).__name__}")
             return True
     finally:
         # Always restore print function
@@ -425,7 +425,7 @@ def run_scenario_test(name, scenario, expect_success=True):
 
 def main():
     """Run all tests."""
-    print("🚀 Streaming Adapter Comprehensive Test")
+    print("Streaming Adapter Comprehensive Test")
     print("=" * 50)
     print("Testing real components with real web server")
 
@@ -443,11 +443,11 @@ def main():
         result = run_scenario_test(name, scenario, expect_success)
         results.append((name, result))
 
-    print("\n📊 Results:")
+    print("\nResults:")
     print("=" * 50)
     passed = 0
     for name, result in results:
-        status = "✅ PASS" if result else "❌ FAIL"
+        status = "[✓] PASS" if result else "[X] FAIL"
         print(f"{status} {name}")
         if result:
             passed += 1

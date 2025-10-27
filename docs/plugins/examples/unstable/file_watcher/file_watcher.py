@@ -46,14 +46,14 @@ class FileWatcher:
         self.running = True
         self.thread = threading.Thread(target=self._watch_loop, daemon=True)
         self.thread.start()
-        print("✅ File watcher started")
+        print("[✓] File watcher started")
 
     def stop_watching(self):
         """Stop the file watching thread."""
         self.running = False
         if self.thread:
             self.thread.join()
-        print("⏹️ File watcher stopped")
+        print("[ ] File watcher stopped")
 
     def _watch_loop(self):
         """Main watching loop."""
@@ -63,7 +63,7 @@ class FileWatcher:
                 time.sleep(WATCH_INTERVAL)
             except Exception as e:
                 if self.running:  # Only print if we're still supposed to be running
-                    print(f"⚠️ File watcher error: {e}")
+                    print(f"[!] File watcher error: {e}")
 
     def _check_files(self):
         """Check for file changes."""
@@ -81,11 +81,11 @@ class FileWatcher:
                     if rel_path not in self.watched_files:
                         # New file
                         self.watched_files[rel_path] = mtime
-                        changes.append(f"🆕 New file created: {rel_path}")
+                        changes.append(f"New file created: {rel_path}")
                     elif self.watched_files[rel_path] != mtime:
                         # Modified file
                         self.watched_files[rel_path] = mtime
-                        changes.append(f"✏️ File modified: {rel_path}")
+                        changes.append(f"File modified: {rel_path}")
 
             # Notify about changes
             if changes and self.message_history:
@@ -97,10 +97,10 @@ class FileWatcher:
 
                 # Print to console as well
                 for change in changes:
-                    print(f"📁 {change}")
+                    print(f"{change}")
 
         except Exception as e:
-            print(f"⚠️ File check error: {e}")
+            print(f"[!] File check error: {e}")
 
 
 # Global file watcher instance
@@ -130,19 +130,19 @@ def watch_command(self, args):
     if not args or args.strip().lower() in ["start", "on"]:
         if not file_watcher.running:
             file_watcher.start_watching()
-            return "✅ File watching started"
+            return "[✓] File watching started"
         else:
-            return "ℹ️ File watching is already running"
+            return "[i] File watching is already running"
     elif args.strip().lower() in ["stop", "off"]:
         if file_watcher.running:
             file_watcher.stop_watching()
-            return "⏹️ File watching stopped"
+            return "[ ] File watching stopped"
         else:
-            return "ℹ️ File watching is already stopped"
+            return "[i] File watching is already stopped"
     elif args.strip().lower() == "status":
         status = "running" if file_watcher.running else "stopped"
         files = len(file_watcher.watched_files)
-        return f"📁 File watcher status: {status}\n   Watching {files} files"
+        return f"File watcher status: {status}\n   Watching {files} files"
     else:
         return "Usage: /watch [start|stop|status]"
 
@@ -150,7 +150,7 @@ def watch_command(self, args):
 # Add the command
 CommandHandler.watch = watch_command
 
-print("✅ File watcher plugin loaded")
+print("[✓] File watcher plugin loaded")
 print(
     "   - Watching for changes in .py, .js, .ts, .jsx, .tsx, .html, .css, .json, .md files"
 )

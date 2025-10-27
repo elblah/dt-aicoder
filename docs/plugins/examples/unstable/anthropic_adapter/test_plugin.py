@@ -12,10 +12,10 @@ sys.path.insert(0, os.path.dirname(__file__))
 def test_plugin_import():
     """Test that the plugin can be imported"""
     try:
-        print("✅ Plugin imported successfully")
+        print("[✓] Plugin imported successfully")
         return True
     except Exception as e:
-        print(f"❌ Plugin import failed: {e}")
+        print(f"[X] Plugin import failed: {e}")
         return False
 
 
@@ -25,10 +25,10 @@ def test_requirements():
         import importlib
 
         importlib.util.find_spec("anthropic")
-        print("✅ Anthropic library available")
+        print("[✓] Anthropic library available")
         return True
     except ImportError:
-        print("❌ Anthropic library not found. Install with: pip install anthropic")
+        print("[X] Anthropic library not found. Install with: pip install anthropic")
         return False
 
 
@@ -49,13 +49,13 @@ def test_environment_variables():
         if hasattr(anthropic_adapter, "_anthropic_api_key") and hasattr(
             anthropic_adapter, "_anthropic_model"
         ):
-            print("✅ Environment variables handling works")
+            print("[✓] Environment variables handling works")
             return True
         else:
-            print("❌ Environment variables not properly handled")
+            print("[X] Environment variables not properly handled")
             return False
     except Exception as e:
-        print(f"❌ Environment variables test failed: {e}")
+        print(f"[X] Environment variables test failed: {e}")
         return False
     finally:
         # Restore original values
@@ -85,8 +85,8 @@ if __name__ == "__main__":
     print(f"Results: {passed}/{len(tests)} tests passed")
 
     if passed == len(tests):
-        print("🎉 All tests passed!")
+        print("*** All tests passed!")
         sys.exit(0)
     else:
-        print("❌ Some tests failed!")
+        print("[X] Some tests failed!")
         sys.exit(1)

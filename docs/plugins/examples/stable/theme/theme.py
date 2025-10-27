@@ -263,10 +263,10 @@ def apply_theme(theme_name="default"):
         # Update other modules that import these colors directly
         # _update_dependent_modules(theme)
 
-        print(f"✅ Applied theme: {theme_name}")
+        print(f"[✓] Applied theme: {theme_name}")
         return True
     except Exception as e:
-        print(f"❌ Failed to apply theme {theme_name}: {e}")
+        print(f"[X] Failed to apply theme {theme_name}: {e}")
         return False
 
 
@@ -300,7 +300,7 @@ def _update_dependent_modules(theme):
                 pass
 
     except Exception as e:
-        print(f"⚠️ Warning: Some modules may not have updated colors: {e}")
+        print(f"[!] Warning: Some modules may not have updated colors: {e}")
 
 
 def list_themes():
@@ -316,7 +316,7 @@ def initialize_theme_plugin():
 
     # Print startup info only in debug mode
     if debug:
-        print("🎨 Theme Customization plugin loaded")
+        print("Theme Customization plugin loaded")
         print("   - High contrast themes for better readability")
         print("   - 15+ famous terminal themes included")
         print("   - Set AICODER_THEME environment variable for persistent themes")
@@ -332,7 +332,7 @@ def initialize_theme_plugin():
         return True
     elif theme_env:
         print(
-            f"⚠️ Theme '{theme_env}' not found. Available themes: {', '.join(list_themes())}"
+            f"[!] Theme '{theme_env}' not found. Available themes: {', '.join(list_themes())}"
         )
         return False
     return False

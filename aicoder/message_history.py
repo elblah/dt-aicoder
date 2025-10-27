@@ -840,11 +840,11 @@ Provide a detailed but concise summary of our conversation above. Focus on infor
                 if planning_mode_detected and not current_mode:
                     # Session was in plan mode but we're in build mode - switch to plan mode
                     planning_mode.set_plan_mode(True)
-                    imsg(" 🔄 Planning mode detected and restored from session")
+                    imsg(" *** Planning mode detected and restored from session")
                 elif not planning_mode_detected and current_mode:
                     # Session was in build mode but we're in plan mode - switch to build mode
                     planning_mode.set_plan_mode(False)
-                    imsg(" 🔄 Build mode restored from session")
+                    imsg(" *** Build mode restored from session")
 
                 # After setting the mode, mark message as sent to avoid duplicate mode messages on first user input
                 planning_mode._mode_message_sent = True
@@ -891,7 +891,7 @@ Provide a detailed but concise summary of our conversation above. Focus on infor
             except Exception as e:
                 # Always warn the user if autosave fails - this is about data safety!
                 emsg(
-                    f" *** ⚠️  AUTOSAVE FAILED: Could not save to {self.autosave_filename}"
+                    f" *** AUTOSAVE FAILED: Could not save to {self.autosave_filename}"
                 )
                 emsg(f" *** Error: {e}")
                 wmsg(" *** Your session may not be saved if the application crashes!")

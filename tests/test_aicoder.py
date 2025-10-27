@@ -1,7 +1,7 @@
 """
 Comprehensive tests for the AI Coder application.
 
-⚠️ CRITICAL: This test triggers tool approval prompts that will hang indefinitely.
+[!] CRITICAL: This test triggers tool approval prompts that will hang indefinitely.
 Tests automatically set YOLO_MODE=1 if not already set to prevent hanging.
 """
 

@@ -21,7 +21,7 @@ Tip: For HTTP connection timeouts, set HTTP_TIMEOUT=X (e.g., HTTP_TIMEOUT=600)""
     CONNECTION_ERROR = """Connection Error: {reason}
 Check your internet connection and API endpoint."""
 
-    CONNECTION_DROPPED = """🚫 Connection dropped by server ({reason}).
+    CONNECTION_DROPPED = """Connection dropped by server ({reason}).
 The AI model server closed the connection unexpectedly.
 Please try your request again - connection may work next time."""
 
@@ -38,7 +38,7 @@ You can try running with ENABLE_STREAMING=0 to disable streaming mode."""
     RETRY_ERROR_WITH_CANCEL = """{error_type} detected. Retrying in {retry_sleep_secs} secs... (Press ESC to cancel)"""
 
     # === TIMEOUT REMINDER ERRORS ===
-    TIMEOUT_REMINDER = """⚠️  It's been {read_timeout_seconds} seconds with no new data.
+    TIMEOUT_REMINDER = """It's been {read_timeout_seconds} seconds with no new data.
    Press ESC to cancel the request, or wait for more data..."""
 
     # === RETRY ERRORS ===

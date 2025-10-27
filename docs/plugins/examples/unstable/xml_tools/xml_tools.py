@@ -39,20 +39,20 @@ def on_aicoder_init(aicoder_instance):
         aicoder_instance.command_handlers["/xml_tools"] = _handle_xml_tools_command
         aicoder_instance.command_handlers["/execute_xml"] = _handle_execute_xml_command
 
-        print("✅ XML Tools plugin loaded successfully")
+        print("[✓] XML Tools plugin loaded successfully")
         print("   - Use '/xml_tools help' for available commands")
         return True
     except Exception as e:
-        print(f"❌ Failed to load XML Tools plugin: {e}")
+        print(f"[X] Failed to load XML Tools plugin: {e}")
         return False
 
 
 # === XML SYSTEM PROMPT GENERATION FUNCTIONS ===
-# ⚠️  WARNING: DO NOT DELETE THIS SECTION - CRITICAL FOR XML TOOLS FUNCTIONALITY
+# [!]  WARNING: DO NOT DELETE THIS SECTION - CRITICAL FOR XML TOOLS FUNCTIONALITY
 # This section generates the XML format system prompt with tool descriptions
 # that enables LLMs to use XML tool calls instead of native tool calling
 #
-# 🛑 STOP DELETING THIS - IT'S NEEDED FOR THE PLUGIN TO WORK PROPERLY
+# [X] STOP DELETING THIS - IT'S NEEDED FOR THE PLUGIN TO WORK PROPERLY
 # This is the THIRD time it's been removed - NEVER remove this again!
 # Without this, the AI won't know how to use XML format tool calls!
 
@@ -316,7 +316,7 @@ def _print_xml_system_prompt():
     if not hasattr(_aicoder_ref, "tool_manager") or not hasattr(
         _aicoder_ref.tool_manager, "registry"
     ):
-        print("❌ Tool registry not available")
+        print("[X] Tool registry not available")
         return
 
     # Generate the XML format system prompt
@@ -328,7 +328,7 @@ def _print_xml_system_prompt():
     print("=" * 80)
     print(prompt)
     print("=" * 80)
-    print("\n💡 Tip: Use '/xml_tools enable' to add this to the conversation")
+    print("\n[i] Tip: Use '/xml_tools enable' to add this to the conversation")
 
 
 # === INPUT MONKEY PATCHING ===
@@ -352,7 +352,7 @@ def _patch_input():
             if results:
                 # Return the results directly instead of showing the prompt
                 # This will be sent as the user's "response" to the AI
-                print(f"🔄 Sending XML tool results to AI: {results[:100]}...")
+                print(f"*** Sending XML tool results to AI: {results[:100]}...")
                 return results
 
         # Call original input for normal prompts
@@ -394,12 +394,12 @@ def _process_pending_xml_tool_calls_for_input():
             _processed_messages.add(message_id)
 
             # Process the XML tool calls
-            print("🔄 Processing XML tool calls in assistant message...")
+            print("*** Processing XML tool calls in assistant message...")
             tool_results = _parse_and_execute_xml_tools(message["content"])
             if tool_results:
                 # Format results as a single string to return from input()
                 results_text = "[XML Tool Results]\n" + "\n\n".join(tool_results)
-                print("✅ XML tool calls processed and results ready to send to AI")
+                print("[✓] XML tool calls processed and results ready to send to AI")
                 return results_text
 
             # Only process the most recent unprocessed message
@@ -422,10 +422,10 @@ def _lazy_load_mcp_tools():
     # Small delay to ensure MCP servers have time to initialize
     time.sleep(0.1)
 
-    print("🔍 Lazy loading MCP tools...")
+    print("Lazy loading MCP tools...")
     _mcp_tools_cache = _get_all_available_tools()
     _mcp_tools_last_update = current_time
-    print(f"✅ Loaded {len(_mcp_tools_cache)} available tools")
+    print(f"[✓] Loaded {len(_mcp_tools_cache)} available tools")
 
 
 # === COMMAND HANDLERS ===
@@ -454,7 +454,7 @@ def _handle_xml_tools_command(args):
         _show_xml_tools_status()
         return False, False
     else:
-        print(f"❌ Unknown xml_tools command: {command}")
+        print(f"[X] Unknown xml_tools command: {command}")
         _show_xml_tools_help()
         return False, False
 
@@ -476,9 +476,9 @@ def _show_xml_tools_status():
     """Show current XML tools status"""
     global _xml_tools_enabled
     if _xml_tools_enabled:
-        print("✅ XML Tools are currently ENABLED")
+        print("[✓] XML Tools are currently ENABLED")
     else:
-        print("❌ XML Tools are currently DISABLED")
+        print("[X] XML Tools are currently DISABLED")
 
 
 def _enable_xml_tools():
@@ -486,7 +486,7 @@ def _enable_xml_tools():
     global _aicoder_ref, _xml_tools_enabled
 
     if _xml_tools_enabled:
-        print("⚠️  XML Tools are already enabled")
+        print("[!]  XML Tools are already enabled")
         return False, False
 
     # Generate and add XML system prompt
@@ -507,16 +507,16 @@ def _enable_xml_tools():
             # Insert at the beginning
             _aicoder_ref.message_history.messages.insert(0, system_message)
 
-        print("✅ XML Tools instructions added to conversation")
+        print("[✓] XML Tools instructions added to conversation")
     else:
-        print("⚠️  Tool registry not available - XML tools instructions not added")
+        print("[!]  Tool registry not available - XML tools instructions not added")
 
     # Monkey patch input to automatically process XML tool calls
     _patch_input()
 
     _xml_tools_enabled = True
 
-    print("✅ XML Tools ENABLED")
+    print("[✓] XML Tools ENABLED")
     print("   XML tool calls in assistant messages will be automatically processed")
     print("   Tool results will be sent back to the AI automatically")
 
@@ -528,7 +528,7 @@ def _disable_xml_tools():
     global _aicoder_ref, _xml_tools_enabled
 
     if not _xml_tools_enabled:
-        print("⚠️  XML Tools are already disabled")
+        print("[!]  XML Tools are already disabled")
         return False, False
 
     # Remove XML tools system message from message history
@@ -550,7 +550,7 @@ def _disable_xml_tools():
     _xml_tools_enabled = False
     _processed_messages.clear()  # Clear processed messages cache
 
-    print("✅ XML Tools DISABLED")
+    print("[✓] XML Tools DISABLED")
     print("   XML tool instructions removed from conversation")
     print("   Original input processing restored")
 
@@ -560,7 +560,7 @@ def _disable_xml_tools():
 def _handle_execute_xml_command(args):
     """Handle /execute_xml command - for manual testing"""
     if not args:
-        print("❌ Please provide XML tool call to execute")
+        print("[X] Please provide XML tool call to execute")
         print("Example: /execute_xml <read_file><path>test.txt</path></read_file>")
         return False, False
 
@@ -568,11 +568,11 @@ def _handle_execute_xml_command(args):
     try:
         result = _execute_xml_tool_call(xml_string)
         if result:
-            print(f"✅ XML Tool Execution Result:\n{result}")
+            print(f"[✓] XML Tool Execution Result:\n{result}")
         else:
-            print("⚠️  No result returned from tool execution")
+            print("[!]  No result returned from tool execution")
     except Exception as e:
-        print(f"❌ Error executing XML tool call: {e}")
+        print(f"[X] Error executing XML tool call: {e}")
 
     return False, False
 
@@ -626,11 +626,11 @@ def _get_all_available_tools():
                 # Debug: print discovered tools
                 if server_tools:
                     print(
-                        f"🔍 Found {len(server_tools)} tools from MCP server '{server_name}': {list(server_tools.keys())}"
+                        f"Found {len(server_tools)} tools from MCP server '{server_name}': {list(server_tools.keys())}"
                     )
             except Exception as e:
                 # If there's an issue, continue with other servers
-                print(f"⚠️  Failed to get tools from MCP server '{server_name}': {e}")
+                print(f"[!]  Failed to get tools from MCP server '{server_name}': {e}")
                 pass
 
     # Remove duplicates while preserving order
@@ -683,11 +683,11 @@ def _parse_and_execute_xml_tools(response: str) -> List[str]:
                 tool_name = root.tag
                 # Notify user that tool is being executed
                 print(
-                    f"🔄 Executing XML tool call {i + 1}/{len(tool_calls)}: {tool_name}"
+                    f"*** Executing XML tool call {i + 1}/{len(tool_calls)}: {tool_name}"
                 )
             except Exception:
                 tool_name = "unknown"
-                print(f"🔄 Executing XML tool call {i + 1}/{len(tool_calls)}")
+                print(f"*** Executing XML tool call {i + 1}/{len(tool_calls)}")
 
             result = _execute_xml_tool_call(tool_call)
             if result:

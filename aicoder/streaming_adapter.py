@@ -719,17 +719,23 @@ class StreamingAdapter(APIClient):
                             choice = data["choices"][0]
 
                             # Process content
+                            content = ""
                             if "delta" in choice and "content" in choice["delta"]:
                                 content = choice["delta"]["content"]
-                                if content:
-                                    # Handle non-string content (API compatibility issue)
-                                    if not isinstance(content, str):
-                                        # Ignore non string deltas, sometimes thinking comes as list
-                                        continue
-                                    else:
-                                        content_buffer += content
-                                        # Use new buffering system to handle whitespace
-                                        self._buffer_and_print_content(content)
+                            
+                            # If content is empty, try reasoning (fallback for providers like Minimax)
+                            if not content and "delta" in choice and "reasoning" in choice["delta"]:
+                                content = choice["delta"]["reasoning"]
+                            
+                            if content:
+                                # Handle non-string content (API compatibility issue)
+                                if not isinstance(content, str):
+                                    # Ignore non string deltas, sometimes thinking comes as list
+                                    continue
+                                else:
+                                    content_buffer += content
+                                    # Use new buffering system to handle whitespace
+                                    self._buffer_and_print_content(content)
 
                             # Process tool calls - handle null or missing tool_calls gracefully
                             if "delta" in choice and "tool_calls" in choice["delta"]:

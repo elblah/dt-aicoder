@@ -34,7 +34,7 @@ class CompactCommand(BaseCommand):
         elif subcommand == "help":
             return self._handle_help()
         else:
-            emsg(f"\n ❌ Unknown subcommand: {subcommand}")
+            emsg(f"\n [X] Unknown subcommand: {subcommand}")
             wmsg(" *** Use '/compact help' to see available commands")
             return False, False
 
@@ -63,10 +63,10 @@ class CompactCommand(BaseCommand):
 
         # Check if there are any messages at all
         if round_count == 0:
-            wmsg("\n ℹ️  No messages available to compact")
-            wmsg(" ℹ️  Your conversation is already minimal")
-            wmsg(" ℹ️  Start a conversation to enable compaction features")
-            wmsg(" ℹ️  Use '/compact help' for more options")
+            wmsg("\n [i] No messages available to compact")
+            wmsg(" [i] Your conversation is already minimal")
+            wmsg(" [i] Start a conversation to enable compaction features")
+            wmsg(" [i] Use '/compact help' for more options")
             return False, False
 
         # Check if auto-compaction is actually needed first
@@ -75,12 +75,12 @@ class CompactCommand(BaseCommand):
             and percentage < config.CONTEXT_COMPACT_PERCENTAGE
         ):
             wmsg(
-                f"\n ℹ️  Auto-compaction not needed ({percentage:.1f}% of {threshold:,} tokens - below {config.CONTEXT_COMPACT_PERCENTAGE}% threshold)"
+                f"\n [i] Auto-compaction not needed ({percentage:.1f}% of {threshold:,} tokens - below {config.CONTEXT_COMPACT_PERCENTAGE}% threshold)"
             )
-            wmsg(f" ℹ️  Current conversation: {round_count} rounds")
-            wmsg(' ℹ️  A "round" = user message + complete assistant response')
-            wmsg(" ℹ️  Force compaction: /compact force [N] (default 1 round)")
-            wmsg(" ℹ️  Use '/compact help' for more options")
+            wmsg(f" [i] Current conversation: {round_count} rounds")
+            wmsg(' [i] A "round" = user message + complete assistant response')
+            wmsg(" [i] Force compaction: /compact force [N] (default 1 round)")
+            wmsg(" [i] Use '/compact help' for more options")
             return False, False
 
         try:
@@ -93,26 +93,26 @@ class CompactCommand(BaseCommand):
                 new_message_count = len(self.app.message_history.messages)
                 messages_removed = original_message_count - new_message_count
                 imsg(
-                    f"\n ✓ Auto-compaction completed successfully (removed {messages_removed} messages)"
+                    f"\n [✓] Auto-compaction completed successfully (removed {messages_removed} messages)"
                 )
             else:
-                wmsg("\n ℹ️  Auto-compaction checked - no changes needed")
-                wmsg(" ℹ️  Your conversation context is already optimized")
-                wmsg(f" ℹ️  Current conversation: {round_count} rounds")
-                wmsg(" ℹ️  If you want to force compaction anyway: /compact force [N]")
-                wmsg(" ℹ️  Use '/compact help' for more options")
+                wmsg("\n [i] Auto-compaction checked - no changes needed")
+                wmsg(" [i] Your conversation context is already optimized")
+                wmsg(f" [i] Current conversation: {round_count} rounds")
+                wmsg(" [i] If you want to force compaction anyway: /compact force [N]")
+                wmsg(" [i] Use '/compact help' for more options")
 
         except NoMessagesToCompactError:
-            wmsg("\n ℹ️  No messages available to compact")
-            wmsg(" ℹ️  Your conversation is already minimal")
-            wmsg(f" ℹ️  Current conversation: {round_count} rounds")
+            wmsg("\n [i] No messages available to compact")
+            wmsg(" [i] Your conversation is already minimal")
+            wmsg(f" [i] Current conversation: {round_count} rounds")
             if round_count == 0:
-                wmsg(" ℹ️  Start a conversation to enable compaction features")
+                wmsg(" [i] Start a conversation to enable compaction features")
             else:
-                wmsg(" ℹ️  Use '/compact force [N]' to remove specific rounds if needed")
-            wmsg(" ℹ️  Use '/compact help' for more options")
+                wmsg(" [i] Use '/compact force [N]' to remove specific rounds if needed")
+            wmsg(" [i] Use '/compact help' for more options")
         except Exception as e:
-            emsg(f"\n ❌ Auto-compaction failed: {str(e)}")
+            emsg(f"\n [X] Auto-compaction failed: {str(e)}")
             wmsg(" *** Your conversation history has been preserved.")
             wmsg(
                 " *** Options: Try '/compact force', save with '/save', or continue with a new message."
@@ -127,7 +127,7 @@ class CompactCommand(BaseCommand):
         if args and args[0].isdigit():
             num_rounds = int(args[0])
             if num_rounds <= 0:
-                emsg("\n ❌ Number of rounds must be positive")
+                emsg("\n [X] Number of rounds must be positive")
                 return False, False
         else:
             num_rounds = 1  # Default
@@ -138,14 +138,14 @@ class CompactCommand(BaseCommand):
             remaining = self.app.message_history.get_round_count()
 
             imsg(
-                f"\n ✅ Force compacted {actual_compacted} oldest round{'s' if actual_compacted != 1 else ''}"
+                f"\n [✓] Force compacted {actual_compacted} oldest round{'s' if actual_compacted != 1 else ''}"
             )
-            wmsg(f" ℹ️  Remaining: {remaining} round{'s' if remaining != 1 else ''}")
+            wmsg(f" [i] Remaining: {remaining} round{'s' if remaining != 1 else ''}")
 
         except NoMessagesToCompactError as e:
-            wmsg(f"\n ℹ️  Nothing to compact: {str(e)}")
+            wmsg(f"\n [i] Nothing to compact: {str(e)}")
         except Exception as e:
-            emsg(f"\n ❌ Force compaction failed: {str(e)}")
+            emsg(f"\n [X] Force compaction failed: {str(e)}")
             wmsg(" *** Your conversation history has been preserved.")
             self.app.message_history._compaction_performed = False
 
@@ -177,22 +177,22 @@ class CompactCommand(BaseCommand):
             auto_enabled = True
 
         # Display stats
-        imsg("\n 📊 Conversation Statistics:")
+        imsg("\n Conversation Statistics:")
         wmsg(
-            f" ℹ️  Current conversation: {round_count} round{'s' if round_count != 1 else ''}"
+            f" [i] Current conversation: {round_count} round{'s' if round_count != 1 else ''}"
         )
 
         if auto_enabled:
             wmsg(
-                f" ℹ️  Auto-compaction: enabled (triggers at {config.CONTEXT_COMPACT_PERCENTAGE}% of {threshold:,} tokens)"
+                f" [i] Auto-compaction: enabled (triggers at {config.CONTEXT_COMPACT_PERCENTAGE}% of {threshold:,} tokens)"
             )
-            wmsg(f" ℹ️  Current usage: {current_tokens:,} tokens ({percentage:.1f}%)")
+            wmsg(f" [i] Current usage: {current_tokens:,} tokens ({percentage:.1f}%)")
         else:
-            wmsg(" ℹ️  Auto-compaction: disabled")
+            wmsg(" [i] Auto-compaction: disabled")
 
         # Show compaction stats
         compaction_count = getattr(self.app.message_history.stats, "compactions", 0)
-        wmsg(f" ℹ️  Total compactions: {compaction_count}")
+        wmsg(f" [i] Total compactions: {compaction_count}")
 
         return False, False
 
@@ -212,7 +212,7 @@ class CompactCommand(BaseCommand):
         elif action == "status":
             return self._handle_auto_status()
         else:
-            emsg(f"\n ❌ Unknown auto control action: {action}")
+            emsg(f"\n [X] Unknown auto control action: {action}")
             wmsg(" *** Use: /compact auto enable|disable|status")
             return False, False
 
@@ -222,11 +222,11 @@ class CompactCommand(BaseCommand):
         from .. import config
 
         if config.CONTEXT_COMPACT_PERCENTAGE > 0:
-            wmsg("\n ℹ️  Auto-compaction is already enabled")
+            wmsg("\n [i] Auto-compaction is already enabled")
         else:
             # Set default percentage if currently disabled
             os.environ["CONTEXT_COMPACT_PERCENTAGE"] = "80"
-            wmsg("\n ✅ Auto-compaction enabled (80% threshold)")
+            wmsg("\n [✓] Auto-compaction enabled (80% threshold)")
             wmsg(
                 " *** Restart application or use '/compact auto status' to see updated settings"
             )
@@ -239,10 +239,10 @@ class CompactCommand(BaseCommand):
         from .. import config
 
         if config.CONTEXT_COMPACT_PERCENTAGE == 0:
-            wmsg("\n ℹ️  Auto-compaction is already disabled")
+            wmsg("\n [i] Auto-compaction is already disabled")
         else:
             os.environ["CONTEXT_COMPACT_PERCENTAGE"] = "0"
-            wmsg("\n ✅ Auto-compaction disabled")
+            wmsg("\n [✓] Auto-compaction disabled")
             wmsg(
                 " *** Restart application or use '/compact auto status' to see updated settings"
             )
@@ -259,7 +259,7 @@ class CompactCommand(BaseCommand):
         if config.CONTEXT_COMPACT_PERCENTAGE > 0:
             threshold = config.AUTO_COMPACT_THRESHOLD
             wmsg(
-                f"\n ℹ️  Auto-compaction: enabled ({config.CONTEXT_COMPACT_PERCENTAGE}% of {threshold:,} tokens)"
+                f"\n [i] Auto-compaction: enabled ({config.CONTEXT_COMPACT_PERCENTAGE}% of {threshold:,} tokens)"
             )
 
             # Show current usage if available
@@ -271,43 +271,43 @@ class CompactCommand(BaseCommand):
                 )
                 percentage = (current_tokens / threshold) * 100 if threshold > 0 else 0
                 wmsg(
-                    f" ℹ️  Current usage: {current_tokens:,} tokens ({percentage:.1f}%)"
+                    f" [i] Current usage: {current_tokens:,} tokens ({percentage:.1f}%)"
                 )
         else:
-            wmsg("\n ℹ️  Auto-compaction: disabled")
+            wmsg("\n [i] Auto-compaction: disabled")
 
         wmsg(
-            f" ℹ️  Current conversation: {round_count} round{'s' if round_count != 1 else ''}"
+            f" [i] Current conversation: {round_count} round{'s' if round_count != 1 else ''}"
         )
 
         return False, False
 
     def _handle_help(self) -> Tuple[bool, bool]:
         """Handle help display."""
-        imsg("\n 📚 Compact Command Help:\n")
+        imsg("\n Compact Command Help:\n")
 
-        wmsg(" 🔹 /compact                    Try auto-compaction (threshold-based)")
+        wmsg("  - /compact                    Try auto-compaction (threshold-based)")
         wmsg("    - Compacts when token usage exceeds threshold")
         wmsg("    - Shows why compaction is/isn't needed\n")
 
         wmsg(
-            " 🔹 /compact force [N]           Force compact N oldest conversation rounds"
+            "  - /compact force [N]           Force compact N oldest conversation rounds"
         )
         wmsg("    - Default: 1 round (use /compact force for 1 round)")
         wmsg("    - Example: /compact force 3 (compacts 3 oldest rounds)")
         wmsg('    - A "round" = user message + complete assistant response\n')
 
-        wmsg(" 🔹 /compact stats              Show conversation statistics")
+        wmsg("  - /compact stats              Show conversation statistics")
         wmsg("    - Current round count and token usage")
         wmsg("    - Auto-compaction status\n")
 
-        wmsg(" 🔹 /compact auto enable         Enable auto-compaction")
-        wmsg(" 🔹 /compact auto disable        Disable auto-compaction")
-        wmsg(" 🔹 /compact auto status        Show auto-compaction setting\n")
+        wmsg("  - /compact auto enable         Enable auto-compaction")
+        wmsg("  - /compact auto disable        Disable auto-compaction")
+        wmsg("  - /compact auto status        Show auto-compaction setting\n")
 
-        wmsg(" 🔹 /compact help               Show this help message\n")
+        wmsg("  - /compact help               Show this help message\n")
 
-        wmsg(" 💡 Tips:")
+        wmsg("  Tips:")
         wmsg(
             "    - Use /compact force when approaching model limits (even if threshold not reached)"
         )

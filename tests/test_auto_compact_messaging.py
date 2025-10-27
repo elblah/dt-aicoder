@@ -177,4 +177,4 @@ if __name__ == "__main__":
     test_auto_compaction_no_messages_to_compact_message()
     test_auto_compaction_no_pruning_needed_message()
     test_app_auto_compaction_error_handling()
-    print("✅ All auto-compaction messaging tests passed!")
+    print("[✓] All auto-compaction messaging tests passed!")

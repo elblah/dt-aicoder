@@ -153,10 +153,10 @@ def main():
     print("=" * 50)
 
     if not test_tmux_available():
-        print("❌ tmux is not available. Please install tmux to run this test.")
+        print("[X] tmux is not available. Please install tmux to run this test.")
         return 1
 
-    print("✅ tmux is available")
+    print("[✓] tmux is available")
 
     # Create the test script
     test_script = create_animation_test_script()
@@ -171,7 +171,7 @@ def main():
             f"new-session -d -s {session_name} -n test bash"
         )
         if rc != 0:
-            print(f"❌ Failed to create tmux session: {stderr}")
+            print(f"[X] Failed to create tmux session: {stderr}")
             return 1
 
         try:
@@ -186,10 +186,10 @@ def main():
             # Check if session exists
             stdout, stderr, rc = run_tmux_command(f"has-session -t {session_name}")
             if rc != 0:
-                print(f"❌ Session doesn't exist: {stderr}")
+                print(f"[X] Session doesn't exist: {stderr}")
                 return 1
 
-            print("✅ Test running in tmux session")
+            print("[✓] Test running in tmux session")
             print(f"Session name: {session_name}")
             print(f"Script file: {test_script}")
 

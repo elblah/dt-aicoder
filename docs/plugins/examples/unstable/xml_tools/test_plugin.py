@@ -38,10 +38,10 @@ def test_xml_parsing():
         assert "<read_file>" in tool_calls[0], "First tool call should be read_file"
         assert "<grep>" in tool_calls[1], "Second tool call should be grep"
 
-        print("✅ XML parsing test passed!")
+        print("[✓] XML parsing test passed!")
         return True
     except Exception as e:
-        print(f"❌ XML parsing test failed: {e}")
+        print(f"[X] XML parsing test failed: {e}")
         import traceback
 
         traceback.print_exc()
@@ -79,10 +79,10 @@ def test_tool_description_formatting():
         assert "Description:" in result, "Should contain description"
         assert "<path>path/to/file</path>" in result, "Should contain parameter example"
 
-        print("✅ Tool description formatting test passed!")
+        print("[✓] Tool description formatting test passed!")
         return True
     except Exception as e:
-        print(f"❌ Tool description formatting test failed: {e}")
+        print(f"[X] Tool description formatting test failed: {e}")
         import traceback
 
         traceback.print_exc()
@@ -119,10 +119,10 @@ def test_xml_contains_detection():
             "Should not detect XML tool calls"
         )
 
-        print("✅ XML contains detection test passed!")
+        print("[✓] XML contains detection test passed!")
         return True
     except Exception as e:
-        print(f"❌ XML contains detection test failed: {e}")
+        print(f"[X] XML contains detection test failed: {e}")
         import traceback
 
         traceback.print_exc()
@@ -152,10 +152,10 @@ def test_plugin_imports():
                 f"Missing required function: {func_name}"
             )
 
-        print("✅ Plugin imports test passed!")
+        print("[✓] Plugin imports test passed!")
         return True
     except Exception as e:
-        print(f"❌ Plugin imports test failed: {e}")
+        print(f"[X] Plugin imports test failed: {e}")
         import traceback
 
         traceback.print_exc()
@@ -207,10 +207,10 @@ def test_xml_execution_extraction():
             except ET.ParseError:
                 assert False, f"Failed to parse XML: {tool_call}"
 
-        print("✅ XML execution extraction test passed!")
+        print("[✓] XML execution extraction test passed!")
         return True
     except Exception as e:
-        print(f"❌ XML execution extraction test failed: {e}")
+        print(f"[X] XML execution extraction test failed: {e}")
         import traceback
 
         traceback.print_exc()
@@ -239,8 +239,8 @@ if __name__ == "__main__":
     print(f"Passed {passed}/{len(tests)} tests")
 
     if passed == len(tests):
-        print("✅ All tests passed!")
+        print("[✓] All tests passed!")
         sys.exit(0)
     else:
-        print("❌ Some tests failed!")
+        print("[X] Some tests failed!")
         sys.exit(1)

@@ -89,12 +89,12 @@ def execute_read_file(path: str, stats, offset: int = None, limit: int = None) -
 
             if lines_were_truncated:
                 warnings.append(
-                    f"⚠️  Some lines were truncated to {MAX_LINE_LENGTH} characters"
+                    f"[!] Some lines were truncated to {MAX_LINE_LENGTH} characters"
                 )
 
             if has_more_lines:
                 warnings.append(
-                    f"📄 File has more lines. Use offset={start_line + len(lines)} to read further"
+                    f"[i] File has more lines. Use offset={start_line + len(lines)} to read further"
                 )
 
             if warnings:

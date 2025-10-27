@@ -19,6 +19,7 @@ Plugin Constants:
 """
 
 import os
+import shutil
 import subprocess
 
 
@@ -62,9 +63,9 @@ def _set_golint_config(key: str, value: str) -> None:
     """Set golint config in persistent storage."""
     if _aicoder_ref and hasattr(_aicoder_ref, "persistent_config"):
         _aicoder_ref.persistent_config[f"golint.{key}"] = value
-        print(f"✅ Golint {key} set to: {value}")
+        print(f"[✓] Golint {key} set to: {value}")
     else:
-        print("❌ Persistent config not available")
+        print("[X] Persistent config not available")
 
 
 def _handle_golint_command(args: list[str]) -> tuple[bool, bool]:
@@ -85,10 +86,10 @@ def _handle_golint_command(args: list[str]) -> tuple[bool, bool]:
             enabled = _is_golint_enabled()
             format_enabled = _is_golint_format_enabled()
 
-            status = f"""🔍 **Go Lint Plugin Status**
+            status = f"""Go Lint Plugin Status
 
-- **Checking**: {"✅ Enabled" if enabled else "❌ Disabled"}
-- **Auto-format**: {"✅ Enabled" if format_enabled else "❌ Disabled"}
+- **Checking**: {"[✓] Enabled" if enabled else "[X] Disabled"}
+- **Auto-format**: {"[✓] Enabled" if format_enabled else "[X] Disabled"}
 
 **Commands:**
 - `/golint check on/off` - Enable/disable checking
@@ -104,13 +105,13 @@ def _handle_golint_command(args: list[str]) -> tuple[bool, bool]:
                 check_cmd = args[1].lower()
                 if check_cmd in ["on", "off"]:
                     _set_golint_config("enabled", check_cmd == "on")
-                    imsg(f"✅ Go vet checking turned {check_cmd}")
+                    imsg(f"[✓] Go vet checking turned {check_cmd}")
                     return False, False
                 else:
-                    emsg("❌ Usage: `/golint check on|off`")
+                    emsg("[X] Usage: `/golint check on|off`")
                     return False, False
             else:
-                emsg("❌ Usage: `/golint check on|off`")
+                emsg("[X] Usage: `/golint check on|off`")
                 return False, False
 
         elif cmd == "format":
@@ -118,17 +119,17 @@ def _handle_golint_command(args: list[str]) -> tuple[bool, bool]:
                 format_cmd = args[1].lower()
                 if format_cmd in ["on", "off"]:
                     _set_golint_config("format_enabled", format_cmd == "on")
-                    imsg(f"✅ Go fmt auto-formatting turned {format_cmd}")
+                    imsg(f"[✓] Go fmt auto-formatting turned {format_cmd}")
                     return False, False
                 else:
-                    emsg("❌ Usage: `/golint format on|off`")
+                    emsg("[X] Usage: `/golint format on|off`")
                     return False, False
             else:
-                emsg("❌ Usage: `/golint format on|off`")
+                emsg("[X] Usage: `/golint format on|off`")
                 return False, False
 
         elif cmd == "help":
-            help_text = """🔍 **Go Lint Plugin Commands**
+            help_text = """Go Lint Plugin Commands
 
 - `/golint` - Show current status
 - `/golint check on|off` - Enable/disable checking
@@ -145,12 +146,12 @@ def _handle_golint_command(args: list[str]) -> tuple[bool, bool]:
             return False, False
         else:
             emsg(
-                f"❌ Unknown golint command: {cmd}. Use `/golint help` for available commands."
+                f"[X] Unknown golint command: {cmd}. Use `/golint help` for available commands."
             )
             return False, False
 
     except Exception as e:
-        emsg(f"❌ Error handling golint command: {e}")
+        emsg(f"[X] Error handling golint command: {e}")
         return False, False
 
 
@@ -164,8 +165,8 @@ def on_aicoder_init(aicoder_instance):
     aicoder_instance.command_handlers["/golint"] = _handle_golint_command
 
     if not _is_go_available():
-        print("⚠️  Go not found - plugin will be disabled")
-        print("💡 Install Go: https://golang.org/dl/")
+        print("[!] Go not found - plugin will be disabled")
+        print("[i] Install Go: https://golang.org/dl/")
         return False
 
     try:
@@ -195,15 +196,15 @@ def on_aicoder_init(aicoder_instance):
         INTERNAL_TOOL_FUNCTIONS["write_file"] = patched_write_file
         INTERNAL_TOOL_FUNCTIONS["edit_file"] = patched_edit_file
 
-        print(f"✅ Go Lint plugin activated - Auto-format: {ENABLE_GOLINT_FORMAT}")
+        print(f"[✓] Go Lint plugin activated - Auto-format: {ENABLE_GOLINT_FORMAT}")
         return True
 
     except ImportError as e:
-        print(f"❌ Failed to import internal tools: {e}")
+        print(f"[X] Failed to import internal tools: {e}")
         return False
 
     except Exception as e:
-        print(f"❌ Failed to initialize Go Lint plugin: {e}")
+        print(f"[X] Failed to initialize Go Lint plugin: {e}")
         import traceback
 
         traceback.print_exc()
@@ -212,13 +213,7 @@ def on_aicoder_init(aicoder_instance):
 
 def _is_go_available() -> bool:
     """Check if go is installed and available."""
-    try:
-        result = subprocess.run(
-            ["go", "version"], capture_output=True, text=True, timeout=10
-        )
-        return result.returncode == 0
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return False
+    return shutil.which("go") is not None
 
 
 def _check_file_with_go_vet(file_path: str) -> None:
@@ -234,7 +229,7 @@ def _check_file_with_go_vet(file_path: str) -> None:
         file_name = os.path.basename(file_path)
 
         # Fast syntax check first with go build (much faster than go vet)
-        print(f"⚡ Running fast syntax check on {file_name}...")  # Debug
+        print(f"Running fast syntax check on {file_name}...")  # Debug
         start_time = time.time()
 
         # Use go build for syntax checking - much faster than go vet
@@ -253,7 +248,7 @@ def _check_file_with_go_vet(file_path: str) -> None:
         # If syntax check fails, report and return
         if result.returncode != 0:
             error_output = result.stderr.strip() or result.stdout.strip()
-            print(f"❌ Syntax error in {file_name} ({syntax_elapsed:.2f}s)")
+            print(f"[X] Syntax error in {file_name} ({syntax_elapsed:.2f}s)")
             _add_go_vet_issues_message(file_path, f"Syntax Error: {error_output}")
             return
 
@@ -275,23 +270,23 @@ def _check_file_with_go_vet(file_path: str) -> None:
             # Combine stdout and stderr for comprehensive error reporting
             vet_output = result.stdout.strip() or result.stderr.strip()
             total_elapsed = syntax_elapsed + vet_elapsed
-            print(f"🔍 Go vet issues found in {file_name} ({total_elapsed:.2f}s)")
+            print(f"Go vet issues found in {file_name} ({total_elapsed:.2f}s)")
             _add_go_vet_issues_message(file_path, vet_output)
             # Don't format if there are issues that need to be fixed first
             return
 
         # Success! No issues found
         total_elapsed = syntax_elapsed + vet_elapsed
-        print(f"✅ {file_name} passed all checks ({total_elapsed:.2f}s)")
+        print(f"[✓] {file_name} passed all checks ({total_elapsed:.2f}s)")
 
         # Only run go fmt if no issues were found
         if _is_golint_format_enabled():
             _format_file_with_go_fmt(file_path)
 
     except subprocess.TimeoutExpired:
-        print(f"⚠️  Go tools timeout for {file_path} - skipping checks")
+        print(f"[!] Go tools timeout for {file_path} - skipping checks")
     except Exception as e:
-        print(f"⚠️  Go vet failed for {file_path}: {e}")
+        print(f"[!] Go vet failed for {file_path}: {e}")
 
 
 def _format_file_with_go_fmt(file_path: str) -> None:
@@ -315,27 +310,27 @@ def _format_file_with_go_fmt(file_path: str) -> None:
             # In a real implementation, you might want to check file modification time
             _add_go_fmt_message(file_path)
         else:
-            print(f"⚠️  Go fmt failed for {file_path}: {result.stderr}")
+            print(f"[!] Go fmt failed for {file_path}: {result.stderr}")
 
     except Exception as e:
-        print(f"⚠️  Go fmt failed for {file_path}: {e}")
+        print(f"[!] Go fmt failed for {file_path}: {e}")
 
 
 def _add_go_fmt_message(file_path: str) -> None:
     """Add a user message about go fmt formatting that occurred."""
     if not _aicoder_ref:
-        print("⚠️  Go fmt completed but no aicoder context available")
+        print("[!] Go fmt completed but no aicoder context available")
         return
 
     try:
         # Create a user-friendly message that clearly indicates it's from the plugin
-        message_content = f"""✨ **Go Lint Plugin: File Formatted**
+        message_content = f"""[*] Go Lint Plugin: File Formatted
 
 The Go Lint plugin automatically formatted the file to improve code style and consistency:
 
-📁 **File**: {file_path}
-🤖 **Plugin Action**: File was reformatted using go fmt
-✅ **Status**: Formatting completed successfully
+File: {file_path}
+Plugin Action: File was reformatted using go fmt
+Status: Formatting completed successfully
 
 The file content has been updated to follow Go formatting standards."""
 
@@ -344,21 +339,21 @@ The file content has been updated to follow Go formatting standards."""
 
         # Use the pending_tool_messages system
         _aicoder_ref.tool_manager.executor.pending_tool_messages.append(user_message)
-        print("✨ Go fmt formatting completed - AI will be notified")
+        print("[*] Go fmt formatting completed - AI will be notified")
 
     except Exception as e:
-        print(f"⚠️  Failed to add go fmt message: {e}")
+        print(f"[!] Failed to add go fmt message: {e}")
 
 
 def _add_go_vet_issues_message(file_path: str, vet_output: str) -> None:
     """Add a user message about go vet issues found."""
     if not _aicoder_ref:
-        print("⚠️  Go vet issues found but no aicoder context available")
+        print("[!] Go vet issues found but no aicoder context available")
         return
 
     try:
         # Create a user-friendly message that clearly indicates it's from the plugin
-        message_content = f"""🔍 **Go Lint Plugin: Issues Detected in {file_path}**
+        message_content = f"""Go Lint Plugin: Issues Detected in {file_path}
 
 The Go Lint plugin automatically detected code quality issues in the file you just saved and is asking the AI to fix them:
 
@@ -366,9 +361,9 @@ The Go Lint plugin automatically detected code quality issues in the file you ju
 {vet_output}
 ```
 
-🤖 **Plugin Action**: The AI will now attempt to fix these issues automatically.
-📁 **File**: {file_path}
-🔧 **Tool**: Use edit_file or write_file to resolve the problems
+Plugin Action: The AI will now attempt to fix these issues automatically.
+File: {file_path}
+Tool: Use edit_file or write_file to resolve the problems
 
 The file has already been saved, so the AI needs to edit it again to resolve the issues."""
 
@@ -377,10 +372,10 @@ The file has already been saved, so the AI needs to edit it again to resolve the
 
         # Use the pending_tool_messages system
         _aicoder_ref.tool_manager.executor.pending_tool_messages.append(user_message)
-        print("🔍 Go vet issues found - AI will be notified")
+        print("Go vet issues found - AI will be notified")
 
     except Exception as e:
-        print(f"⚠️  Failed to add go vet message: {e}")
+        print(f"[!] Failed to add go vet message: {e}")
 
 
 def cleanup():
@@ -396,10 +391,10 @@ def cleanup():
         if _original_edit_file:
             INTERNAL_TOOL_FUNCTIONS["edit_file"] = _original_edit_file
 
-        print("✅ Go Lint plugin cleaned up")
+        print("[✓] Go Lint plugin cleaned up")
 
     except Exception as e:
-        print(f"⚠️  Failed to cleanup Go Lint plugin: {e}")
+        print(f"[!] Failed to cleanup Go Lint plugin: {e}")
 
 
 # Plugin metadata

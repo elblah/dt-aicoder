@@ -28,41 +28,54 @@ class ProjectMemory:
         """
         self.project_path = os.path.abspath(project_path)
         self.db_path = os.path.join(self.project_path, ".aicoder", "memory.db")
+        self._disabled = False
 
         # Ensure .aicoder directory exists
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        try:
+            os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        except Exception:
+            # Can't create directory, disable memory functionality
+            self._disabled = True
+            return
 
         # Initialize database
         self._init_database()
 
     def _init_database(self) -> None:
         """Initialize SQLite database with simple schema."""
-        with sqlite3.connect(self.db_path) as conn:
-            # Main notes table
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS notes (
-                    name TEXT PRIMARY KEY,
-                    content TEXT NOT NULL,
-                    tags TEXT DEFAULT '',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    access_count INTEGER DEFAULT 0,
-                    last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
+        if self._disabled:
+            return
 
-            # Indexes for common queries
-            conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_notes_updated_at 
-                ON notes(updated_at DESC)
-            """)
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                # Main notes table
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS notes (
+                        name TEXT PRIMARY KEY,
+                        content TEXT NOT NULL,
+                        tags TEXT DEFAULT '',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        access_count INTEGER DEFAULT 0,
+                        last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
 
-            conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_notes_last_accessed 
-                ON notes(last_accessed DESC)
-            """)
+                # Indexes for common queries
+                conn.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_notes_updated_at
+                    ON notes(updated_at DESC)
+                """)
 
-            conn.commit()
+                conn.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_notes_last_accessed
+                    ON notes(last_accessed DESC)
+                """)
+
+                conn.commit()
+        except Exception:
+            # If database initialization fails, disable memory functionality
+            self._disabled = True
 
     def create(self, name: str, content: str, tags: List[str] = None) -> str:
         """
@@ -76,26 +89,32 @@ class ProjectMemory:
         Returns:
             Success message
         """
+        if self._disabled:
+            return "Memory system is disabled (read-only filesystem)"
+
         tags_str = ",".join(tags or [])
 
-        with sqlite3.connect(self.db_path) as conn:
-            # Check if note exists to determine if we're creating or updating
-            cursor = conn.execute("SELECT name FROM notes WHERE name = ?", (name,))
-            exists = cursor.fetchone() is not None
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                # Check if note exists to determine if we're creating or updating
+                cursor = conn.execute("SELECT name FROM notes WHERE name = ?", (name,))
+                exists = cursor.fetchone() is not None
 
-            # Insert or replace note
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO notes (name, content, tags, updated_at)
-                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-            """,
-                (name, content, tags_str),
-            )
+                # Insert or replace note
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO notes (name, content, tags, updated_at)
+                    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                """,
+                    (name, content, tags_str),
+                )
 
-            conn.commit()
+                conn.commit()
 
-            action = "Updated" if exists else "Created"
-            return f"{action} memory note: {name}"
+                action = "Updated" if exists else "Created"
+                return f"{action} memory note: {name}"
+        except Exception:
+            return "Failed to save memory note"
 
     def read(self, name: str) -> Optional[Dict[str, Any]]:
         """
@@ -107,46 +126,50 @@ class ProjectMemory:
         Returns:
             Note data or None if not found
         """
-        with sqlite3.connect(self.db_path) as conn:
-            # Update access statistics first
-            conn.execute(
-                """
-                UPDATE notes 
-                SET access_count = access_count + 1,
-                    last_accessed = CURRENT_TIMESTAMP
-                WHERE name = ?
-            """,
-                (name,),
-            )
+        if self._disabled:
+            return None
 
-            cursor = conn.execute(
-                """
-                SELECT name, content, tags, created_at, updated_at, 
-                       access_count, last_accessed
-                FROM notes WHERE name = ?
-            """,
-                (name,),
-            )
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                # Update access statistics first
+                conn.execute(
+                    """
+                    UPDATE notes
+                    SET access_count = access_count + 1,
+                        last_accessed = CURRENT_TIMESTAMP
+                    WHERE name = ?
+                """,
+                    (name,),
+                )
 
-            row = cursor.fetchone()
-            if row:
-                conn.commit()
+                # Read the note
+                cursor = conn.execute(
+                    """
+                    SELECT name, content, tags, created_at, updated_at, access_count
+                    FROM notes
+                    WHERE name = ?
+                """,
+                    (name,),
+                )
 
-                return {
-                    "name": row[0],
-                    "content": row[1],
-                    "tags": row[2].split(",") if row[2] else [],
-                    "created_at": row[3],
-                    "updated_at": row[4],
-                    "access_count": row[5],
-                    "last_accessed": row[6],
-                }
+                row = cursor.fetchone()
+                if row:
+                    return {
+                        "name": row[0],
+                        "content": row[1],
+                        "tags": row[2].split(",") if row[2] else [],
+                        "created_at": row[3],
+                        "updated_at": row[4],
+                        "access_count": row[5],
+                    }
 
-        return None
+                return None
+        except Exception:
+            return None
 
     def search(self, query: str, limit: int = 20) -> List[Dict[str, Any]]:
         """
-        Search memory notes using simple text matching.
+        Search memory notes by content or name.
 
         Args:
             query: Search query
@@ -155,83 +178,94 @@ class ProjectMemory:
         Returns:
             List of matching notes
         """
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute(
-                """
-                SELECT name, content, tags, created_at, updated_at,
-                       access_count, last_accessed
-                FROM notes 
-                WHERE content LIKE ? OR name LIKE ? OR tags LIKE ?
-                ORDER BY last_accessed DESC
-                LIMIT ?
-            """,
-                (f"%{query}%", f"%{query}%", f"%{query}%", limit),
-            )
+        if self._disabled:
+            return []
 
-            results = []
-            for row in cursor.fetchall():
-                results.append(
-                    {
-                        "name": row[0],
-                        "content": row[1],
-                        "tags": row[2].split(",") if row[2] else [],
-                        "created_at": row[3],
-                        "updated_at": row[4],
-                        "access_count": row[5],
-                        "last_accessed": row[6],
-                    }
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.execute(
+                    """
+                    SELECT name, content, tags, created_at, updated_at, access_count
+                    FROM notes
+                    WHERE name LIKE ? OR content LIKE ?
+                    ORDER BY last_accessed DESC
+                    LIMIT ?
+                """,
+                    (f"%{query}%", f"%{query}%", limit),
                 )
 
-            return results
+                results = []
+                for row in cursor.fetchall():
+                    results.append(
+                        {
+                            "name": row[0],
+                            "content": row[1],
+                            "tags": row[2].split(",") if row[2] else [],
+                            "created_at": row[3],
+                            "updated_at": row[4],
+                            "access_count": row[5],
+                        }
+                    )
 
-    def list_all(
-        self, limit: int = 50, sort_by: str = "updated_at"
-    ) -> List[Dict[str, Any]]:
+                return results
+        except Exception:
+            return []
+
+    def list(self, limit: int = 20, sort_by: str = "updated_at") -> List[Dict[str, Any]]:
         """
         List all memory notes.
 
         Args:
-            limit: Maximum number of notes to return
-            sort_by: Sort column ('updated_at', 'created_at', 'last_accessed', 'name')
+            limit: Maximum number of results
+            sort_by: Sort column (updated_at, created_at, last_accessed, name)
 
         Returns:
-            List of all notes
+            List of notes
         """
-        valid_sort_columns = ["updated_at", "created_at", "last_accessed", "name"]
+        if self._disabled:
+            return []
+
+        # Validate sort column
+        valid_sort_columns = [
+            "updated_at",
+            "created_at",
+            "last_accessed",
+            "name",
+        ]
         if sort_by not in valid_sort_columns:
             sort_by = "updated_at"
 
-        order = "DESC" if sort_by != "name" else "ASC"
+        # Determine sort direction (updated_at desc, others asc)
+        sort_direction = "DESC" if sort_by == "updated_at" else "ASC"
 
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute(
-                f"""
-                SELECT name, content, tags, created_at, updated_at,
-                       access_count, last_accessed
-                FROM notes 
-                ORDER BY {sort_by} {order}
-                LIMIT ?
-            """,
-                (limit,),
-            )
-
-            results = []
-            for row in cursor.fetchall():
-                results.append(
-                    {
-                        "name": row[0],
-                        "content": row[1][:200] + "..."
-                        if len(row[1]) > 200
-                        else row[1],
-                        "tags": row[2].split(",") if row[2] else [],
-                        "created_at": row[3],
-                        "updated_at": row[4],
-                        "access_count": row[5],
-                        "last_accessed": row[6],
-                    }
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.execute(
+                    f"""
+                    SELECT name, content, tags, created_at, updated_at, access_count
+                    FROM notes
+                    ORDER BY {sort_by} {sort_direction}
+                    LIMIT ?
+                """,
+                    (limit,),
                 )
 
-            return results
+                results = []
+                for row in cursor.fetchall():
+                    results.append(
+                        {
+                            "name": row[0],
+                            "content": row[1],
+                            "tags": row[2].split(",") if row[2] else [],
+                            "created_at": row[3],
+                            "updated_at": row[4],
+                            "access_count": row[5],
+                        }
+                    )
+
+                return results
+        except Exception:
+            return []
 
     def delete(self, name: str) -> bool:
         """
@@ -241,111 +275,133 @@ class ProjectMemory:
             name: Note identifier
 
         Returns:
-            True if deleted, False if not found
+            True if deleted, False if not found or error
         """
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute("DELETE FROM notes WHERE name = ?", (name,))
-            conn.commit()
+        if self._disabled:
+            return False
 
-            return cursor.rowcount > 0
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.execute("DELETE FROM notes WHERE name = ?", (name,))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception:
+            return False
+
+    def stats(self) -> Dict[str, Any]:
+        """
+        Get memory system statistics.
+
+        Returns:
+            Dictionary with stats
+        """
+        if self._disabled:
+            return {"disabled": True, "total_notes": 0}
+
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                # Get total notes
+                cursor = conn.execute("SELECT COUNT(*) FROM notes")
+                total_notes = cursor.fetchone()[0]
+
+                # Get storage size
+                try:
+                    import os
+                    storage_bytes = os.path.getsize(self.db_path) if os.path.exists(self.db_path) else 0
+                except Exception:
+                    storage_bytes = 0
+
+                # Get tag statistics
+                cursor = conn.execute("SELECT tags FROM notes WHERE tags != ''")
+                all_tags = set()
+                for row in cursor.fetchall():
+                    if row[0]:
+                        all_tags.update(tag.strip() for tag in row[0].split(',') if tag.strip())
+
+                # Get most accessed notes
+                cursor = conn.execute("""
+                    SELECT name, access_count 
+                    FROM notes 
+                    WHERE access_count > 0 
+                    ORDER BY access_count DESC 
+                    LIMIT 5
+                """)
+                most_accessed = dict(cursor.fetchall())
+
+                # Get recently updated notes
+                cursor = conn.execute("""
+                    SELECT name, updated_at 
+                    FROM notes 
+                    ORDER BY updated_at DESC 
+                    LIMIT 5
+                """)
+                recently_updated = cursor.fetchall()
+
+                return {
+                    "disabled": False,
+                    "total_notes": total_notes,
+                    "storage_bytes": storage_bytes,
+                    "tag_count": len(all_tags),
+                    "unique_tags": list(all_tags),
+                    "most_accessed": most_accessed,
+                    "recently_updated": recently_updated
+                }
+        except Exception:
+            return {"disabled": True, "total_notes": 0}
 
     def get_stats(self) -> Dict[str, Any]:
         """
-        Get memory statistics.
-
-        Returns:
-            Dictionary with memory statistics
+        Alias for stats() method for backward compatibility.
         """
-        with sqlite3.connect(self.db_path) as conn:
-            stats = {}
+        return self.stats()
 
-            # Total notes
-            stats["total_notes"] = conn.execute(
-                "SELECT COUNT(*) FROM notes"
-            ).fetchone()[0]
-
-            # Storage usage
-            stats["storage_bytes"] = (
-                conn.execute("SELECT SUM(LENGTH(content)) FROM notes").fetchone()[0]
-                or 0
-            )
-
-            # Most accessed notes
-            stats["most_accessed"] = conn.execute("""
-                SELECT name, access_count FROM notes 
-                WHERE access_count > 0
-                ORDER BY access_count DESC LIMIT 5
-            """).fetchall()
-
-            # Recently updated
-            stats["recently_updated"] = conn.execute("""
-                SELECT name, updated_at FROM notes 
-                ORDER BY updated_at DESC LIMIT 5
-            """).fetchall()
-
-            # All tags
-            tags_result = conn.execute("SELECT tags FROM notes WHERE tags != ''")
-            all_tags = set()
-            for row in tags_result:
-                if row[0]:
-                    all_tags.update(row[0].split(","))
-
-            stats["unique_tags"] = sorted(list(all_tags))
-            stats["tag_count"] = len(all_tags)
-
-            return stats
-
-    def auto_save_decision(
-        self, context: str, decision: str, tags: List[str] = None
-    ) -> str:
+    def list_all(self, limit: int = 20) -> List[Dict[str, Any]]:
         """
-        Automatically save an important decision or discovery.
+        Alias for list() method for backward compatibility.
+        """
+        return self.list(limit=limit)
+
+    def auto_save_decision(self, issue: str, solution: str, tags: List[str] = None) -> str:
+        """
+        Auto-save a decision to memory.
 
         Args:
-            context: What led to this decision
-            decision: The decision or discovery made
-            tags: Optional tags
+            issue: The issue or problem addressed
+            solution: The solution implemented
+            tags: Optional list of tags
 
         Returns:
-            Result message
+            Success message
         """
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        name = f"decision_{timestamp}"
-
-        content = f"Context: {context}\n\nDecision: {decision}"
-
-        auto_tags = ["auto-saved", "decision"]
-        if tags:
-            auto_tags.extend(tags)
-
-        return self.create(name, content, auto_tags)
+        import time
+        name = f"decision_{int(time.time())}"
+        content = f"Issue: {issue}\nSolution: {solution}"
+        # Add auto-saved and decision tags
+        all_tags = (tags or []) + ["auto-saved", "decision"]
+        return self.create(name, content, all_tags)
 
 
-# Global memory instance (will be initialized in AICoder)
-_memory_instance: Optional[ProjectMemory] = None
+# Global memory instance management
+_memory_instances = {}
 
 
-def get_project_memory(project_path: str = None) -> ProjectMemory:
+def get_project_memory(project_path: str) -> ProjectMemory:
     """
-    Get or create the project memory instance.
+    Get or create a project memory instance.
 
     Args:
-        project_path: Project directory (uses current working directory if None)
+        project_path: Project directory path
 
     Returns:
         ProjectMemory instance
     """
-    global _memory_instance
-
-    if _memory_instance is None:
-        if project_path is None:
-            project_path = os.getcwd()
-        _memory_instance = ProjectMemory(project_path)
-
-    return _memory_instance
+    abs_path = os.path.abspath(project_path)
+    if abs_path not in _memory_instances:
+        _memory_instances[abs_path] = ProjectMemory(abs_path)
+    return _memory_instances[abs_path]
 
 
 def reset_memory():
-    """Reset the global memory instance (for testing)."""
-    global _memory_instance
-    _memory_instance = None
+    """Reset all memory instances (for testing)."""
+    global _memory_instances
+    _memory_instances.clear()

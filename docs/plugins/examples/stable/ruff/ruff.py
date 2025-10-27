@@ -23,6 +23,7 @@ Plugin Constants:
 """
 
 import os
+import shutil
 import subprocess
 
 
@@ -97,9 +98,9 @@ def _set_ruff_config(key: str, value: str) -> None:
     """Set ruff config in persistent storage."""
     if _aicoder_ref and hasattr(_aicoder_ref, "persistent_config"):
         _aicoder_ref.persistent_config[f"ruff.{key}"] = value
-        print(f"✅ Ruff {key} set to: {value}")
+        print(f"[✓] Ruff {key} set to: {value}")
     else:
-        print("❌ Persistent config not available")
+        print("[X] Persistent config not available")
 
 
 def _handle_ruff_command(args: list[str]) -> tuple[bool, bool]:
@@ -123,11 +124,11 @@ def _handle_ruff_command(args: list[str]) -> tuple[bool, bool]:
             check_args = _get_ruff_check_args()
             format_args = _get_ruff_format_args()
 
-            status = f"""🔍 **Ruff Plugin Status**
+            status = f"""Ruff Plugin Status
 
-- **Checking**: {"✅ Enabled" if enabled else "❌ Disabled"}
-- **Serious-only mode**: {"✅ Enabled" if serious_only else "❌ Disabled"}
-- **Auto-format**: {"✅ Enabled" if format_enabled else "❌ Disabled"}
+- **Checking**: {"[✓] Enabled" if enabled else "[X] Disabled"}
+- **Serious-only mode**: {"[✓] Enabled" if serious_only else "[X] Disabled"}
+- **Auto-format**: {"[✓] Enabled" if format_enabled else "[X] Disabled"}
 - **Check args**: `{check_args or "default"}`
 - **Format args**: `{format_args or "default"}`
 
@@ -148,20 +149,20 @@ def _handle_ruff_command(args: list[str]) -> tuple[bool, bool]:
                 check_cmd = args[1].lower()
                 if check_cmd in ["on", "off"]:
                     _set_ruff_config("enabled", check_cmd == "on")
-                    imsg(f"✅ Ruff checking turned {check_cmd}")
+                    imsg(f"[✓] Ruff checking turned {check_cmd}")
                     return False, False
                 elif check_cmd == "args":
                     check_args = " ".join(args[2:])
                     _set_ruff_config("check_args", check_args)
-                    imsg(f"✅ Ruff check arguments set to: `{check_args}`")
+                    imsg(f"[✓] Ruff check arguments set to: `{check_args}`")
                     return False, False
                 else:
                     emsg(
-                        "❌ Usage: `/ruff check on|off` or `/ruff check args <arguments>`"
+                        "[X] Usage: `/ruff check on|off` or `/ruff check args <arguments>`"
                     )
                     return False, False
             else:
-                emsg("❌ Usage: `/ruff check on|off` or `/ruff check args <arguments>`")
+                emsg("[X] Usage: `/ruff check on|off` or `/ruff check args <arguments>`")
                 return False, False
 
         elif cmd == "check-only-serious":
@@ -174,13 +175,13 @@ def _handle_ruff_command(args: list[str]) -> tuple[bool, bool]:
                         if serious_cmd == "on"
                         else "serious-only mode disabled"
                     )
-                    imsg(f"✅ Ruff {mode_text}")
+                    imsg(f"[✓] Ruff {mode_text}")
                     return False, False
                 else:
-                    emsg("❌ Usage: `/ruff check-only-serious on|off`")
+                    emsg("[X] Usage: `/ruff check-only-serious on|off`")
                     return False, False
             else:
-                emsg("❌ Usage: `/ruff check-only-serious on|off`")
+                emsg("[X] Usage: `/ruff check-only-serious on|off`")
                 return False, False
 
         elif cmd == "format":
@@ -188,33 +189,33 @@ def _handle_ruff_command(args: list[str]) -> tuple[bool, bool]:
                 format_cmd = args[1].lower()
                 if format_cmd in ["on", "off"]:
                     _set_ruff_config("format_enabled", format_cmd == "on")
-                    imsg(f"✅ Ruff auto-formatting turned {format_cmd}")
+                    imsg(f"[✓] Ruff auto-formatting turned {format_cmd}")
                     return False, False
                 else:
-                    emsg("❌ Usage: `/ruff format on|off`")
+                    emsg("[X] Usage: `/ruff format on|off`")
                     return False, False
             else:
-                emsg("❌ Usage: `/ruff format on|off`")
+                emsg("[X] Usage: `/ruff format on|off`")
                 return False, False
 
         elif cmd == "check":
             if len(args) >= 2 and args[1].lower() == "args":
                 check_args = " ".join(args[2:])
                 _set_ruff_config("check_args", check_args)
-                imsg(f"✅ Ruff check arguments set to: `{check_args}`")
+                imsg(f"[✓] Ruff check arguments set to: `{check_args}`")
                 return False, False
             else:
-                emsg("❌ Usage: `/ruff check args <arguments>`")
+                emsg("[X] Usage: `/ruff check args <arguments>`")
                 return False, False
 
         elif cmd == "format" and len(args) >= 2 and args[1].lower() == "args":
             format_args = " ".join(args[2:])
             _set_ruff_config("format_args", format_args)
-            imsg(f"✅ Ruff format arguments set to: `{format_args}`")
+            imsg(f"[✓] Ruff format arguments set to: `{format_args}`")
             return False, False
 
         elif cmd == "help":
-            help_text = """🔍 **Ruff Plugin Commands**
+            help_text = """Ruff Plugin Commands
 
 - `/ruff` - Show current status
 - `/ruff check on|off` - Enable/disable checking
@@ -234,12 +235,12 @@ def _handle_ruff_command(args: list[str]) -> tuple[bool, bool]:
             return False, False
         else:
             emsg(
-                f"❌ Unknown ruff command: {cmd}. Use `/ruff help` for available commands."
+                f"[X] Unknown ruff command: {cmd}. Use `/ruff help` for available commands."
             )
             return False, False
 
     except Exception as e:
-        emsg(f"❌ Error handling ruff command: {e}")
+        emsg(f"[X] Error handling ruff command: {e}")
         return False, False
 
 
@@ -253,8 +254,8 @@ def on_aicoder_init(aicoder_instance):
     aicoder_instance.command_handlers["/ruff"] = _handle_ruff_command
 
     if not _is_ruff_available():
-        print("⚠️  Ruff not found - plugin will be disabled")
-        print("💡 Install with: pip install ruff")
+        print("[!] Ruff not found - plugin will be disabled")
+        print("[i] Install with: pip install ruff")
         return False
 
     try:
@@ -282,15 +283,15 @@ def on_aicoder_init(aicoder_instance):
         INTERNAL_TOOL_FUNCTIONS["write_file"] = patched_write_file
         INTERNAL_TOOL_FUNCTIONS["edit_file"] = patched_edit_file
 
-        print(f"✅ Ruff plugin activated - Auto-format: {ENABLE_RUFF_FORMAT}")
+        print(f"[✓] Ruff plugin activated - Auto-format: {ENABLE_RUFF_FORMAT}")
         return True
 
     except ImportError as e:
-        print(f"❌ Failed to import internal tools: {e}")
+        print(f"[X] Failed to import internal tools: {e}")
         return False
 
     except Exception as e:
-        print(f"❌ Failed to initialize Ruff plugin: {e}")
+        print(f"[X] Failed to initialize Ruff plugin: {e}")
         import traceback
 
         traceback.print_exc()
@@ -299,13 +300,7 @@ def on_aicoder_init(aicoder_instance):
 
 def _is_ruff_available() -> bool:
     """Check if ruff is installed and available."""
-    try:
-        result = subprocess.run(
-            ["ruff", "--version"], capture_output=True, text=True, timeout=10
-        )
-        return result.returncode == 0
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return False
+    return shutil.which("ruff") is not None
 
 
 def _check_file_with_ruff(file_path: str) -> None:
@@ -334,7 +329,7 @@ def _check_file_with_ruff(file_path: str) -> None:
             _format_file_with_ruff(abs_path)
 
     except Exception as e:
-        print(f"⚠️  Ruff check failed for {file_path}: {e}")
+        print(f"[!] Ruff check failed for {file_path}: {e}")
 
 
 def _format_file_with_ruff(file_path: str) -> None:
@@ -354,23 +349,23 @@ def _format_file_with_ruff(file_path: str) -> None:
             ):
                 _add_format_message(file_path)
         else:
-            print(f"⚠️  Ruff format failed for {file_path}: {result.stderr}")
+            print(f"[!] Ruff format failed for {file_path}: {result.stderr}")
 
     except Exception as e:
-        print(f"⚠️  Ruff format failed for {file_path}: {e}")
+        print(f"[!] Ruff format failed for {file_path}: {e}")
 
 
 def _add_format_message(file_path: str) -> None:
     """Add a user message about ruff formatting that occurred."""
     try:
         # Create a user-friendly message that clearly indicates it's from the plugin
-        message_content = f"""✨ **Ruff Plugin: File Formatted**
+        message_content = f"""[*] Ruff Plugin: File Formatted
 
 The Ruff plugin automatically formatted the file to improve code style and consistency:
 
-📁 **File**: {file_path}
-🤖 **Plugin Action**: File was reformatted using ruff format
-✅ **Status**: Formatting completed successfully
+File: {file_path}
+Plugin Action: File was reformatted using ruff format
+Status: Formatting completed successfully
 
 The file content has been updated to follow Python formatting standards."""
 
@@ -379,17 +374,17 @@ The file content has been updated to follow Python formatting standards."""
 
         # Use the pending_tool_messages system
         _aicoder_ref.tool_manager.executor.pending_tool_messages.append(user_message)
-        print("✨ Ruff formatting completed - AI will be notified")
+        print("[*] Ruff formatting completed - AI will be notified")
 
     except Exception as e:
-        print(f"⚠️  Failed to add ruff format message: {e}")
+        print(f"[!] Failed to add ruff format message: {e}")
 
 
 def _add_ruff_issues_message(file_path: str, ruff_output: str) -> None:
     """Add a user message about ruff issues found."""
     try:
         # Create a user-friendly message that clearly indicates it's from the plugin
-        message_content = f"""🔍 **Ruff Plugin: Issues Detected in {file_path}**
+        message_content = f"""Ruff Plugin: Issues Detected in {file_path}
 
 The Ruff plugin automatically detected code quality issues in the file you just saved and is asking the AI to fix them:
 
@@ -397,9 +392,9 @@ The Ruff plugin automatically detected code quality issues in the file you just 
 {ruff_output}
 ```
 
-🤖 **Plugin Action**: The AI will now attempt to fix these issues automatically.
-📁 **File**: {file_path}
-🔧 **Tool**: Use edit_file or write_file to resolve the problems
+Plugin Action: The AI will now attempt to fix these issues automatically.
+File: {file_path}
+Tool: Use edit_file or write_file to resolve the problems
 
 The file has already been saved, so the AI needs to edit it again to resolve the issues."""
 
@@ -408,10 +403,10 @@ The file has already been saved, so the AI needs to edit it again to resolve the
 
         # Use the pending_tool_messages system
         _aicoder_ref.tool_manager.executor.pending_tool_messages.append(user_message)
-        print("🔍 Ruff issues found - AI will be notified")
+        print("Ruff issues found - AI will be notified")
 
     except Exception as e:
-        print(f"⚠️  Failed to add ruff issues message: {e}")
+        print(f"[!] Failed to add ruff issues message: {e}")
 
 
 def cleanup():
@@ -427,10 +422,10 @@ def cleanup():
         if _original_edit_file:
             INTERNAL_TOOL_FUNCTIONS["edit_file"] = _original_edit_file
 
-        print("✅ Ruff plugin cleaned up")
+        print("[✓] Ruff plugin cleaned up")
 
     except Exception as e:
-        print(f"⚠️  Failed to cleanup Ruff plugin: {e}")
+        print(f"[!] Failed to cleanup Ruff plugin: {e}")
 
 
 # Plugin metadata

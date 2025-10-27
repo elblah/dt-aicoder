@@ -130,7 +130,7 @@ class LSPManager:
 
                         self.servers[lang] = process
                         results[lang] = True
-                        print(f"✅ Started {server_name} for {lang}")
+                        print(f"[✓] Started {server_name} for {lang}")
 
                         # Initialize the server in a background thread
                         init_thread = threading.Thread(
@@ -141,10 +141,10 @@ class LSPManager:
                         init_thread.start()
 
                     except Exception as e:
-                        print(f"❌ Failed to start {server_name} for {lang}: {e}")
+                        print(f"[X] Failed to start {server_name} for {lang}: {e}")
                         results[lang] = False
                 else:
-                    print(f"ℹ️ {server_name} not found for {lang}")
+                    print(f"[i] {server_name} not found for {lang}")
                     results[lang] = False
 
         return results
@@ -192,7 +192,7 @@ class LSPManager:
             process.stdin.flush()
 
         except Exception as e:
-            print(f"⚠️ Failed to initialize {language} LSP server: {e}")
+            print(f"[!] Failed to initialize {language} LSP server: {e}")
 
     def handle_diagnostics(self, language: str, diagnostics: List[Dict]):
         """Handle diagnostics from LSP servers."""
@@ -210,7 +210,7 @@ class LSPManager:
 
         # Show in terminal if configured
         if LSP_CONFIG["show_in_terminal"]:
-            print(f"\n🔍 {language.upper()} Diagnostics:")
+            print(f"\n{language.upper()} Diagnostics:")
             for diag in significant_diagnostics[:5]:  # Show first 5
                 severity = {1: "ERROR", 2: "WARNING", 3: "INFO", 4: "HINT"}.get(
                     diag.get("severity", 3), "UNKNOWN"
@@ -239,10 +239,10 @@ class LSPManager:
             if diag_messages:
                 # In a real implementation, this would add to message history
                 # For now, we just print that AI was notified
-                print(f"🤖 AI notified of {len(diag_messages)} {language} issues")
+                print(f"AI notified of {len(diag_messages)} {language} issues")
 
         except Exception as e:
-            print(f"⚠️ Failed to notify AI of diagnostics: {e}")
+            print(f"[!] Failed to notify AI of diagnostics: {e}")
 
     def get_status(self) -> str:
         """Get LSP status information."""
@@ -266,9 +266,9 @@ class LSPManager:
                 if process.poll() is None:  # Still running
                     process.terminate()
                     process.wait(timeout=5)
-                    print(f"⏹️ Stopped {lang} LSP server")
+                    print(f"[ ] Stopped {lang} LSP server")
             except Exception as e:
-                print(f"⚠️ Error stopping {lang} LSP server: {e}")
+                print(f"[!] Error stopping {lang} LSP server: {e}")
 
         self.servers.clear()
         self.diagnostics.clear()
@@ -281,25 +281,25 @@ lsp_manager = LSPManager()
 # Plugin initialization
 def initialize_lsp_plugin():
     """Initialize the LSP plugin."""
-    print("🔍 Detecting project types...")
+    print("Detecting project types...")
     project_types = lsp_manager.detect_project_type()
 
     if project_types:
-        print(f"✅ Detected project types: {', '.join(project_types)}")
+        print(f"[✓] Detected project types: {', '.join(project_types)}")
 
         if LSP_CONFIG["auto_start"]:
-            print("🚀 Starting language servers...")
+            print("Starting language servers...")
             results = lsp_manager.start_language_servers()
 
             started_count = sum(1 for success in results.values() if success)
             if started_count > 0:
-                print(f"✅ {started_count} language servers started successfully")
+                print(f"[✓] {started_count} language servers started successfully")
             else:
-                print("ℹ️ No language servers started (install LSP servers to enable)")
+                print("[i] No language servers started (install LSP servers to enable)")
         else:
-            print("ℹ️ LSP auto-start disabled")
+            print("[i] LSP auto-start disabled")
     else:
-        print("ℹ️ No project types detected")
+        print("[i] No project types detected")
 
 
 # Store original functions
@@ -326,7 +326,7 @@ def lsp_tracked_write_file(path, content, **kwargs):
             # In a real implementation, this would send a textDocument/didChange notification
             # For now, we'll just log that a file was changed
             if LSP_CONFIG["show_in_terminal"]:
-                print(f"📝 File changed: {path} ({lang})")
+                print(f"File changed: {path} ({lang})")
             break
 
     return result
@@ -349,7 +349,7 @@ def lsp_tracked_edit_file(file_path, new_string, old_string="", **kwargs):
     for lang, config in LSP_CONFIG["languages"].items():
         if file_ext in config["file_extensions"]:
             if LSP_CONFIG["show_in_terminal"]:
-                print(f"📝 File edited: {file_path} ({lang})")
+                print(f"File edited: {file_path} ({lang})")
             break
 
     return result
@@ -382,23 +382,23 @@ def lsp_command(self, args):
 
         result_lines = ["LSP Server Start Results:"]
         if started:
-            result_lines.append(f"✅ Started: {', '.join(started)}")
+            result_lines.append(f"[✓] Started: {', '.join(started)}")
         if failed:
-            result_lines.append(f"❌ Failed: {', '.join(failed)}")
+            result_lines.append(f"[X] Failed: {', '.join(failed)}")
 
         return "\n".join(result_lines)
 
     elif command == "stop":
         # Stop all servers
         lsp_manager.stop_servers()
-        return "✅ All language servers stopped"
+        return "[✓] All language servers stopped"
 
     elif command == "restart":
         # Restart servers
         lsp_manager.stop_servers()
         results = lsp_manager.start_language_servers()
         started = [lang for lang, success in results.items() if success]
-        return f"✅ Restarted language servers: {', '.join(started) if started else 'None'}"
+        return f"[✓] Restarted language servers: {', '.join(started) if started else 'None'}"
 
     elif command == "diagnostics":
         # Show current diagnostics
@@ -442,13 +442,13 @@ def background_lsp_monitor():
             # Check if servers are still running
             for lang, process in list(lsp_manager.servers.items()):
                 if process.poll() is not None:  # Server has stopped
-                    print(f"⚠️ {lang} LSP server stopped unexpectedly")
+                    print(f"[!] {lang} LSP server stopped unexpectedly")
                     del lsp_manager.servers[lang]
 
             time.sleep(30)  # Check every 30 seconds
         except Exception as e:
             if lsp_manager.running:  # Only print if still running
-                print(f"⚠️ LSP monitor error: {e}")
+                print(f"[!] LSP monitor error: {e}")
             time.sleep(30)
 
 
@@ -464,7 +464,7 @@ def start_lsp_monitoring():
 initialize_lsp_plugin()
 start_lsp_monitoring()
 
-print("✅ LSP Integration plugin loaded")
+print("[✓] LSP Integration plugin loaded")
 print("   - Automatic language server detection enabled")
 print("   - Real-time diagnostics monitoring enabled")
 print("   - AI notification of code issues enabled")

@@ -232,7 +232,7 @@ def test_auto_compaction_handles_exception_gracefully(mock_print, app_with_compa
 
     # Should have printed error messages
     print_calls = [str(call) for call in mock_print.call_args_list]
-    error_found = any("❌ Compaction failed" in call for call in print_calls)
+    error_found = any("[X] Compaction failed" in call for call in print_calls)
     assert error_found, "Should print compaction failed error"
 
     preserved_found = any(

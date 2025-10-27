@@ -26,7 +26,7 @@ Basic cost tracking with simple per-million-token pricing.
 ### 16_cost_display_plugin.py
 Displays cost information above prompts in a user-friendly format.
 - Shows costs automatically when prompts contain ">"
-- Format: `💰 [model-name] Cost: 0.04 input / 0.03 output = 0.07 total`
+- Format: `[model-name] Cost: 0.04 input / 0.03 output = 0.07 total`
 - Supports multiple model types with simple pricing
 
 ### 18_tiered_cost_tracking_plugin.py

@@ -74,10 +74,10 @@ if __name__ == "__main__":
         test_safe_text_conversion()
         test_plugin_hooks()
 
-        print("\n✅ All tests passed! Plugin is ready for use.")
+        print("\n[✓] All tests passed! Plugin is ready for use.")
 
     except Exception as e:
-        print(f"\n❌ Test failed: {e}")
+        print(f"\n[X] Test failed: {e}")
         import traceback
 
         traceback.print_exc()

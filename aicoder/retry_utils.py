@@ -511,8 +511,8 @@ def handle_request_error(exception):
 
     # Debug
     if os.environ.get("AICODER_REGEX_DEBUG", "0") == "1":
-        print(f'🔍 Regex matching text: "{match_text}"')
-        print(f"🔍 Decision: {decision}, Pattern: {pattern}")
+        print(f'[DEBUG] Regex matching text: "{match_text}"')
+        print(f"[DEBUG] Decision: {decision}, Pattern: {pattern}")
 
     # Never retry
     if decision == "no":

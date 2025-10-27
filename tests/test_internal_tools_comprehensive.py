@@ -1,7 +1,7 @@
 """
 Comprehensive tests for internal tools that were missing tests.
 
-⚠️ CRITICAL: ALWAYS run this test with YOLO_MODE=1 to prevent hanging:
+[!] CRITICAL: ALWAYS run this test with YOLO_MODE=1 to prevent hanging:
 
 YOLO_MODE=1 python tests/test_internal_tools_comprehensive.py
 

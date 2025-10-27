@@ -4,8 +4,8 @@ Tiered Cost Display Plugin
 This plugin extends the cost display functionality to handle models with tiered pricing
 based on context length. It displays cost information for both the last request and
 accumulated total costs:
-"💰 [model-name] Last Request: 0.01 input / 0.00 output = 0.01 total (12K prompt tokens, Tier 1)"
-"💰 [model-name] Total Costs: 0.05 input / 0.03 output = 0.08 total"
+"[COST] [model-name] Last Request: 0.01 input / 0.00 output = 0.01 total (12K prompt tokens, Tier 1)"
+"[COST] [model-name] Total Costs: 0.05 input / 0.03 output = 0.08 total"
 
 The plugin automatically detects tiered pricing models and calculates costs based on
 the appropriate pricing tier determined by context length.
@@ -264,7 +264,7 @@ def save_cost_data():
         _stats_instance.prompt_tokens <= 0 and _stats_instance.completion_tokens <= 0
     ):
         if os.environ.get("DEBUG", "0") == "1":
-            print("ℹ️  No costs to save (no tokens processed)")
+            print("[i] No costs to save (no tokens processed)")
         return
 
     try:
@@ -298,10 +298,10 @@ def save_cost_data():
             f.write(line)
 
         if os.environ.get("DEBUG", "0") == "1":
-            print(f"✅ Cost data saved to {COST_DATA_FILE}")
+            print(f"[✓] Cost data saved to {COST_DATA_FILE}")
     except Exception as e:
         if os.environ.get("DEBUG", "0") == "1":
-            print(f"⚠️  Failed to save cost data: {e}")
+            print(f"[!] Failed to save cost data: {e}")
 
 
 # Register the save function to run on exit
@@ -381,14 +381,14 @@ def on_before_user_prompt():
 
                 # Print both cost displays in a noticeable way (yellow color with money emoji)
                 print(
-                    f"\n\033[93m💰 {last_cost_display}\033[0m"
+                    f"\n\033[93m[COST] {last_cost_display}\033[0m"
                 )  # Yellow color for visibility
                 print(
-                    f"\033[93m💰 {total_cost_display}\033[0m"
+                    f"\033[93m[COST] {total_cost_display}\033[0m"
                 )  # Yellow color for visibility
             elif total_cost == 0:
                 # Model price not found
-                print(f"\n\033[93m💰 Model price not found for [{model_name}]\033[0m")
+                print(f"\n\033[93m[COST] Model price not found for [{model_name}]\033[0m")
 
 
 def _try_get_stats_instance():
@@ -471,7 +471,7 @@ if PLUGIN_ENABLED:
 # Only show plugin loading messages in debug mode
 if os.environ.get("DEBUG", "0") == "1":
     if PLUGIN_ENABLED:
-        print("✅ Tiered cost display plugin loaded")
+        print("[✓] Tiered cost display plugin loaded")
         print("   - Shows cost information above prompts when tokens are present")
         print("   - Automatically detects model and applies appropriate pricing")
         print("   - Supports tiered pricing for Qwen models based on context length")
@@ -482,10 +482,10 @@ if os.environ.get("DEBUG", "0") == "1":
             "     - Environment overrides take precedence and disable multitier support"
         )
         print(
-            "   - Format: 💰 [model-name] Last Request: 0.01 input / 0.00 output = 0.01 total (12K prompt tokens, Tier 1)"
+            "   - Format: [COST] [model-name] Last Request: 0.01 input / 0.00 output = 0.01 total (12K prompt tokens, Tier 1)"
         )
         print(
-            "            💰 [model-name] Total Costs: 0.05 input / 0.03 output = 0.08 total"
+            "            [COST] [model-name] Total Costs: 0.05 input / 0.03 output = 0.08 total"
         )
         print(f"   - Cost data will be saved to: {COST_DATA_FILE}")
 
@@ -495,7 +495,7 @@ if os.environ.get("DEBUG", "0") == "1":
                 f"   - Using environment variable overrides: INPUT_TOKEN_COST={INPUT_TOKEN_COST_ENV}, OUTPUT_TOKEN_COST={OUTPUT_TOKEN_COST_ENV}"
             )
     else:
-        print("⚠️  Tiered cost display plugin is disabled")
+        print("[!] Tiered cost display plugin is disabled")
         print("   - Set TIERED_COST_PLUGIN_ENABLED=true to enable")
         print("   - Set TIERED_COST_DATA_FILE to configure the save path")
         print(

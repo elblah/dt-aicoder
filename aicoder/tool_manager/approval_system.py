@@ -96,7 +96,7 @@ class ApprovalSystem:
                 # Show file path for file operations
                 if tool_name in ["edit_file", "write_file"] and "path" in arguments:
                     file_path = arguments["path"]
-                    print(f"{config.CYAN}📁 File: {file_path}{config.RESET}")
+                    print(f"{config.CYAN}File: {file_path}{config.RESET}")
             except Exception as e:
                 emsg(f"Error displaying prompt: {e}")
                 # Still proceed with approval to maintain security
@@ -352,11 +352,11 @@ class ApprovalSystem:
 
             # Run diff tool
             print(
-                f"\n{config.CYAN}📝 Opening {diff_tool} for interactive diff editing...{config.RESET}"
+                f"\n{config.CYAN}Opening {diff_tool} for interactive diff editing...{config.RESET}"
             )
             wmsg(f"Original: {file_path}")
             wmsg(f"Temp file: {tmp_path}")
-            imsg("💡 Edit the temp file as needed, then save and exit")
+            imsg("[i] Edit the temp file as needed, then save and exit")
 
             if diff_tool == "vimdiff":
                 subprocess.run([diff_tool, file_path, tmp_path])
@@ -373,17 +373,17 @@ class ApprovalSystem:
 
             if modified_temp_content != original_temp_content:
                 # User modified the file!
-                imsg("\n✨ User modifications detected!")
+                imsg("\n[*] User modifications detected!")
 
                 # Apply user changes to original file
                 with open(file_path, "w", encoding="utf-8") as f:
                     f.write(modified_temp_content)
 
-                imsg(f"✅ Applied user modifications to {file_path}")
+                imsg(f"[✓] Applied user modifications to {file_path}")
 
                 # Notify user
                 print(
-                    f"{config.CYAN}🎯 Your changes have been applied successfully!{config.RESET}"
+                    f"{config.CYAN}Your changes have been applied successfully!{config.RESET}"
                 )
 
                 # Store notification to be added after tool result
@@ -401,7 +401,7 @@ class ApprovalSystem:
 
                 return True
             else:
-                print(f"\n{config.BLUE}ℹ️  No modifications detected{config.RESET}")
+                print(f"\n{config.BLUE}[i] No modifications detected{config.RESET}")
                 return False
 
         except Exception as e:

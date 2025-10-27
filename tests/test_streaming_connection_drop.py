@@ -225,7 +225,7 @@ def test_connection_drop_detection(
     # Mock select to return no input available
     mock_select.return_value = ([], [], [])  # No input available
 
-    print("\n🧪 Testing Connection Drop Detection")
+    print("\nTesting Connection Drop Detection")
     print("=" * 50)
 
     from aicoder.app import AICoder
@@ -234,7 +234,7 @@ def test_connection_drop_detection(
     app = AICoder()
 
     # Test first request - this should trigger connection drop and be detected
-    print("🎯 Testing first request (should detect connection drop)...")
+    print("Testing first request (should detect connection drop)...")
 
     messages = [{"role": "user", "content": "Hello mock Grok"}]
 
@@ -244,8 +244,8 @@ def test_connection_drop_detection(
         # With our fix, connection drops should be detected and return None
         # This is the CORRECT behavior - we want to detect drops, not hide them
         if response is None:
-            print("✅ Connection drop properly detected!")
-            print("✅ Request returned None as expected when connection was dropped")
+            print("[✓] Connection drop properly detected!")
+            print("[✓] Request returned None as expected when connection was dropped")
             assert True  # Connection drop was detected
         else:
             # If we get a response, it should mean the connection didn't drop
@@ -253,14 +253,14 @@ def test_connection_drop_detection(
             content = (
                 response.get("choices", [{}])[0].get("message", {}).get("content", "")
             )
-            print(f"⚠️  Unexpected: Request succeeded with content: '{content}'")
+            print(f"[!]  Unexpected: Request succeeded with content: '{content}'")
             print("   This might mean the connection drop wasn't simulated correctly")
 
     except Exception as e:
         pytest.fail(f"Request should handle connection drops gracefully: {e}")
 
     # Test second request - this should work fine (no state corruption)
-    print("\n🎯 Testing second request (should work fine after clean failure)...")
+    print("\nTesting second request (should work fine after clean failure)...")
 
     messages = [{"role": "user", "content": "Second test message"}]
 
@@ -269,18 +269,18 @@ def test_connection_drop_detection(
 
         # The second request should also detect the connection drop (same behavior)
         if response is None:
-            print("✅ Second request also detected connection drop correctly!")
-            print("✅ No state corruption - clean failure as expected")
+            print("[✓] Second request also detected connection drop correctly!")
+            print("[✓] No state corruption - clean failure as expected")
             assert True  # No state corruption
         else:
             # If we get a response, check if it's valid
             content = (
                 response.get("choices", [{}])[0].get("message", {}).get("content", "")
             )
-            print(f"✅ Second request got content: '{content}'")
+            print(f"[✓] Second request got content: '{content}'")
 
     except Exception as e:
         pytest.fail(f"Second request should handle connection drops gracefully: {e}")
 
-    print("\n✅ Connection drop detection working correctly!")
-    print("✅ Both requests detected drops cleanly with no state corruption!")
+    print("\n[✓] Connection drop detection working correctly!")
+    print("[✓] Both requests detected drops cleanly with no state corruption!")

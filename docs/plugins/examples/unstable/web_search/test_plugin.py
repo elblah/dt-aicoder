@@ -38,7 +38,7 @@ def test_web_search_function():
         return True
 
     except Exception as e:
-        print(f"❌ Test failed with error: {e}")
+        print(f"[X] Test failed with error: {e}")
         return False
 
 

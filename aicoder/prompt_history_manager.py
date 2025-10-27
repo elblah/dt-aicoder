@@ -43,8 +43,9 @@ class PromptHistoryManager:
         """Ensure the .aicoder directory exists."""
         try:
             self.history_file.parent.mkdir(exist_ok=True)
-        except OSError as e:
+        except Exception as e:
             emsg(f"Warning: Could not create history directory: {e}")
+            self.enabled = False
 
     def load_history(self) -> List[str]:
         """
@@ -53,7 +54,10 @@ class PromptHistoryManager:
         Returns:
             List of historical prompts, empty list if file doesn't exist or is corrupted.
         """
-        if not self.enabled or not self.history_file.exists():
+        if not self.enabled:
+            return []
+        
+        if not self.history_file.exists():
             return []
 
         try:
@@ -130,7 +134,14 @@ class PromptHistoryManager:
             return True
 
         try:
+            # Check if disabled (might have been set during _ensure_history_dir)
+            if not self.enabled:
+                return False
             self._ensure_history_dir()
+            
+            # Check again after ensuring directory
+            if not self.enabled:
+                return False
 
             # Check if this is a duplicate of the last prompt
             last_prompt = self._get_last_prompt()
@@ -266,6 +277,9 @@ class PromptHistoryManager:
         Returns:
             True if successful, False otherwise.
         """
+        if not self.enabled:
+            return False
+            
         try:
             if self.history_file.exists():
                 self.history_file.unlink()
@@ -273,7 +287,7 @@ class PromptHistoryManager:
                 if hasattr(self, "_save_count"):
                     delattr(self, "_save_count")
             return True
-        except OSError as e:
+        except Exception as e:
             emsg(f"Error clearing history file: {e}")
             return False
 

@@ -69,7 +69,7 @@ class CloudMemorySync:
         # Then upload to cloud
         if "Created" in result or "Updated" in result:
             if self._upload_to_cloud(name, content, tags):
-                print(f"☁️  Synced '{name}' to cloud")
+                print(f"Synced '{name}' to cloud")
 
         return result
 
@@ -86,7 +86,7 @@ class CloudMemorySync:
                 memory_instance.create(
                     name, cloud_note["content"], cloud_note.get("tags", [])
                 )
-                print(f"☁️  Downloaded '{name}' from cloud")
+                print(f"Downloaded '{name}' from cloud")
                 return memory_instance.read(name)
 
         return result
@@ -104,12 +104,12 @@ class CloudMemorySync:
             memory_module.ProjectMemory.create = self._enhanced_create
             memory_module.ProjectMemory.read = self._enhanced_read
 
-            print("✅ Cloud Memory Sync plugin loaded")
+            print("[✓] Cloud Memory Sync plugin loaded")
             print(f"   Sync URL: {self.api_url}")
             print(f"   API Key: {'Configured' if self.api_key else 'Not configured'}")
 
         except ImportError as e:
-            print(f"❌ Failed to load Cloud Memory Sync plugin: {e}")
+            print(f"[X] Failed to load Cloud Memory Sync plugin: {e}")
 
 
 # Initialize plugin

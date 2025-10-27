@@ -107,7 +107,7 @@ def enhanced_create(self, name, content, tags=None):
     
     # Additional logic
     if "important" in content.lower():
-        print("⚠️  Important note created!")
+        print("[!]  Important note created!")
     
     return result
 

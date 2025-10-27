@@ -81,6 +81,7 @@ def execute_memory(
     limit: int = 20,
     sort_by: str = "updated_at",
     stats=None,
+    project_path: str = None,
 ) -> str:
     """
     Execute memory operations.
@@ -100,8 +101,11 @@ def execute_memory(
     """
     try:
         from aicoder.memory import get_project_memory
+        import os
 
-        memory = get_project_memory()
+        # Use provided project_path or current working directory
+        project_dir = project_path or os.getcwd()
+        memory = get_project_memory(project_dir)
         if stats:
             stats.tool_calls += 1
 
@@ -174,7 +178,7 @@ Created: {created} | Accessed: {accessed} times | {tags_str}
                 return f"Memory note '{name}' not found"
 
         elif operation == "list":
-            notes = memory.list_all(limit, sort_by)
+            notes = memory.list(limit=limit, sort_by=sort_by)
             if notes:
                 output = f"Memory notes (sorted by {sort_by}):\n\n"
                 for i, note in enumerate(notes, 1):

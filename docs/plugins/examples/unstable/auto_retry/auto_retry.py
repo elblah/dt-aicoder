@@ -110,7 +110,7 @@ def patched_make_api_request(original_method):
                         else "Server"
                     )
                     print(
-                        f"🔄 {error_type} error detected. Retrying in {retry_delay_for_this_attempt}s (attempt {attempt}/{max_retries}) (Press ESC to cancel)"
+                        f"*** {error_type} error detected. Retrying in {retry_delay_for_this_attempt}s (attempt {attempt}/{max_retries}) (Press ESC to cancel)"
                     )
 
                     # Try to use cancellable sleep if available
@@ -143,7 +143,7 @@ def install_auto_retry_plugin():
 
         # Check if we've already patched
         if hasattr(APIHandlerMixin._make_api_request, "_auto_retry_patched"):
-            print("✅ Auto retry plugin already installed")
+            print("[✓] Auto retry plugin already installed")
             return True
 
         # Store reference to original method
@@ -157,7 +157,7 @@ def install_auto_retry_plugin():
         # Apply the patch
         APIHandlerMixin._make_api_request = patched_method
 
-        print("✅ Auto retry plugin installed successfully")
+        print("[✓] Auto retry plugin installed successfully")
         print("   Features:")
         print("   - Automatic retry for 500 errors containing 429 content")
         print("   - Automatic retry for HTTP errors: 502, 503, 504, 429, 500")
@@ -173,15 +173,15 @@ def install_auto_retry_plugin():
 
     except ImportError as e:
         # This is expected when running outside of AI Coder
-        print(f"ℹ️  Auto retry plugin loaded (API handler not available: {e})")
+        print(f"[i] Auto retry plugin loaded (API handler not available: {e})")
         return True
     except Exception as e:
-        print(f"❌ Failed to install auto retry plugin: {e}")
+        print(f"[X] Failed to install auto retry plugin: {e}")
         return False
 
 
 # Install the plugin when loaded
 if install_auto_retry_plugin():
-    print("✅ Auto retry plugin loaded")
+    print("[✓] Auto retry plugin loaded")
 else:
-    print("❌ Auto retry plugin failed to load")
+    print("[X] Auto retry plugin failed to load")

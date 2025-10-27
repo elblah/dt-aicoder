@@ -50,10 +50,10 @@ def on_aicoder_init(aicoder_instance):
         # Register exit handler for auto-save
         atexit.register(_auto_save_on_exit)
 
-        print("✅ Session manager plugin loaded successfully")
+        print("[✓] Session manager plugin loaded successfully")
         return True
     except Exception as e:
-        print(f"❌ Failed to load session manager plugin: {e}")
+        print(f"[X] Failed to load session manager plugin: {e}")
         import traceback
 
         traceback.print_exc()
@@ -64,9 +64,9 @@ def _auto_save_on_exit():
     """Auto-save session on exit"""
     try:
         _save_current_session()
-        print("✅ Current session auto-saved")
+        print("[✓] Current session auto-saved")
     except Exception as e:
-        print(f"❌ Error during session auto-save: {e}")
+        print(f"[X] Error during session auto-save: {e}")
 
 
 def _get_session_dir():
@@ -132,12 +132,12 @@ def _load_current_session():
                     # Actually load the session content
                     _load_session_by_filename(session_filename)
 
-                    print(f"✅ Loaded session: {session_name}")
+                    print(f"[✓] Loaded session: {session_name}")
                 else:
-                    print("⚠️  Current session file not found, creating new session")
+                    print("[!] Current session file not found, creating new session")
                     _create_new_session()
         except Exception as e:
-            print(f"❌ Error loading current session: {e}")
+            print(f"[X] Error loading current session: {e}")
             _create_new_session()
     else:
         # No current session, create new one
@@ -187,10 +187,10 @@ def _create_new_session(session_name=None):
         _update_current_session_tracking(full_session_path)
         _current_session_file = full_session_path
 
-        print(f"✅ Created new session: session_{timestamp}__{sanitized_name}")
+        print(f"[✓] Created new session: session_{timestamp}__{sanitized_name}")
 
     except Exception as e:
-        print(f"❌ Error creating new session: {e}")
+        print(f"[X] Error creating new session: {e}")
 
 
 def _sanitize_session_name(name):
@@ -222,7 +222,7 @@ def _update_current_session_tracking(session_file_path):
         with open(current_session_file, "w") as f:
             json.dump(tracking_data, f, indent=2)
     except Exception as e:
-        print(f"❌ Error updating current session tracking: {e}")
+        print(f"[X] Error updating current session tracking: {e}")
 
 
 def _get_session_name_from_file(filepath):
@@ -238,7 +238,7 @@ def _handle_sessions_command(args):
     global _session_manager_ref, _current_session_file
 
     if not _session_manager_ref:
-        print("❌ Session manager not available")
+        print("[X] Session manager not available")
         return False, False
 
     if not args:
@@ -253,7 +253,7 @@ def _handle_sessions_command(args):
         return False, False
     elif command == "load":
         if len(args) < 2:
-            print("❌ Usage: /sessions load <session_name>")
+            print("[X] Usage: /sessions load <session_name>")
             return False, False
         _load_session(args[1])
         return False, False
@@ -266,13 +266,13 @@ def _handle_sessions_command(args):
         return False, False
     elif command == "delete":
         if len(args) < 2:
-            print("❌ Usage: /sessions delete <session_name>")
+            print("[X] Usage: /sessions delete <session_name>")
             return False, False
         _delete_session(args[1])
         return False, False
     elif command == "rename":
         if len(args) < 2:
-            print("❌ Usage: /sessions rename <new_name>")
+            print("[X] Usage: /sessions rename <new_name>")
             return False, False
         # Join all arguments as a single name
         new_name = " ".join(args[1:])
@@ -285,14 +285,14 @@ def _handle_sessions_command(args):
         _show_help()
         return False, False
     else:
-        print(f"❌ Unknown command: {command}")
+        print(f"[X] Unknown command: {command}")
         print("Use '/sessions help' for available commands")
         return False, False
 
 
 def _show_help():
     """Show help information for /sessions commands"""
-    print("\n📋 Session Manager Help:")
+    print("\nSession Manager Help:")
     print("=" * 50)
     print("/sessions                    - List all sessions")
     print("/sessions list              - List all sessions")
@@ -303,7 +303,7 @@ def _show_help():
     print("/sessions rename <name>     - Rename the current session")
     print("/sessions info              - Show current session information")
     print("/sessions help              - Show this help message")
-    print("\n💡 Tips:")
+    print("\n[i] Tips:")
     print("- Session names with spaces are automatically converted to underscores")
     print("- All arguments after 'rename' are treated as a single name")
     print("- Sessions are auto-saved when AI Coder exits")
@@ -330,7 +330,7 @@ def _list_sessions():
         print("No sessions found")
         return
 
-    print("\n📋 Available Sessions:")
+    print("\nAvailable Sessions:")
     print("=" * 60)
 
     # Sort by creation time (filename)
@@ -355,7 +355,7 @@ def _load_session(session_name):
     full_session_path = os.path.join(session_dir, session_file)
 
     if not os.path.exists(full_session_path):
-        print(f"❌ Session '{session_name}' not found")
+        print(f"[X] Session '{session_name}' not found")
         return
 
     try:
@@ -393,7 +393,7 @@ def _load_session(session_name):
                         f"DEBUG: Loading from new format with {len(loaded_messages)} messages"
                     )
             else:
-                print(f"❌ Invalid session format in '{session_name}'")
+                print(f"[X] Invalid session format in '{session_name}'")
                 return
 
             # Clean messages using the same function as the built-in load_session
@@ -406,15 +406,15 @@ def _load_session(session_name):
                 new_messages = _session_manager_ref.message_history.messages
                 print(f"DEBUG: After loading, message count: {len(new_messages)}")
 
-            print(f"✅ Loaded session: {session_name}")
+            print(f"[✓] Loaded session: {session_name}")
 
             # Update current session tracking
             _update_current_session_tracking(full_session_path)
             _current_session_file = full_session_path
         else:
-            print("❌ Message history not available")
+            print("[X] Message history not available")
     except Exception as e:
-        print(f"❌ Error loading session '{session_name}': {e}")
+        print(f"[X] Error loading session '{session_name}': {e}")
         import traceback
 
         traceback.print_exc()
@@ -425,7 +425,7 @@ def _load_session_by_filename(session_filename):
     global _current_session_file
 
     if not os.path.exists(session_filename):
-        print(f"❌ Session file not found: {session_filename}")
+        print(f"[X] Session file not found: {session_filename}")
         return
 
     try:
@@ -463,7 +463,7 @@ def _load_session_by_filename(session_filename):
                         f"DEBUG: Loading from new format with {len(loaded_messages)} messages"
                     )
             else:
-                print(f"❌ Invalid session format in '{session_filename}'")
+                print(f"[X] Invalid session format in '{session_filename}'")
                 return
 
             # Clean messages using the same function as the built-in load_session
@@ -480,9 +480,9 @@ def _load_session_by_filename(session_filename):
             _update_current_session_tracking(session_filename)
             _current_session_file = session_filename
         else:
-            print("❌ Message history not available")
+            print("[X] Message history not available")
     except Exception as e:
-        print(f"❌ Error loading session '{session_filename}': {e}")
+        print(f"[X] Error loading session '{session_filename}': {e}")
         import traceback
 
         traceback.print_exc()
@@ -493,11 +493,11 @@ def _save_current_session():
     global _current_session_file
 
     if not _current_session_file:
-        print("❌ No current session to save")
+        print("[X] No current session to save")
         return
 
     if not hasattr(_session_manager_ref, "message_history"):
-        print("❌ Message history not available")
+        print("[X] Message history not available")
         return
 
     try:
@@ -519,10 +519,10 @@ def _save_current_session():
             json.dump(session_data, f, indent=2)
 
         session_name = _get_session_name_from_file(_current_session_file)
-        print(f"✅ Saved session: {session_name}")
+        print(f"[✓] Saved session: {session_name}")
 
     except Exception as e:
-        print(f"❌ Error saving session: {e}")
+        print(f"[X] Error saving session: {e}")
 
 
 def _delete_session(session_name):
@@ -534,7 +534,7 @@ def _delete_session(session_name):
     full_session_path = os.path.join(session_dir, session_file)
 
     if not os.path.exists(full_session_path):
-        print(f"❌ Session '{session_name}' not found")
+        print(f"[X] Session '{session_name}' not found")
         return
 
     try:
@@ -546,7 +546,7 @@ def _delete_session(session_name):
 
         # Delete the file
         os.remove(full_session_path)
-        print(f"✅ Deleted session: {session_name}")
+        print(f"[✓] Deleted session: {session_name}")
 
         # If we deleted the current session, create a new one
         if is_current:
@@ -554,7 +554,7 @@ def _delete_session(session_name):
             _create_new_session()
 
     except Exception as e:
-        print(f"❌ Error deleting session '{session_name}': {e}")
+        print(f"[X] Error deleting session '{session_name}': {e}")
 
 
 def _rename_current_session(new_name):
@@ -562,7 +562,7 @@ def _rename_current_session(new_name):
     global _current_session_file
 
     if not _current_session_file:
-        print("❌ No current session to rename")
+        print("[X] No current session to rename")
         return
 
     try:
@@ -594,10 +594,10 @@ def _rename_current_session(new_name):
         _update_current_session_tracking(new_full_path)
         _current_session_file = new_full_path
 
-        print(f"✅ Renamed session to: {new_session_name}")
+        print(f"[✓] Renamed session to: {new_session_name}")
 
     except Exception as e:
-        print(f"❌ Error renaming session: {e}")
+        print(f"[X] Error renaming session: {e}")
 
 
 def _show_session_info():
@@ -605,7 +605,7 @@ def _show_session_info():
     global _current_session_file
 
     if not _current_session_file or not os.path.exists(_current_session_file):
-        print("❌ No current session")
+        print("[X] No current session")
         return
 
     try:
@@ -614,7 +614,7 @@ def _show_session_info():
 
         session_name = _get_session_name_from_file(_current_session_file)
 
-        print(f"\n🔍 Session Information: {session_name}")
+        print(f"\nSession Information: {session_name}")
         print("=" * 50)
         print(f"File: {_current_session_file}")
 
@@ -648,4 +648,4 @@ def _show_session_info():
             pass
 
     except Exception as e:
-        print(f"❌ Error getting session info: {e}")
+        print(f"[X] Error getting session info: {e}")

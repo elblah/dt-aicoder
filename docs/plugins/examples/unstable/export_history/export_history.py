@@ -35,13 +35,13 @@ def export_history_command(self, args):
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(messages, f, indent=2, ensure_ascii=False)
 
-        return f"✅ Conversation history exported to {filepath}"
+        return f"[✓] Conversation history exported to {filepath}"
 
     except Exception as e:
-        return f"❌ Failed to export history: {e}"
+        return f"[X] Failed to export history: {e}"
 
 
 # Add the new command
 CommandHandler.export = export_history_command
 
-print("✅ Export history plugin loaded - use '/export [filename]' to save conversation")
+print("[✓] Export history plugin loaded - use '/export [filename]' to save conversation")

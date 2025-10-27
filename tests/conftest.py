@@ -24,7 +24,7 @@ def block_external_internet():
     if _internet_blocked:
         return  # Already blocked
 
-    print("🔒 Blocking external internet access for all tests...")
+    print("Blocking external internet access for all tests...")
 
     def mock_urlopen(*args, **kwargs):
         """Mock urllib.urlopen to block external URLs."""
@@ -38,7 +38,7 @@ def block_external_internet():
         # Check if it's an external URL
         if url and not _is_local_url(url):
             raise RuntimeError(
-                f"🚫 EXTERNAL INTERNET ACCESS BLOCKED in tests!\n"
+                f"[X] EXTERNAL INTERNET ACCESS BLOCKED in tests!\n"
                 f"Attempted URL: {url}\n"
                 f"Fix: Use local test servers or mock objects\n"
                 f"Allowed: localhost, 127.0.0.1, ::1, 0.0.0.0\n"
@@ -54,7 +54,7 @@ def block_external_internet():
             address = args[0][0] if args[0] else None
             if address and not _is_local_address(address):
                 raise RuntimeError(
-                    f"🚫 EXTERNAL NETWORK ACCESS BLOCKED in tests!\n"
+                    f"[X] EXTERNAL NETWORK ACCESS BLOCKED in tests!\n"
                     f"Attempted connection to: {address}\n"
                     f"Fix: Use local test servers\n"
                     f"Allowed: localhost, 127.0.0.1, ::1, 0.0.0.0"
@@ -90,7 +90,7 @@ def block_external_internet():
     socket.create_connection = mock_socket_create
 
     _internet_blocked = True
-    print("✅ External internet access blocked (local connections allowed)")
+    print("[✓] External internet access blocked (local connections allowed)")
 
 
 # Auto-block internet when this module is imported
