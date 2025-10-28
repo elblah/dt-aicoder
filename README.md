@@ -3,16 +3,15 @@
 **Fast, lightweight AI-assisted development that runs anywhere**
 
 <img src="https://img.shields.io/badge/Python-3.8+-blue.svg" alt="Python">
-<img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
-<img src="https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg" alt="Platform">
 
 AI Coder is a blazing-fast, resource-efficient CLI for AI-powered coding that brings the power of GPT models directly to your terminal. Built with performance and simplicity in mind, it runs flawlessly on everything from Raspberry Pi to high-end workstations.
 
 ## ✨ Why AI Coder?
 
 **🚀 Blazing Fast**
-- Uses <5% CPU on Raspberry Pi 3B
-- Minimal memory footprint
+- Less than a second startup on most computers (~2s on low-end computers)
+- Uses <5% CPU on Raspberry Pi 3 and <1% CPU on normal computers most of the time)
+- Minimal memory footprint (~25M RAM)
 - Zero background processes
 
 **🛡️ Secure by Design** 
@@ -25,6 +24,8 @@ AI Coder is a blazing-fast, resource-efficient CLI for AI-powered coding that br
 - Planning mode for safe exploration
 - Beautiful themes and syntax highlighting
 - Seamless TMUX integration
+- Simple plugin system using monkey patch
+- Works well with bash scripts
 
 ## 🚀 Quick Start
 
@@ -94,8 +95,9 @@ Approve? [a]llow once [s]ession [d]eny
 
 ### Environment Variables
 ```bash
+export OPENAI_BASE_URL="http://localhost:4999"
 export OPENAI_API_KEY="your-api-key"
-export OPENAI_MODEL="gpt-4"           # Default: gpt-5-nano
+export OPENAI_MODEL="gpt-5"           # Default: gpt-5-nano
 export DEBUG=1                        # Enable debug mode
 export YOLO_MODE=1                    # Bypass approvals
 ```
@@ -144,9 +146,6 @@ python aicoder.py
 ```bash
 # Comprehensive test suite
 ./run-tests.sh
-
-# Quick tests  
-YOLO_MODE=1 python -m unittest discover
 ```
 
 ## 📚 Documentation
@@ -196,57 +195,7 @@ class NotifyPlugin:
 - **🎨 Theme Plugin** - Dynamic color themes (Luna, Ocean, Forest, Sunset)
 - **🔔 Notify Plugin** - Desktop notifications for AI responses and command completion
 - **🔤 Char Filter Plugin** - Content filtering and sanitization
-
-### 🛠️ Build Your Own
-
-**Step 1: Create Plugin Structure**
-```bash
-mkdir plugins/my_plugin
-touch plugins/my_plugin/__init__.py
-touch plugins/my_plugin/main.py
-```
-
-**Step 2: Implement Plugin Interface**
-```python
-# plugins/my_plugin/main.py
-class MyPlugin:
-    def __init__(self):
-        self.name = "my_plugin"
-        self.version = "1.0.0"
-    
-    def initialize(self, aicoder_instance):
-        """Called when plugin loads"""
-        print(f"✅ {self.name} v{self.version} loaded")
-    
-    def on_ai_response(self, message):
-        """Called when AI sends a response"""
-        # Your custom logic here
-        pass
-    
-    def add_commands(self):
-        """Add custom commands"""
-        return {
-            "/my_command": self.handle_my_command
-        }
-    
-    def handle_my_command(self, args):
-        """Handle custom command"""
-        return "Hello from my plugin!"
-```
-
-**Step 3: Register Plugin**
-Add to `plugins/active_plugins.json`:
-```json
-{
-  "active": ["my_plugin"],
-  "plugins": {
-    "my_plugin": {
-      "enabled": true,
-      "config": {}
-    }
-  }
-}
-```
+- **many more...**
 
 ### 🔧 Advanced Features
 
@@ -254,7 +203,6 @@ Add to `plugins/active_plugins.json`:
 - **Theme Support**: Create custom color schemes
 - **Event Hooks**: Respond to AI responses, command completions, errors
 - **Configuration**: Per-plugin configuration files
-
 
 ### 📚 Plugin Resources
 
@@ -278,32 +226,10 @@ Get started in minutes with our [Plugin Development Guide](docs/plugins/README.m
 
 | Platform | CPU Usage | Memory | Startup Time |
 |----------|-----------|---------|--------------|
-| Raspberry Pi 3B | <5% | ~50MB | ~2s |
+| Raspberry Pi 3B | <5% | ~25MB | ~1s |
 | Modern Laptop | <1% | ~30MB | <1s |
-| Docker Container | <2% | ~40MB | ~1.5s |
+| Docker Container | <2% | ~30MB | ~1s |
 
-## 🤝 Contributing
+## License
 
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-### Quick Start
-```bash
-git clone https://github.com/elblah/dt-aicoder
-cd dt-aicoder
-python -m venv venv
-source venv/bin/activate
-pip install -e ".[dev]"
-pre-commit install
-```
-
-## 🙏 Acknowledgments
-
-- Built with [MCP (Model Context Protocol)](https://modelcontextprotocol.io/)
-- Inspired by the need for efficient AI development tools
-- Optimized for developers who value performance and simplicity
-
----
-
-**Ready to supercharge your development workflow?**
-
-[Install Now](https://github.com/elblah/dt-aicoder) • [Documentation](docs/) • [Discord](https://discord.gg/aicoder) • [Issues](https://github.com/elblah/dt-aicoder/issues)
+Apache 2.0
