@@ -138,8 +138,8 @@ export YOLO_MODE=1                    # Bypass approvals
 ```bash
 git clone https://github.com/elblah/dt-aicoder
 cd dt-aicoder
-pip install -e .
-python aicoder.py
+uv tool install .
+aicoder
 ```
 
 ### Running Tests
