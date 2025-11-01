@@ -161,6 +161,7 @@ def test_animator_with_delay():
         # Set environment variables for local server
         os.environ["OPENAI_BASE_URL"] = f"http://localhost:{port}"
         os.environ["OPENAI_API_KEY"] = "test-key"
+        os.environ["DISABLE_RETRY_PATTERNS"] = "1"  # Disable retry patterns for predictable test behavior
 
         # Capture stdout to verify animation
         old_stdout = sys.stdout
@@ -347,6 +348,7 @@ def test_esc_during_request():
             # Set environment variables for local server
             os.environ["OPENAI_BASE_URL"] = f"http://localhost:{port}"
             os.environ["OPENAI_API_KEY"] = "test-key"
+            os.environ["DISABLE_RETRY_PATTERNS"] = "1"  # Disable retry patterns for predictable test behavior
 
             # Prepare test message
             messages = [{"role": "user", "content": "Hello"}]

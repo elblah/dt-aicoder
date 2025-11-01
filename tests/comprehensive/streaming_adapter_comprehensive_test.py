@@ -36,34 +36,42 @@ class TestAPIHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         """Handle POST requests."""
-        content_length = int(self.headers["Content-Length"])
-        self.rfile.read(content_length)
+        try:
+            content_length = int(self.headers["Content-Length"])
+            self.rfile.read(content_length)
 
-        scenario = os.environ.get("TEST_SCENARIO", "normal")
-        print(f"Test server: {scenario} scenario - received request")
+            scenario = os.environ.get("TEST_SCENARIO", "normal")
+            print(f"Test server: {scenario} scenario - received request")
 
-        # Send streaming headers
-        self.send_response(200)
-        self.send_header("Content-Type", "text/event-stream")
-        self.send_header("Cache-Control", "no-cache")
-        self.send_header("Connection", "keep-alive")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.end_headers()
+            # Send streaming headers
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "keep-alive")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
 
-        if scenario == "normal":
-            self._send_normal()
-        elif scenario == "connection_drop":
-            self._send_connection_drop()
-        elif scenario == "tool_calls":
-            self._send_tool_calls()
-        elif scenario == "timeout":
-            self._send_timeout()
-        elif scenario == "empty":
-            self._send_empty()
-        elif scenario == "error":
-            self._send_error()
-        else:
-            self._send_normal()
+            if scenario == "normal":
+                self._send_normal()
+            elif scenario == "connection_drop":
+                self._send_connection_drop()
+            elif scenario == "tool_calls":
+                self._send_tool_calls()
+            elif scenario == "timeout":
+                self._send_timeout()
+            elif scenario == "empty":
+                self._send_empty()
+            elif scenario == "error":
+                self._send_error()
+            else:
+                self._send_normal()
+        except (ConnectionResetError, BrokenPipeError):
+            # Client closed connection - this is normal behavior, suppress the error
+            pass
+        except Exception as e:
+            # For other exceptions, still log them
+            print(f"Test server error: {e}")
+            pass
 
     def _send_normal(self):
         """Normal streaming response."""
@@ -79,6 +87,16 @@ class TestAPIHandler(BaseHTTPRequestHandler):
             }
             self._send_sse(msg)
             time.sleep(0.01)  # Much faster
+        
+        # Send final chunk with finish_reason
+        final_msg = {
+            "id": "test-123",
+            "object": "chat.completion.chunk",
+            "created": 1234567890,
+            "model": "test-model",
+            "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+        }
+        self._send_sse(final_msg)
         self._send_done()
 
     def _send_connection_drop(self):
@@ -197,11 +215,16 @@ class TestAPIHandler(BaseHTTPRequestHandler):
                 return
 
         # Send completion marker immediately
-        try:
-            self.wfile.write(b"data: [DONE]\n\n")
-            self.wfile.flush()
-        except (ConnectionResetError, BrokenPipeError):
-            print("Tool calls server: Client disconnected before [DONE]")
+        # Send final chunk with finish_reason for tool_calls
+        final_msg = {
+            "id": "test-123",
+            "object": "chat.completion.chunk",
+            "created": 1234567890,
+            "model": "test-model",
+            "choices": [{"index": 0, "delta": {}, "finish_reason": "tool_calls"}],
+        }
+        self._send_sse(final_msg)
+        self._send_done()
 
     def _send_timeout(self):
         """Cause timeout - send initial data then wait longer than read timeout."""
@@ -220,6 +243,15 @@ class TestAPIHandler(BaseHTTPRequestHandler):
 
     def _send_empty(self):
         """Send empty response."""
+        # Send empty final chunk with finish_reason
+        final_msg = {
+            "id": "test-123",
+            "object": "chat.completion.chunk",
+            "created": 1234567890,
+            "model": "test-model",
+            "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+        }
+        self._send_sse(final_msg)
         self._send_done()
 
     def _send_error(self):
@@ -298,6 +330,7 @@ def run_scenario_test(name, scenario, expect_success=True):
             "HTTP_TIMEOUT": "5",
             "YOLO_MODE": "1",
             "ENABLE_STREAMING": "1",
+            "DISABLE_RETRY_PATTERNS": "1",  # Disable retry patterns for predictable test behavior
         }
     )
 

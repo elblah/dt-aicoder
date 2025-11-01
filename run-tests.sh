@@ -15,6 +15,12 @@ echo -e "\nRunning ruff check for serious errors:"
 ruff check aicoder --select E,F --ignore E501,F841,E712,F401,E722,F541
 ret_ruff_check_serious=$?
 
+empty_dirs=$(find . -type d -empty | grep -v '^./tmp$')
+if [[ -n "$empty_dirs" ]]; then
+    echo -e "\n[!] Empty dirs:"
+    echo "$empty_dirs"
+fi
+
 echo -e "\nFinal Results:"
 
 if [[ "$ret_unittest" == 0 && "$ret_test_runner" == 0 && "$ret_ruff_check_serious" == 0 ]]; then

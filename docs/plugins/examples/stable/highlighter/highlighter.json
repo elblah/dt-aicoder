@@ -1,0 +1,99 @@
+{
+  "version": "1.0",
+  "rules": [
+    {
+      "name": "critical_alert",
+      "pattern": "\\[!\\]",
+      "style": {
+        "background": "bright_red",
+        "foreground": "auto_contrast",
+        "bold": true
+      },
+      "priority": 100
+    },
+    {
+      "name": "success_indicator",
+      "pattern": "\\[✓\\]",
+      "style": {
+        "background": "bright_green",
+        "foreground": "black",
+        "bold": true
+      },
+      "priority": 95
+    },
+    {
+      "name": "error_text",
+      "pattern": "ERROR:",
+      "style": {
+        "background": "red",
+        "foreground": "white",
+        "bold": true
+      },
+      "priority": 90
+    },
+    {
+      "name": "warning_text",
+      "pattern": "WARNING:",
+      "style": {
+        "background": "bright_yellow",
+        "foreground": "black"
+      },
+      "priority": 80
+    },
+    {
+      "name": "info_text",
+      "pattern": "INFO:",
+      "style": {
+        "foreground": "bright_blue",
+        "bold": true
+      },
+      "priority": 70
+    },
+    {
+      "name": "success_text",
+      "pattern": "SUCCESS:",
+      "style": {
+        "background": "bright_green",
+        "foreground": "black",
+        "bold": true
+      },
+      "priority": 85
+    },
+    {
+      "name": "tool_output",
+      "pattern": "^Tool result:|^Running command:|^File modified:",
+      "style": {
+        "foreground": "dim"
+      },
+      "priority": 10
+    },
+    {
+      "name": "debug_messages",
+      "pattern": "\\[DEBUG\\]|Debug:|DEBUG:",
+      "style": {
+        "foreground": "bright_cyan"
+      },
+      "priority": 60
+    },
+    {
+      "name": "critical_keywords",
+      "pattern": "\\b(CRITICAL|FATAL|CRASH|PANIC)\\b",
+      "style": {
+        "background": "bright_red",
+        "foreground": "white",
+        "bold": true,
+        "underline": true
+      },
+      "priority": 98
+    },
+    {
+      "name": "file_paths",
+      "pattern": "\\.[a-zA-Z0-9]+\\.(py|js|ts|json|yaml|yml|md|txt|log|conf|config|env|sh|bash|zsh|fish|sql|html|css|xml|csv|tsv)$",
+      "style": {
+        "foreground": "bright_blue",
+        "italic": true
+      },
+      "priority": 30
+    }
+  ]
+}

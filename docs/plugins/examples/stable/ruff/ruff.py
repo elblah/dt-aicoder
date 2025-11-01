@@ -25,6 +25,7 @@ Plugin Constants:
 import os
 import shutil
 import subprocess
+import sys
 
 
 # Plugin configuration
@@ -254,8 +255,13 @@ def on_aicoder_init(aicoder_instance):
     aicoder_instance.command_handlers["/ruff"] = _handle_ruff_command
 
     if not _is_ruff_available():
-        print("[!] Ruff not found - plugin will be disabled")
-        print("[i] Install with: pip install ruff")
+        try:
+            from aicoder.utils import alert_critical, alert_info
+            alert_critical("Ruff not found - plugin will be disabled")
+            alert_info("Install with: pip install ruff")
+        except ImportError:
+            print("[!] Ruff not found - plugin will be disabled")
+            print("[i] Install with: pip install ruff")
         return False
 
     try:
@@ -287,11 +293,19 @@ def on_aicoder_init(aicoder_instance):
         return True
 
     except ImportError as e:
-        print(f"[X] Failed to import internal tools: {e}")
+        try:
+            from aicoder.utils import alert_critical
+            alert_critical(f"Failed to import internal tools: {e}")
+        except ImportError:
+            print(f"[X] Failed to import internal tools: {e}")
         return False
 
     except Exception as e:
-        print(f"[X] Failed to initialize Ruff plugin: {e}")
+        try:
+            from aicoder.utils import alert_critical
+            alert_critical(f"Failed to initialize Ruff plugin: {e}")
+        except ImportError:
+            print(f"[X] Failed to initialize Ruff plugin: {e}")
         import traceback
 
         traceback.print_exc()
@@ -329,7 +343,11 @@ def _check_file_with_ruff(file_path: str) -> None:
             _format_file_with_ruff(abs_path)
 
     except Exception as e:
-        print(f"[!] Ruff check failed for {file_path}: {e}")
+        try:
+            from aicoder.utils import alert_warning
+            alert_warning(f"Ruff check failed for {file_path}: {e}")
+        except ImportError:
+            print(f"[!] Ruff check failed for {file_path}: {e}")
 
 
 def _format_file_with_ruff(file_path: str) -> None:
@@ -349,10 +367,18 @@ def _format_file_with_ruff(file_path: str) -> None:
             ):
                 _add_format_message(file_path)
         else:
-            print(f"[!] Ruff format failed for {file_path}: {result.stderr}")
+            try:
+                from aicoder.utils import alert_warning
+                alert_warning(f"Ruff format failed for {file_path}: {result.stderr}")
+            except ImportError:
+                print(f"[!] Ruff format failed for {file_path}: {result.stderr}")
 
     except Exception as e:
-        print(f"[!] Ruff format failed for {file_path}: {e}")
+        try:
+            from aicoder.utils import alert_warning
+            alert_warning(f"Ruff format failed for {file_path}: {e}")
+        except ImportError:
+            print(f"[!] Ruff format failed for {file_path}: {e}")
 
 
 def _add_format_message(file_path: str) -> None:
@@ -377,7 +403,11 @@ The file content has been updated to follow Python formatting standards."""
         print("[*] Ruff formatting completed - AI will be notified")
 
     except Exception as e:
-        print(f"[!] Failed to add ruff format message: {e}")
+        try:
+            from aicoder.utils import alert_warning
+            alert_warning(f"Failed to add ruff format message: {e}")
+        except ImportError:
+            print(f"[!] Failed to add ruff format message: {e}")
 
 
 def _add_ruff_issues_message(file_path: str, ruff_output: str) -> None:
@@ -403,10 +433,18 @@ The file has already been saved, so the AI needs to edit it again to resolve the
 
         # Use the pending_tool_messages system
         _aicoder_ref.tool_manager.executor.pending_tool_messages.append(user_message)
-        print("Ruff issues found - AI will be notified")
+        try:
+            from aicoder.utils import alert_critical
+            alert_critical("Ruff issues found - AI will be notified")
+        except ImportError:
+            print("Ruff issues found - AI will be notified")
 
     except Exception as e:
-        print(f"[!] Failed to add ruff issues message: {e}")
+        try:
+            from aicoder.utils import alert_warning
+            alert_warning(f"Failed to add ruff issues message: {e}")
+        except ImportError:
+            print(f"[!] Failed to add ruff issues message: {e}")
 
 
 def cleanup():
@@ -425,7 +463,11 @@ def cleanup():
         print("[✓] Ruff plugin cleaned up")
 
     except Exception as e:
-        print(f"[!] Failed to cleanup Ruff plugin: {e}")
+        try:
+            from aicoder.utils import alert_warning
+            alert_warning(f"Failed to cleanup Ruff plugin: {e}")
+        except ImportError:
+            print(f"[!] Failed to cleanup Ruff plugin: {e}")
 
 
 # Plugin metadata

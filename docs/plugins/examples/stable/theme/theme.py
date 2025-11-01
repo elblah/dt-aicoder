@@ -41,6 +41,14 @@ THEMES = {
         "CYAN": "\033[36m",
         "WHITE": "\033[37m",
         "RESET": "\033[0m",
+        # Bright variants
+        "BRIGHT_RED": "\033[91m",
+        "BRIGHT_GREEN": "\033[92m",
+        "BRIGHT_YELLOW": "\033[93m",
+        "BRIGHT_BLUE": "\033[94m",
+        "BRIGHT_MAGENTA": "\033[95m",
+        "BRIGHT_CYAN": "\033[96m",
+        "BRIGHT_WHITE": "\033[97m",
     },
     "luna": {
         "RED": "\033[38;5;219m",
@@ -51,6 +59,14 @@ THEMES = {
         "CYAN": "\033[38;5;159m",
         "WHITE": "\033[38;5;255m",
         "RESET": "\033[0m",
+        # Bright variants (more intense versions)
+        "BRIGHT_RED": "\033[38;5;203m",
+        "BRIGHT_GREEN": "\033[38;5;194m",
+        "BRIGHT_YELLOW": "\033[38;5;226m",
+        "BRIGHT_BLUE": "\033[38;5;153m",
+        "BRIGHT_MAGENTA": "\033[38;5;207m",
+        "BRIGHT_CYAN": "\033[38;5;159m",
+        "BRIGHT_WHITE": "\033[38;5;231m",
     },
     # One Dark Pro (high contrast variant)
     "one-dark-pro": {
@@ -62,6 +78,14 @@ THEMES = {
         "CYAN": "\033[38;2;139;233;253m",  # Bright cyan
         "WHITE": "\033[38;2;197;200;198m",  # Light gray
         "RESET": "\033[0m",
+        # Bright variants (maximum intensity)
+        "BRIGHT_RED": "\033[38;2;255;100;100m",  # Even more vibrant
+        "BRIGHT_GREEN": "\033[38;2;100;255;150m",  # Even brighter
+        "BRIGHT_YELLOW": "\033[38;2;255;240;120m",  # Even brighter
+        "BRIGHT_BLUE": "\033[38;2;120;200;255m",  # Even brighter
+        "BRIGHT_MAGENTA": "\033[38;2;220;150;240m",  # Even brighter
+        "BRIGHT_CYAN": "\033[38;2;160;240;255m",  # Even brighter
+        "BRIGHT_WHITE": "\033[38;2;220;220;220m",  # Even lighter
     },
     # Nord (polar night and snow storm)
     "nord": {
@@ -73,6 +97,14 @@ THEMES = {
         "CYAN": "\033[38;2;143;188;187m",  # Nord8 - Frost
         "WHITE": "\033[38;2;216;222;233m",  # Nord6 - Snow storm
         "RESET": "\033[0m",
+        # Bright variants (enhanced Nord colors)
+        "BRIGHT_RED": "\033[38;2;215;110;120m",  # Brighter red
+        "BRIGHT_GREEN": "\033[38;2;180;200;150m",  # Brighter green
+        "BRIGHT_YELLOW": "\033[38;2;245;215;150m",  # Brighter yellow
+        "BRIGHT_BLUE": "\033[38;2;150;180;210m",  # Brighter blue
+        "BRIGHT_MAGENTA": "\033[38;2;200;160;185m",  # Brighter purple
+        "BRIGHT_CYAN": "\033[38;2;160;200;200m",  # Brighter frost
+        "BRIGHT_WHITE": "\033[38;2;230;235;240m",  # Brighter snow
     },
     # Solarized Dark (high contrast variant)
     "solarized-dark": {
@@ -84,6 +116,14 @@ THEMES = {
         "CYAN": "\033[38;2;42;161;152m",  # Base01 cyan
         "WHITE": "\033[38;2;253;246;227m",  # Base2 white
         "RESET": "\033[0m",
+        # Bright variants (solarized accents)
+        "BRIGHT_RED": "\033[38;2;240;80;70m",  # Brighter red
+        "BRIGHT_GREEN": "\033[38;2;150;180;50m",  # Brighter green
+        "BRIGHT_YELLOW": "\033[38;2;200;160;50m",  # Brighter yellow
+        "BRIGHT_BLUE": "\033[38;2;60;170;230m",  # Brighter blue
+        "BRIGHT_MAGENTA": "\033[38;2;230;80;150m",  # Brighter magenta
+        "BRIGHT_CYAN": "\033[38;2;60;190;180m",  # Brighter cyan
+        "BRIGHT_WHITE": "\033[38;2;255;250;240m",  # Brighter white
     },
     # Gruvbox Dark (high contrast)
     "gruvbox-dark": {
@@ -95,6 +135,14 @@ THEMES = {
         "CYAN": "\033[38;2;142;192;124m",  # Bright aqua
         "WHITE": "\033[38;2;235;219;178m",  # Light beige
         "RESET": "\033[0m",
+        # Bright variants (maximum gruvbox intensity)
+        "BRIGHT_RED": "\033[38;2;255;100;80m",  # Brighter red
+        "BRIGHT_GREEN": "\033[38;2;200;205;60m",  # Brighter green
+        "BRIGHT_YELLOW": "\033[38;2;255;210;80m",  # Brighter yellow
+        "BRIGHT_BLUE": "\033[38;2;150;185;170m",  # Brighter blue
+        "BRIGHT_MAGENTA": "\033[38;2;255;150;180m",  # Brighter purple
+        "BRIGHT_CYAN": "\033[38;2;170;210;150m",  # Brighter aqua
+        "BRIGHT_WHITE": "\033[38;2;245;230;190m",  # Brighter beige
     },
     # Dracula (high contrast)
     "dracula": {
@@ -106,6 +154,14 @@ THEMES = {
         "CYAN": "\033[38;2;139;233;253m",  # Cyan
         "WHITE": "\033[38;2;248;248;242m",  # White
         "RESET": "\033[0m",
+        # Bright variants (maximum dracula intensity)
+        "BRIGHT_RED": "\033[38;2;255;120;120m",  # Brighter pink
+        "BRIGHT_GREEN": "\033[38;2;100;255;150m",  # Brighter green
+        "BRIGHT_YELLOW": "\033[38;2;255;200;140m",  # Brighter orange
+        "BRIGHT_BLUE": "\033[38;2;160;240;255m",  # Brighter cyan
+        "BRIGHT_MAGENTA": "\033[38;2;255;150;220m",  # Brighter pink
+        "BRIGHT_CYAN": "\033[38;2;160;240;255m",  # Brighter cyan
+        "BRIGHT_WHITE": "\033[38;2;255;255;255m",  # Pure white
     },
     # Monokai (high contrast)
     "monokai": {
@@ -117,6 +173,14 @@ THEMES = {
         "CYAN": "\033[38;2;102;217;239m",  # Blue
         "WHITE": "\033[38;2;230;230;230m",  # Light gray
         "RESET": "\033[0m",
+        # Bright variants (maximum monokai intensity)
+        "BRIGHT_RED": "\033[38;2;255;60;140m",  # Brighter pink
+        "BRIGHT_GREEN": "\033[38;2;180;240;60m",  # Brighter green
+        "BRIGHT_YELLOW": "\033[38;2;255;170;50m",  # Brighter orange
+        "BRIGHT_BLUE": "\033[38;2;120;230;255m",  # Brighter blue
+        "BRIGHT_MAGENTA": "\033[38;2;255;60;140m",  # Brighter pink
+        "BRIGHT_CYAN": "\033[38;2;120;230;255m",  # Brighter blue
+        "BRIGHT_WHITE": "\033[38;2;245;245;245m",  # Brighter gray
     },
     # Catppuccin Mocha (high contrast)
     "catppuccin-mocha": {
@@ -128,6 +192,14 @@ THEMES = {
         "CYAN": "\033[38;2;148;226;213m",  # Teal
         "WHITE": "\033[38;2;205;214;244m",  # Text
         "RESET": "\033[0m",
+        # Bright variants (maximum catppuccin intensity)
+        "BRIGHT_RED": "\033[38;2;255;160;190m",  # Brighter red
+        "BRIGHT_GREEN": "\033[38;2;180;240;180m",  # Brighter green
+        "BRIGHT_YELLOW": "\033[38;2;255;240;200m",  # Brighter yellow
+        "BRIGHT_BLUE": "\033[38;2;160;200;255m",  # Brighter blue
+        "BRIGHT_MAGENTA": "\033[38;2;255;210;240m",  # Brighter pink
+        "BRIGHT_CYAN": "\033[38;2;180;240;230m",  # Brighter teal
+        "BRIGHT_WHITE": "\033[38;2;220;230;255m",  # Brighter text
     },
     # Tokyo Night (high contrast)
     "tokyo-night": {
@@ -194,6 +266,14 @@ THEMES = {
         "CYAN": "\033[38;2;130;170;255m",  # Blue
         "WHITE": "\033[38;2;255;255;255m",  # White
         "RESET": "\033[0m",
+        # Bright variants (maximum material intensity)
+        "BRIGHT_RED": "\033[38;2;255;140;150m",  # Brighter red
+        "BRIGHT_GREEN": "\033[38;2;210;245;170m",  # Brighter green
+        "BRIGHT_YELLOW": "\033[38;2;255;220;140m",  # Brighter yellow
+        "BRIGHT_BLUE": "\033[38;2;150;200;255m",  # Brighter blue
+        "BRIGHT_MAGENTA": "\033[38;2;255;140;150m",  # Brighter red
+        "BRIGHT_CYAN": "\033[38;2;150;200;255m",  # Brighter blue
+        "BRIGHT_WHITE": "\033[38;2;255;255;255m",  # Pure white
     },
     # Github Dark (high contrast)
     "github-dark": {
@@ -205,6 +285,14 @@ THEMES = {
         "CYAN": "\033[38;2;120;185;255m",  # Blue
         "WHITE": "\033[38;2;240;246;252m",  # White
         "RESET": "\033[0m",
+        # Bright variants (maximum github intensity)
+        "BRIGHT_RED": "\033[38;2;255;140;160m",  # Brighter red
+        "BRIGHT_GREEN": "\033[38;2;140;255;170m",  # Brighter green
+        "BRIGHT_YELLOW": "\033[38;2;255;240;130m",  # Brighter yellow
+        "BRIGHT_BLUE": "\033[38;2;150;210;255m",  # Brighter blue
+        "BRIGHT_MAGENTA": "\033[38;2;255;140;160m",  # Brighter red
+        "BRIGHT_CYAN": "\033[38;2;150;210;255m",  # Brighter blue
+        "BRIGHT_WHITE": "\033[38;2;255;255;255m",  # Pure white
     },
     # High Visibility (extremely high contrast)
     "high-visibility": {
@@ -216,6 +304,14 @@ THEMES = {
         "CYAN": "\033[38;2;0;255;255m",  # Pure cyan
         "WHITE": "\033[38;2;255;255;255m",  # Pure white
         "RESET": "\033[0m",
+        # Bright variants (already maximum intensity - use same)
+        "BRIGHT_RED": "\033[38;2;255;0;0m",  # Pure red (can't get brighter)
+        "BRIGHT_GREEN": "\033[38;2;0;255;0m",  # Pure green (can't get brighter)
+        "BRIGHT_YELLOW": "\033[38;2;255;255;0m",  # Pure yellow (can't get brighter)
+        "BRIGHT_BLUE": "\033[38;2;0;0;255m",  # Pure blue (can't get brighter)
+        "BRIGHT_MAGENTA": "\033[38;2;255;0;255m",  # Pure magenta (can't get brighter)
+        "BRIGHT_CYAN": "\033[38;2;0;255;255m",  # Pure cyan (can't get brighter)
+        "BRIGHT_WHITE": "\033[38;2;255;255;255m",  # Pure white (can't get brighter)
     },
     # 256-color versions for compatibility
     "one-dark-256": {
@@ -227,6 +323,14 @@ THEMES = {
         "CYAN": "\033[38;5;117m",
         "WHITE": "\033[38;5;255m",
         "RESET": "\033[0m",
+        # Bright variants using 256-color palette
+        "BRIGHT_RED": "\033[38;5;203m",
+        "BRIGHT_GREEN": "\033[38;5;156m",
+        "BRIGHT_YELLOW": "\033[38;5;226m",
+        "BRIGHT_BLUE": "\033[38;5;153m",
+        "BRIGHT_MAGENTA": "\033[38;5;207m",
+        "BRIGHT_CYAN": "\033[38;5;159m",
+        "BRIGHT_WHITE": "\033[38;5;231m",
     },
     "nord-256": {
         "RED": "\033[38;5;167m",
@@ -262,6 +366,13 @@ def apply_theme(theme_name="default"):
 
         # Update other modules that import these colors directly
         # _update_dependent_modules(theme)
+        
+        # Clear background color cache since colors changed
+        try:
+            from aicoder.utils import clear_background_cache
+            clear_background_cache()
+        except ImportError:
+            pass
 
         print(f"[✓] Applied theme: {theme_name}")
         return True

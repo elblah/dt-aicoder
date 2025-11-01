@@ -87,6 +87,7 @@ def main():
     # Set test mode to avoid terminal conflicts
     os.environ["TEST_MODE"] = "1"
     os.environ["OPENAI_API_KEY"] = "test-key"
+    os.environ["DISABLE_RETRY_PATTERNS"] = "1"  # Disable retry patterns for predictable test behavior
     
     # Enable debug to see animation
     import aicoder.config as config_module

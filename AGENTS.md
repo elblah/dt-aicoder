@@ -31,6 +31,7 @@
 ## **CRITICAL**: Testing Requirements
 
 **Always run tests with YOLO_MODE=1** - Tests with tool approvals will hang without it:
+Run tests with a timeout at least 180 seconds (minimum)
 
 ```bash
 # Comprehensive testing method

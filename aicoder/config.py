@@ -111,6 +111,7 @@ STREAMING_TIMEOUT = int(os.environ.get("STREAMING_TIMEOUT", "300"))
 STREAMING_READ_TIMEOUT = int(os.environ.get("STREAMING_READ_TIMEOUT", "30"))
 
 # Define some ANSI color codes
+BLACK = "\033[30m"
 RED = "\033[31m"
 GREEN = "\033[32m"
 YELLOW = "\033[33m"
@@ -124,6 +125,12 @@ BOLD = "\033[1m"
 # Additional color codes for markdown colorization
 ITALIC = "\033[3m"
 BRIGHT_GREEN = "\033[92m"
+BRIGHT_RED = "\033[91m"
+BRIGHT_YELLOW = "\033[93m"
+BRIGHT_BLUE = "\033[94m"
+BRIGHT_MAGENTA = "\033[95m"
+BRIGHT_CYAN = "\033[96m"
+BRIGHT_WHITE = "\033[97m"
 
 # Tmux popup editor configuration
 # Set TMUX_POPUP_EDITOR=1 to enable tmux popup editor when running inside tmux

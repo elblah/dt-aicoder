@@ -42,6 +42,9 @@ _original_edit_file = None
 # Plugin version
 __version__ = "1.0.0"
 
+# Cache for Go project detection (checked once per session)
+_is_go_project_cache = None
+
 
 def _is_golint_enabled() -> bool:
     """Check if go vet checking is enabled (persistent config override)."""
@@ -164,9 +167,20 @@ def on_aicoder_init(aicoder_instance):
     # Register command handler directly to command_handlers
     aicoder_instance.command_handlers["/golint"] = _handle_golint_command
 
+    # Only show background alerts if this is actually a Go project (cached result)
+    is_go_project = _is_go_project()
+    
     if not _is_go_available():
-        print("[!] Go not found - plugin will be disabled")
-        print("[i] Install Go: https://golang.org/dl/")
+        if is_go_project:
+            try:
+                from aicoder.utils import alert_critical, alert_info
+                alert_critical("Go not found - plugin will be disabled")
+                alert_info("Install Go: https://golang.org/dl/")
+            except ImportError:
+                print("[!] Go not found - plugin will be disabled")
+                print("[i] Install Go: https://golang.org/dl/")
+        else:
+            print("[i] Go Lint plugin available (no Go project detected)")
         return False
 
     try:
@@ -200,11 +214,25 @@ def on_aicoder_init(aicoder_instance):
         return True
 
     except ImportError as e:
-        print(f"[X] Failed to import internal tools: {e}")
+        if is_go_project:
+            try:
+                from aicoder.utils import alert_critical
+                alert_critical(f"Failed to import internal tools: {e}")
+            except ImportError:
+                print(f"[X] Failed to import internal tools: {e}")
+        else:
+            print(f"[i] Go Lint plugin: Failed to import internal tools: {e}")
         return False
 
     except Exception as e:
-        print(f"[X] Failed to initialize Go Lint plugin: {e}")
+        if is_go_project:
+            try:
+                from aicoder.utils import alert_critical
+                alert_critical(f"Failed to initialize Go Lint plugin: {e}")
+            except ImportError:
+                print(f"[X] Failed to initialize Go Lint plugin: {e}")
+        else:
+            print(f"[i] Go Lint plugin: Failed to initialize: {e}")
         import traceback
 
         traceback.print_exc()
@@ -214,6 +242,45 @@ def on_aicoder_init(aicoder_instance):
 def _is_go_available() -> bool:
     """Check if go is installed and available."""
     return shutil.which("go") is not None
+
+
+def _is_go_project() -> bool:
+    """Fast check if current directory is a Go project (cached)."""
+    global _is_go_project_cache
+    
+    # Return cached result if already computed
+    if _is_go_project_cache is not None:
+        return _is_go_project_cache
+    
+    import os
+    import glob
+    
+    # Quick checks for Go project indicators
+    current_dir = os.getcwd()
+    
+    # Check for go.mod (most reliable indicator)
+    if os.path.exists(os.path.join(current_dir, "go.mod")):
+        _is_go_project_cache = True
+        return True
+    
+    # Check for .go files (fast glob)
+    try:
+        go_files = glob.glob("*.go", root_dir=current_dir)
+        if go_files:
+            _is_go_project_cache = True
+            return True
+    except (OSError, AttributeError):
+        # Fallback for older Python versions
+        try:
+            for item in os.listdir(current_dir):
+                if item.endswith('.go'):
+                    _is_go_project_cache = True
+                    return True
+        except OSError:
+            pass
+    
+    _is_go_project_cache = False
+    return False
 
 
 def _check_file_with_go_vet(file_path: str) -> None:
@@ -284,9 +351,17 @@ def _check_file_with_go_vet(file_path: str) -> None:
             _format_file_with_go_fmt(file_path)
 
     except subprocess.TimeoutExpired:
-        print(f"[!] Go tools timeout for {file_path} - skipping checks")
+        try:
+            from aicoder.utils import alert_warning
+            alert_warning(f"Go tools timeout for {file_path} - skipping checks")
+        except ImportError:
+            print(f"[!] Go tools timeout for {file_path} - skipping checks")
     except Exception as e:
-        print(f"[!] Go vet failed for {file_path}: {e}")
+        try:
+            from aicoder.utils import alert_warning
+            alert_warning(f"Go vet failed for {file_path}: {e}")
+        except ImportError:
+            print(f"[!] Go vet failed for {file_path}: {e}")
 
 
 def _format_file_with_go_fmt(file_path: str) -> None:
@@ -310,10 +385,18 @@ def _format_file_with_go_fmt(file_path: str) -> None:
             # In a real implementation, you might want to check file modification time
             _add_go_fmt_message(file_path)
         else:
-            print(f"[!] Go fmt failed for {file_path}: {result.stderr}")
+            try:
+                from aicoder.utils import alert_warning
+                alert_warning(f"Go fmt failed for {file_path}: {result.stderr}")
+            except ImportError:
+                print(f"[!] Go fmt failed for {file_path}: {result.stderr}")
 
     except Exception as e:
-        print(f"[!] Go fmt failed for {file_path}: {e}")
+        try:
+            from aicoder.utils import alert_warning
+            alert_warning(f"Go fmt failed for {file_path}: {e}")
+        except ImportError:
+            print(f"[!] Go fmt failed for {file_path}: {e}")
 
 
 def _add_go_fmt_message(file_path: str) -> None:
@@ -372,10 +455,18 @@ The file has already been saved, so the AI needs to edit it again to resolve the
 
         # Use the pending_tool_messages system
         _aicoder_ref.tool_manager.executor.pending_tool_messages.append(user_message)
-        print("Go vet issues found - AI will be notified")
+        try:
+            from aicoder.utils import alert_critical
+            alert_critical("Go vet issues found - AI will be notified")
+        except ImportError:
+            print("Go vet issues found - AI will be notified")
 
     except Exception as e:
-        print(f"[!] Failed to add go vet message: {e}")
+        try:
+            from aicoder.utils import alert_warning
+            alert_warning(f"Failed to add go vet message: {e}")
+        except ImportError:
+            print(f"[!] Failed to add go vet message: {e}")
 
 
 def cleanup():
@@ -394,7 +485,11 @@ def cleanup():
         print("[✓] Go Lint plugin cleaned up")
 
     except Exception as e:
-        print(f"[!] Failed to cleanup Go Lint plugin: {e}")
+        try:
+            from aicoder.utils import alert_warning
+            alert_warning(f"Failed to cleanup Go Lint plugin: {e}")
+        except ImportError:
+            print(f"[!] Failed to cleanup Go Lint plugin: {e}")
 
 
 # Plugin metadata

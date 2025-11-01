@@ -3,6 +3,8 @@ Utility functions for AI Coder.
 """
 
 import os
+import sys
+import re
 import difflib
 import shutil
 import json
@@ -750,3 +752,157 @@ def emsg_str(msg: str) -> str:
 def imsg_str(msg: str) -> str:
     """Return a colorized green string."""
     return colorize(msg, config.GREEN)
+
+
+# Cache for background color conversions
+_background_cache = {}
+
+
+def to_background(color: str) -> str:
+    """Convert a foreground color to background color (cached for performance).
+    
+    Examples:
+    - \033[31m (red) → \033[41m (red background)
+    - \033[92m (bright green) → \033[102m (bright green background)
+    - RGB/256 colors: 38; → 48; (foreground to background)
+    
+    This is useful for creating high-visibility alerts across different themes.
+    """
+    # Check cache first
+    if color in _background_cache:
+        return _background_cache[color]
+    
+    import re
+    match = re.search(r'\033\[([0-9]+)m', color)
+    if match:
+        code = int(match.group(1))
+        # Convert 30-37 (foreground) to 40-47 (background)
+        if 30 <= code <= 37:
+            result = color.replace(f'[{code}', f'[{code + 10}')
+        # Handle bright colors: 90-97 → 100-107
+        elif 90 <= code <= 97:
+            result = color.replace(f'[{code}', f'[{code + 10}')
+        else:
+            result = color
+    else:
+        # Handle 256/truecolor backgrounds - change 38; to 48;
+        result = color.replace('38;', '48;')
+    
+    # Cache the result
+    _background_cache[color] = result
+    return result
+
+
+def clear_background_cache() -> None:
+    """Clear the background color cache. Call when theme changes."""
+    global _background_cache
+    _background_cache.clear()
+
+
+def _get_contrast_color(background_color: str) -> str:
+    """Determine if background is light or dark and return appropriate foreground color."""
+    try:
+        from . import config
+        
+        # Handle RGB/truecolor: \033[48;2;R;G;Bm (most common for themes)
+        match_rgb = re.search(r'\033\[48;2;(\d+);(\d+);(\d+)m', background_color)
+        if match_rgb:
+            r, g, b = map(int, match_rgb.groups())
+            # Calculate luminance using standard formula
+            luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+            
+            # Use white text on dark backgrounds, black text on light backgrounds
+            return config.BRIGHT_WHITE if luminance < 0.5 else config.BLACK
+        
+        # Handle 256-color codes: \033[48;5;Nm
+        match_256 = re.search(r'\033\[48;5;(\d+)m', background_color)
+        if match_256:
+            code = int(match_256.group(1))
+            # 256-color palette: use heuristic based on color groups
+            # Colors 16-231 are general colors, 232-255 are grayscale
+            if code >= 232:
+                # Grayscale: 232-238 dark gray, 239-255 light gray
+                return config.BRIGHT_WHITE if code <= 238 else config.BLACK
+            elif code >= 16:
+                # For other 256 colors, use a simple brightness heuristic
+                return config.BRIGHT_WHITE if code <= 150 else config.BLACK
+            else:
+                # Standard 16 colors: 0-7 dark, 8-15 bright
+                return config.BRIGHT_WHITE if code <= 7 else config.BLACK
+        
+        # Handle basic background codes: \033[4Xm (rare in themes)
+        match_basic = re.search(r'\033\[4([0-7])m', background_color)
+        if match_basic:
+            # Basic ANSI colors - dark backgrounds use white, light use black
+            bg_code = int(match_basic.group(1))
+            # Black, Red, Blue, Magenta, Cyan are dark-ish backgrounds
+            dark_backgrounds = {0, 1, 4, 5, 6}  # black, red, blue, magenta, cyan
+            return config.BRIGHT_WHITE if bg_code in dark_backgrounds else config.BLACK
+        
+        # Fallback to bright white
+        return config.BRIGHT_WHITE
+        
+    except Exception:
+        # If color parsing fails, default to bright white
+        return config.BRIGHT_WHITE
+
+
+def alert_critical(msg: str) -> None:
+    """Print a high-visibility critical alert with red background."""
+    try:
+        from . import config
+        
+        # Use theme colors for maximum visibility with automatic contrast
+        red_bg = to_background(config.RED)
+        fg_color = _get_contrast_color(red_bg)
+        alert = f"{red_bg}{fg_color}{config.BOLD}[!] CRITICAL: {msg.upper()} [!]{config.RESET}"
+        print(alert, file=sys.stderr)
+        sys.stderr.flush()
+    except Exception:
+        # Fallback if anything fails
+        print(f"\033[41m\033[97m[!] CRITICAL: {msg.upper()} [!]\033[0m", file=sys.stderr)
+
+
+def alert_warning(msg: str) -> None:
+    """Print a highly visible warning alert with yellow background."""
+    try:
+        from . import config
+        
+        yellow_bg = to_background(config.YELLOW)
+        fg_color = _get_contrast_color(yellow_bg)
+        alert = f"{yellow_bg}{fg_color}{config.BOLD}[!] WARNING: {msg.upper()} [!]{config.RESET}"
+        print(alert, file=sys.stderr)
+        sys.stderr.flush()
+    except Exception:
+        # Fallback if anything fails
+        print(f"\033[43m\033[97m[!] WARNING: {msg.upper()} [!]\033[0m", file=sys.stderr)
+
+
+def alert_info(msg: str) -> None:
+    """Print an important info alert with blue background."""
+    try:
+        from . import config
+        
+        blue_bg = to_background(config.BLUE)
+        fg_color = _get_contrast_color(blue_bg)
+        alert = f"{blue_bg}{fg_color}{config.BOLD}[*] INFO: {msg.upper()} [*]{config.RESET}"
+        print(alert, file=sys.stderr)
+        sys.stderr.flush()
+    except Exception:
+        # Fallback if anything fails
+        print(f"\033[44m\033[97m[*] INFO: {msg.upper()} [*]\033[0m", file=sys.stderr)
+
+
+def alert_success(msg: str) -> None:
+    """Print a success alert with green background."""
+    try:
+        from . import config
+        
+        green_bg = to_background(config.GREEN)
+        fg_color = _get_contrast_color(green_bg)
+        alert = f"{green_bg}{fg_color}{config.BOLD}[✓] SUCCESS: {msg.upper()} [✓]{config.RESET}"
+        print(alert, file=sys.stderr)
+        sys.stderr.flush()
+    except Exception:
+        # Fallback if anything fails
+        print(f"\033[42m\033[97m[✓] SUCCESS: {msg.upper()} [✓]\033[0m", file=sys.stderr)

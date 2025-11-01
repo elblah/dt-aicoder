@@ -146,9 +146,9 @@ class ToolExecutor:
             return
 
         try:
-            # Create a timestamp for the log file
+            # Create a timestamp for the log file and put it in /tmp
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            log_filename = f"malformed_tool_call_{timestamp}.log"
+            log_filename = f"/tmp/malformed_tool_call_{timestamp}.log"
 
             # Create the log entry
             log_entry = {
@@ -161,8 +161,11 @@ class ToolExecutor:
             # Write to log file
             with open(log_filename, "w") as f:
                 json.dump(log_entry, f, indent=2)
+            
+            # File is automatically closed when exiting 'with' block
 
             wmsg(f" * Malformed tool call logged to {log_filename}")
+            
         except Exception as e:
             emsg(f" * Failed to log malformed tool call: {e}")
 

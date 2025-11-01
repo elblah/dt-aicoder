@@ -33,6 +33,11 @@ class TestEnhancedCompactCommand(unittest.TestCase):
 
     def test_no_args_tries_auto_compact(self):
         """Test that no arguments triggers auto-compaction attempt."""
+        # Mock high token usage to trigger compaction
+        self.app.message_history.api_handler = Mock()
+        self.app.message_history.api_handler.stats = Mock()
+        self.app.message_history.api_handler.stats.current_prompt_size = 200000
+
         self.app.message_history.compact_memory.return_value = None
         self.app.message_history._compaction_performed = (
             True  # Simulate successful compaction
