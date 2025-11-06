@@ -110,7 +110,8 @@ class APIClient:
         self, api_data: Dict[str, Any], timeout: int = 300
     ) -> Dict[str, Any]:
         """Make the actual HTTP request to the API."""
-        request_body = json.dumps(api_data).encode("utf-8")
+        # Use centralized request preparation with caching
+        request_body = self._prepare_and_cache_request(api_data)
 
         api_key = config.get_api_key()
         api_endpoint = config.get_api_endpoint()
@@ -142,53 +143,77 @@ class APIClient:
 
     def _update_stats_on_success(self, api_start_time: float, response: Dict[str, Any]):
         """Update statistics on successful API call."""
-        if self.stats:
-            self.stats.api_success += 1
-            # Record time spent on API call
-            self.stats.api_time_spent += time.time() - api_start_time
+        if not self.stats:
+            return
+            
+        self.stats.api_success += 1
+        # Record time spent on API call
+        self.stats.api_time_spent += time.time() - api_start_time
 
-            # Extract token usage information from the response
-            if "usage" in response:
-                usage = response["usage"]
-                # Extract prompt tokens (input) and completion tokens (output)
-                if "prompt_tokens" in usage:
-                    # Track current prompt size for auto-compaction decisions
-                    self.stats.current_prompt_size = usage["prompt_tokens"]
-                    self.stats.current_prompt_size_estimated = False
-                    # Accumulate prompt tokens for session statistics
-                    self.stats.prompt_tokens += usage["prompt_tokens"]
-                if "completion_tokens" in usage:
-                    # Accumulate completion tokens for session statistics
-                    self.stats.completion_tokens += usage["completion_tokens"]
+        # Check if we should force token estimation instead of using API usage data
+        import aicoder.config as config
+        if config.FORCE_TOKEN_ESTIMATION:
+            # Always use fallback estimation when forced
+            self._process_token_fallback(response)
+            return
+
+        # Use API usage data if available and not forced to estimate
+        if "usage" not in response or not response["usage"]:
+            # No usage data at all - use fallback
+            self._process_token_fallback(response)
+            return
+
+        usage = response["usage"]
+        # Check if usage data seems reasonable
+        prompt_tokens = usage.get("prompt_tokens", 0)
+        if prompt_tokens > 0:
+            # Good usage data - use it
+            self.stats.current_prompt_size = prompt_tokens
+            self.stats.current_prompt_size_estimated = False
+            self.stats.prompt_tokens += prompt_tokens
+        else:
+            # Bad or zero usage data - use fallback
+            self._process_token_fallback(response)
+
+        if "completion_tokens" in usage:
+            completion_tokens = usage.get("completion_tokens", 0)
+            self.stats.completion_tokens += completion_tokens
+
+    def _process_token_fallback(self, response: Dict[str, Any]):
+        """Handle token estimation fallback logic."""
+        estimated_input_tokens = 0
+        estimated_output_tokens = 0
+
+        # Use the cached accurate value from the actual request
+        from .utils import estimate_tokens_from_last_api_request
+        cached_estimate = estimate_tokens_from_last_api_request()
+
+        # Always re-estimate total context size using message history
+        if hasattr(self, "message_history") and self.message_history:
+            self.message_history.estimate_context()
+            estimated_input_tokens = self.message_history.stats.current_prompt_size
+        else:
+            # Fallback to cached value only
+            if cached_estimate is not None:
+                estimated_input_tokens = cached_estimate
             else:
-                # Fallback: estimate tokens if usage information is not available
-                # This can happen with some API providers that don't include token usage
                 estimated_input_tokens = 0
-                estimated_output_tokens = 0
 
-                # For input tokens, we need to access the message history
-                # We'll check if it's available as an instance attribute
-                if hasattr(self, "message_history") and self.message_history:
-                    estimated_input_tokens = self._estimate_messages_tokens(
-                        self.message_history.messages
-                    )
-                # If we don't have access to message_history, we can't estimate input tokens
+        # Estimate output tokens from the response content
+        if "choices" in response and len(response["choices"]) > 0:
+            choice = response["choices"][0]
+            if "message" in choice and "content" in choice["message"]:
+                content = choice["message"]["content"]
+                if content:
+                    estimated_output_tokens = self._estimate_tokens(content)
 
-                # Estimate output tokens from the response content
-                if "choices" in response and len(response["choices"]) > 0:
-                    choice = response["choices"][0]
-                    if "message" in choice and "content" in choice["message"]:
-                        content = choice["message"]["content"]
-                        if content:
-                            estimated_output_tokens = self._estimate_tokens(content)
-
-                # Update stats with estimated values
-                self.stats.prompt_tokens += estimated_input_tokens
-                self.stats.completion_tokens += estimated_output_tokens
-                # Update current prompt size for auto-compaction (use estimated input tokens if available)
-                if estimated_input_tokens > 0:
-                    self.stats.current_prompt_size = estimated_input_tokens
-                    self.stats.current_prompt_size_estimated = True
+        # Update stats with estimated values
+        self.stats.prompt_tokens += estimated_input_tokens
+        self.stats.completion_tokens += estimated_output_tokens
+        # Update current prompt size for auto-compaction (use estimated input tokens if available)
+        if estimated_input_tokens > 0:
+            self.stats.current_prompt_size = estimated_input_tokens
+            self.stats.current_prompt_size_estimated = True
 
         # Reset retry counter on successful API call
         self.retry_handler.reset_retry_counter()
@@ -198,6 +223,22 @@ class APIClient:
         from .utils import estimate_tokens
 
         return estimate_tokens(text)
+
+    def _prepare_and_cache_request(self, api_data: Dict[str, Any]) -> bytes:
+        """
+        Centralized function to prepare API request for sending.
+        - Caches request string for accurate token estimation
+        - Returns encoded request body ready for HTTP request
+        
+        All API request types should use this function for consistency.
+        """
+        request_string = json.dumps(api_data, separators=(',', ':'))
+        from .utils import cache_api_request_for_estimation
+        
+        # Cache token estimation
+        cache_api_request_for_estimation(request_string)
+        
+        return request_string.encode("utf-8")
 
     def _estimate_messages_tokens(self, messages: List[Dict]) -> int:
         """Estimate total tokens for a list of messages using utility function."""
@@ -210,3 +251,8 @@ class APIClient:
         if self.stats:
             # Record time spent even on failed API calls
             self.stats.api_time_spent += time.time() - api_start_time
+            # Increment error counter
+            self.stats.api_errors += 1
+            # Preserve context size estimation - don't reset it on failures
+            # The context size should persist across reconnections to maintain
+            # proper session state and auto-compaction behavior

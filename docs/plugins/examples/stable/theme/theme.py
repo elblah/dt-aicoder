@@ -8,7 +8,7 @@ Features:
 - High contrast themes for better readability
 - Popular terminal themes (One Dark, Nord, etc.)
 - Accessibility-focused themes
-- True color and 256-color support
+- True color support for all themes except ANSI
 - Interactive theme switching with /theme command
 - Theme navigation (next, previous, random)
 - Theme listing and help functionality
@@ -31,8 +31,8 @@ import random
 
 # Define high-contrast, readable themes
 THEMES = {
-    # Default theme (original colors)
-    "default": {
+    # ANSI theme (standard terminal colors)
+    "ansi": {
         "RED": "\033[31m",
         "GREEN": "\033[32m",
         "YELLOW": "\033[33m",
@@ -51,22 +51,22 @@ THEMES = {
         "BRIGHT_WHITE": "\033[97m",
     },
     "luna": {
-        "RED": "\033[38;5;219m",
-        "GREEN": "\033[38;5;191m",
-        "YELLOW": "\033[38;5;220m",
-        "BLUE": "\033[38;5;159m",
-        "MAGENTA": "\033[38;5;219m",
-        "CYAN": "\033[38;5;159m",
-        "WHITE": "\033[38;5;255m",
+        "RED": "\033[38;2;255;175;255m",  # Light Pink/Magenta (#FFAFFF)
+        "GREEN": "\033[38;2;215;255;95m",   # Lime Green (#D7FF5F)
+        "YELLOW": "\033[38;2;255;215;0m",  # Gold (#FFD700)
+        "BLUE": "\033[38;2;175;255;255m",  # Light Cyan (#AFFFFF)
+        "MAGENTA": "\033[38;2;255;175;255m",  # Light Pink/Magenta (#FFAFFF)
+        "CYAN": "\033[38;2;175;255;255m",  # Light Cyan (#AFFFFF)
+        "WHITE": "\033[38;2;255;255;255m",  # Pure White (#FFFFFF)
         "RESET": "\033[0m",
         # Bright variants (more intense versions)
-        "BRIGHT_RED": "\033[38;5;203m",
-        "BRIGHT_GREEN": "\033[38;5;194m",
-        "BRIGHT_YELLOW": "\033[38;5;226m",
-        "BRIGHT_BLUE": "\033[38;5;153m",
-        "BRIGHT_MAGENTA": "\033[38;5;207m",
-        "BRIGHT_CYAN": "\033[38;5;159m",
-        "BRIGHT_WHITE": "\033[38;5;231m",
+        "BRIGHT_RED": "\033[38;2;255;200;255m",   # Brighter Magenta
+        "BRIGHT_GREEN": "\033[38;2;200;255;120m", # Brighter Lime Green
+        "BRIGHT_YELLOW": "\033[38;2;255;235;50m",# Brighter Gold
+        "BRIGHT_BLUE": "\033[38;2;150;255;255m", # Brighter Cyan
+        "BRIGHT_MAGENTA": "\033[38;2;255;200;255m",# Brighter Magenta
+        "BRIGHT_CYAN": "\033[38;2;150;255;255m", # Brighter Cyan
+        "BRIGHT_WHITE": "\033[38;2;255;255;255m", # Pure White
     },
     # One Dark Pro (high contrast variant)
     "one-dark-pro": {
@@ -211,6 +211,14 @@ THEMES = {
         "CYAN": "\033[38;2;137;180;250m",  # Cyan
         "WHITE": "\033[38;2;229;233;237m",  # White
         "RESET": "\033[0m",
+        # Bright variants
+        "BRIGHT_RED": "\033[38;2;255;140;150m",
+        "BRIGHT_GREEN": "\033[38;2;180;220;120m",
+        "BRIGHT_YELLOW": "\033[38;2;240;200;130m",
+        "BRIGHT_BLUE": "\033[38;2;150;190;255m",
+        "BRIGHT_MAGENTA": "\033[38;2;210;180;255m",
+        "BRIGHT_CYAN": "\033[38;2;170;210;255m",
+        "BRIGHT_WHITE": "\033[38;2;240;245;250m",
     },
     # Kanagawa (high contrast)
     "kanagawa": {
@@ -222,6 +230,14 @@ THEMES = {
         "CYAN": "\033[38;2;142;192;124m",  # Autumn Green
         "WHITE": "\033[38;2;229;200;169m",  # Wave White
         "RESET": "\033[0m",
+        # Bright variants
+        "BRIGHT_RED": "\033[38;2;250;140;140m",
+        "BRIGHT_GREEN": "\033[38;2;180;230;160m",
+        "BRIGHT_YELLOW": "\033[38;2;240;210;140m",
+        "BRIGHT_BLUE": "\033[38;2;150;200;230m",
+        "BRIGHT_MAGENTA": "\033[38;2;220;150;240m",
+        "BRIGHT_CYAN": "\033[38;2;170;220;150m",
+        "BRIGHT_WHITE": "\033[38;2;240;220;190m",
     },
     # Rosé Pine (high contrast)
     "rose-pine": {
@@ -233,6 +249,14 @@ THEMES = {
         "CYAN": "\033[38;2;156;207;216m",  # Foam
         "WHITE": "\033[38;2;224;215;198m",  # Text
         "RESET": "\033[0m",
+        # Bright variants
+        "BRIGHT_RED": "\033[38;2;250;140;170m",
+        "BRIGHT_GREEN": "\033[38;2;80;210;160m",
+        "BRIGHT_YELLOW": "\033[38;2;250;220;140m",
+        "BRIGHT_BLUE": "\033[38;2;180;220;230m",
+        "BRIGHT_MAGENTA": "\033[38;2;250;140;170m",
+        "BRIGHT_CYAN": "\033[38;2;180;220;230m",
+        "BRIGHT_WHITE": "\033[38;2;240;235;220m",
     },
     # Everforest (high contrast)
     "everforest": {
@@ -244,6 +268,14 @@ THEMES = {
         "CYAN": "\033[38;2;124;164;170m",  # Blue
         "WHITE": "\033[38;2;220;206;186m",  # Text
         "RESET": "\033[0m",
+        # Bright variants
+        "BRIGHT_RED": "\033[38;2;255;140;130m",
+        "BRIGHT_GREEN": "\033[38;2;200;210;160m",
+        "BRIGHT_YELLOW": "\033[38;2;250;210;130m",
+        "BRIGHT_BLUE": "\033[38;2;150;180;190m",
+        "BRIGHT_MAGENTA": "\033[38;2;230;170;200m",
+        "BRIGHT_CYAN": "\033[38;2;150;180;190m",
+        "BRIGHT_WHITE": "\033[38;2;230;220;200m",
     },
     # Ayu Dark (high contrast)
     "ayu-dark": {
@@ -255,6 +287,14 @@ THEMES = {
         "CYAN": "\033[38;2;102;217;239m",  # Blue
         "WHITE": "\033[38;2;197;207;206m",  # White
         "RESET": "\033[0m",
+        # Bright variants
+        "BRIGHT_RED": "\033[38;2;255;120;120m",
+        "BRIGHT_GREEN": "\033[38;2;190;245;190m",
+        "BRIGHT_YELLOW": "\033[38;2;255;240;140m",
+        "BRIGHT_BLUE": "\033[38;2;130;230;255m",
+        "BRIGHT_MAGENTA": "\033[38;2;255;120;120m",
+        "BRIGHT_CYAN": "\033[38;2;130;230;255m",
+        "BRIGHT_WHITE": "\033[38;2;220;230;230m",
     },
     # Material Theme (high contrast)
     "material": {
@@ -313,39 +353,10 @@ THEMES = {
         "BRIGHT_CYAN": "\033[38;2;0;255;255m",  # Pure cyan (can't get brighter)
         "BRIGHT_WHITE": "\033[38;2;255;255;255m",  # Pure white (can't get brighter)
     },
-    # 256-color versions for compatibility
-    "one-dark-256": {
-        "RED": "\033[38;5;197m",
-        "GREEN": "\033[38;5;154m",
-        "YELLOW": "\033[38;5;221m",
-        "BLUE": "\033[38;5;117m",
-        "MAGENTA": "\033[38;5;207m",
-        "CYAN": "\033[38;5;117m",
-        "WHITE": "\033[38;5;255m",
-        "RESET": "\033[0m",
-        # Bright variants using 256-color palette
-        "BRIGHT_RED": "\033[38;5;203m",
-        "BRIGHT_GREEN": "\033[38;5;156m",
-        "BRIGHT_YELLOW": "\033[38;5;226m",
-        "BRIGHT_BLUE": "\033[38;5;153m",
-        "BRIGHT_MAGENTA": "\033[38;5;207m",
-        "BRIGHT_CYAN": "\033[38;5;159m",
-        "BRIGHT_WHITE": "\033[38;5;231m",
-    },
-    "nord-256": {
-        "RED": "\033[38;5;167m",
-        "GREEN": "\033[38;5;150m",
-        "YELLOW": "\033[38;5;179m",
-        "BLUE": "\033[38;5;110m",
-        "MAGENTA": "\033[38;5;175m",
-        "CYAN": "\033[38;5;108m",
-        "WHITE": "\033[38;5;254m",
-        "RESET": "\033[0m",
-    },
 }
 
 
-def apply_theme(theme_name="default"):
+def apply_theme(theme_name="ansi"):
     """Apply a theme by modifying the config module."""
     if theme_name not in THEMES:
         print(
@@ -366,7 +377,7 @@ def apply_theme(theme_name="default"):
 
         # Update other modules that import these colors directly
         # _update_dependent_modules(theme)
-        
+
         # Clear background color cache since colors changed
         try:
             from aicoder.utils import clear_background_cache
@@ -431,7 +442,7 @@ def initialize_theme_plugin():
         print("   - High contrast themes for better readability")
         print("   - 15+ famous terminal themes included")
         print("   - Set AICODER_THEME environment variable for persistent themes")
-        print("   - Themes: default, one-dark-pro, nord, solarized-dark,")
+        print("   - Themes: ansi, luna, one-dark-pro, nord, solarized-dark,")
         print("             gruvbox-dark, dracula, monokai, catppuccin-mocha,")
         print("             tokyo-night, kanagawa, rose-pine, everforest,")
         print("             ayu-dark, material, github-dark, high-visibility")
@@ -462,9 +473,9 @@ def get_current_theme():
         for name, theme_colors in THEMES.items():
             if hasattr(config, "RED") and config.RED == theme_colors.get("RED"):
                 return name
-        return "default"  # Fallback
+        return "ansi"  # Fallback
     except Exception:
-        return "default"
+        return "ansi"
 
 
 def get_theme_index(theme_name):
@@ -575,6 +586,6 @@ def on_aicoder_init(aicoder_instance):
 # Initialize plugin
 theme_applied = initialize_theme_plugin()
 
-# Apply default theme only if no theme was set via environment variable
+# Apply ansi theme only if no theme was set via environment variable
 if not theme_applied:
-    apply_theme("default")
+    apply_theme("ansi")

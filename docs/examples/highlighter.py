@@ -66,8 +66,7 @@ import os
 import re
 import json
 from pathlib import Path
-from typing import List, Dict, Any, Pattern, Optional
-import argparse
+from typing import List, Dict, Any, Optional
 
 # Import config for color constants
 try:

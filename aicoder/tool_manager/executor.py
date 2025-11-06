@@ -139,6 +139,48 @@ class ToolExecutor:
         # Simple list for tools to queue messages that should be added after tool results
         self.pending_tool_messages = pending_tool_messages
 
+    def _handle_tool_execution_error(
+        self, tool_name: str, tool_type: str, tool_config: Dict[str, Any], e: Exception, guidance_requested: bool = False
+    ) -> Tuple[str, Dict[str, Any], str, bool]:
+        """
+        Standardized error handling for tool execution.
+        
+        Returns:
+            Tuple of (error_result, tool_config, guidance_content, guidance_requested)
+        """
+        self.stats.tool_errors += 1
+        if str(e) == "CANCEL_ALL_TOOL_CALLS":
+            return "CANCEL_ALL_TOOL_CALLS", tool_config, None, False
+        return (
+            f"Error executing {tool_type} tool '{tool_name}': {e}",
+            tool_config,
+            None,
+            guidance_requested,
+        )
+
+    def _prepare_tool_arguments(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Normalize and validate arguments for tool execution.
+        
+        Returns:
+            Normalized arguments dictionary
+        """
+        # Normalize arguments to ensure they are in dictionary format
+        arguments = self._normalize_arguments(arguments)
+
+        # Final validation: ensure arguments is a dictionary for tool execution
+        if not isinstance(arguments, dict):
+            error_msg = (
+                "ERROR: Invalid JSON format in arguments. "
+                "The JSON string could not be parsed into a dictionary. "
+                "Please ensure your JSON arguments are properly formatted with correct syntax, "
+                "double quotes for strings, and proper escaping."
+            )
+            emsg(f" * {error_msg}")
+            raise ValueError(error_msg)
+
+        return arguments
+
     def _log_malformed_tool_call(self, tool_name: str, arguments_raw: str):
         """Log malformed tool calls to a file for debugging purposes."""
         # Only log if debug mode is enabled
@@ -161,11 +203,11 @@ class ToolExecutor:
             # Write to log file
             with open(log_filename, "w") as f:
                 json.dump(log_entry, f, indent=2)
-            
+
             # File is automatically closed when exiting 'with' block
 
             wmsg(f" * Malformed tool call logged to {log_filename}")
-            
+
         except Exception as e:
             emsg(f" * Failed to log malformed tool call: {e}")
 
@@ -790,19 +832,11 @@ class ToolExecutor:
                                 imsg("Auto approving... running YOLO MODE!")
                     # If auto_approved is True, no approval needed - skip approval logic
 
-                    # Normalize arguments to ensure they are in dictionary format
-                    arguments = self._normalize_arguments(arguments)
-
-                    # Final validation: ensure arguments is a dictionary for tool execution
-                    if not isinstance(arguments, dict):
-                        error_msg = (
-                            f"ERROR: Invalid JSON format in arguments for tool '{tool_name}'. "
-                            f"The JSON string could not be parsed into a dictionary. "
-                            f"Please ensure your JSON arguments are properly formatted with correct syntax, "
-                            f"double quotes for strings, and proper escaping."
-                        )
-                        emsg(f" * {error_msg}")
-                        return error_msg, tool_config, None, False
+                    # Prepare arguments for execution
+                    try:
+                        arguments = self._prepare_tool_arguments(arguments)
+                    except ValueError as e:
+                        return str(e), tool_config, None, False
                     # Check if user used diff-edit to modify the file
                     if (
                         hasattr(self.approval_system, "_diff_edit_result")
@@ -866,14 +900,8 @@ class ToolExecutor:
 
                     return result, tool_config, guidance_content, guidance_requested
                 except Exception as e:
-                    self.stats.tool_errors += 1
-                    if str(e) == "CANCEL_ALL_TOOL_CALLS":
-                        return "CANCEL_ALL_TOOL_CALLS", tool_config, None, False
-                    return (
-                        f"Error executing internal tool '{tool_name}': {e}",
-                        tool_config,
-                        None,
-                        guidance_requested,  # Use the existing guidance_requested value
+                    return self._handle_tool_execution_error(
+                        tool_name, "internal", tool_config, e, locals().get("guidance_requested", False)
                     )
 
             elif tool_type == "command":
@@ -1051,8 +1079,8 @@ class ToolExecutor:
                     if not auto_approved and not config.YOLO_MODE and with_guidance:
                         guidance_requested = True
 
-                    # Normalize arguments to ensure they are in dictionary format
-                    arguments = self._normalize_arguments(arguments)
+                    # Prepare arguments for execution
+                    arguments = self._prepare_tool_arguments(arguments)
 
                     command = tool_config["command"].format(**arguments)
                     # Print the executing command with potential colorization
@@ -1106,17 +1134,8 @@ class ToolExecutor:
                         guidance_requested,
                     )
                 except Exception as e:
-                    self.stats.tool_errors += 1
-                    # Define guidance_requested in case it wasn't defined in approval flow
-                    if "guidance_requested" not in locals():
-                        guidance_requested = False
-                    if str(e) == "CANCEL_ALL_TOOL_CALLS":
-                        return "CANCEL_ALL_TOOL_CALLS", tool_config, None, False
-                    return (
-                        f"Error executing command tool '{tool_name}': {e}",
-                        tool_config,
-                        None,
-                        guidance_requested,
+                    return self._handle_tool_execution_error(
+                        tool_name, "command", tool_config, e, locals().get("guidance_requested", False)
                     )
 
             elif tool_type == "jsonrpc":
@@ -1148,8 +1167,8 @@ class ToolExecutor:
                     if not auto_approved and not config.YOLO_MODE and with_guidance:
                         guidance_requested = True
 
-                    # Normalize arguments to ensure they are in dictionary format
-                    arguments = self._normalize_arguments(arguments)
+                    # Prepare arguments for execution
+                    arguments = self._prepare_tool_arguments(arguments)
 
                     url = tool_config["url"]
                     method = tool_config["method"]
@@ -1187,17 +1206,8 @@ class ToolExecutor:
 
                         return result, tool_config, guidance_content, guidance_requested
                 except Exception as e:
-                    self.stats.tool_errors += 1
-                    # Define guidance_requested in case it wasn't defined in approval flow
-                    if "guidance_requested" not in locals():
-                        guidance_requested = False
-                    if str(e) == "CANCEL_ALL_TOOL_CALLS":
-                        return "CANCEL_ALL_TOOL_CALLS", tool_config, None, False
-                    return (
-                        f"Error executing JSON-RPC tool '{tool_name}': {e}",
-                        tool_config,
-                        None,
-                        guidance_requested,  # Use the actual guidance_requested value
+                    return self._handle_tool_execution_error(
+                        tool_name, "JSON-RPC", tool_config, e, locals().get("guidance_requested", False)
                     )
 
             elif tool_type == "mcp-stdio":
@@ -1269,17 +1279,8 @@ class ToolExecutor:
 
                     return result, tool_config, guidance_content, guidance_requested
                 except Exception as e:
-                    self.stats.tool_errors += 1
-                    # Define guidance_requested in case it wasn't defined in approval flow
-                    if "guidance_requested" not in locals():
-                        guidance_requested = False
-                    if str(e) == "CANCEL_ALL_TOOL_CALLS":
-                        return "CANCEL_ALL_TOOL_CALLS", tool_config, None, False
-                    return (
-                        f"Error executing MCP stdio tool '{tool_name}': {e}",
-                        tool_config,
-                        None,
-                        guidance_requested,
+                    return self._handle_tool_execution_error(
+                        tool_name, "MCP stdio", tool_config, e, locals().get("guidance_requested", False)
                     )
 
             else:

@@ -13,7 +13,6 @@ from . import config
 from .stats import Stats
 from .message_history import MessageHistory, NoMessagesToCompactError
 from .tool_manager import MCPToolManager
-from .animator import Animator
 
 from .api_handler import APIHandlerMixin
 from .tool_call_executor import ToolCallExecutorMixin
@@ -105,7 +104,10 @@ class AICoder(
         self.stats = Stats()
         self.stats._app_instance = self  # Store reference for plugin access
         self.message_history = MessageHistory()
-        self.animator = Animator()
+        
+        # Use singleton animator instance
+        from .animator import get_animator
+        self.animator = get_animator()
 
         # Initialize parent classes properly
         super().__init__()
@@ -113,6 +115,10 @@ class AICoder(
         self.tool_manager = MCPToolManager(
             self.stats, self.message_history, animator=self.animator
         )
+        
+        # Register tool manager as global singleton
+        from .tool_manager import set_tool_manager
+        set_tool_manager(self.tool_manager)
         self._initialize_mcp_servers()
 
         # Initialize project memory
@@ -125,6 +131,9 @@ class AICoder(
 
         # Set up the API handler reference in message history
         self.message_history.api_handler = self
+        
+        # Estimate context size now that api_handler is available (with tools info)
+        self.message_history.estimate_context()
 
         # Initialize command registry
         command_registry = CommandRegistry(self)
@@ -395,6 +404,23 @@ class AICoder(
         """Main application loop."""
         try:
             self._print_startup_info()
+            
+            # Setup file-based prompting if enabled
+            from .file_prompt import get_file_prompt_manager
+            file_manager = get_file_prompt_manager()
+            
+            # Initialize file-based prompting
+            file_manager.setup_file_mode()
+
+            # Auto-enable YOLO mode for file-based prompting (no interactive approval possible)
+            if file_manager.is_file_mode_enabled():
+                if not os.environ.get("YOLO_MODE"):
+                    os.environ["YOLO_MODE"] = "1"
+                    # Also update the config module variable
+                    config.YOLO_MODE = True
+                    if config.DEBUG:
+                        print(f"{config.YELLOW}Auto-enabled YOLO mode for file-based prompting{config.RESET}")
+            
             while True:
                 try:
                     run_api_call = False

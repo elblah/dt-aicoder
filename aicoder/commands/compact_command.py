@@ -27,6 +27,8 @@ class CompactCommand(BaseCommand):
 
         if subcommand == "force":
             return self._handle_force_compact(args[1:])
+        elif subcommand == "force-messages":
+            return self._handle_force_messages_compact(args[1:])
         elif subcommand == "stats":
             return self._handle_stats()
         elif subcommand == "auto":
@@ -146,6 +148,62 @@ class CompactCommand(BaseCommand):
             wmsg(f"\n [i] Nothing to compact: {str(e)}")
         except Exception as e:
             emsg(f"\n [X] Force compaction failed: {str(e)}")
+            wmsg(" *** Your conversation history has been preserved.")
+            self.app.message_history._compaction_performed = False
+
+        return False, False
+
+    def _handle_force_messages_compact(self, args: List[str]) -> Tuple[bool, bool]:
+        """Handle force compaction of N oldest individual messages."""
+        # Parse number of messages
+        if not args:
+            emsg("\n [X] Please specify the number of messages to compact")
+            wmsg(" *** Usage: /compact force-messages <N>")
+            wmsg(" *** Example: /compact force-messages 15")
+            return False, False
+            
+        # Try to parse as integer
+        try:
+            num_messages = int(args[0])
+            if num_messages <= 0:
+                emsg("\n [X] Number of messages must be positive")
+                return False, False
+        except ValueError:
+            emsg("\n [X] Invalid number. Please specify a positive integer.")
+            wmsg(" *** Usage: /compact force-messages <N>")
+            wmsg(" *** Example: /compact force-messages 15")
+            return False, False
+
+        try:
+            compacted_messages = self.app.message_history.compact_messages(num_messages)
+            actual_compacted = len(compacted_messages)
+            remaining_messages = len([
+                msg for msg in self.app.message_history.messages 
+                if not (
+                    msg.get("role") == "system"
+                    and msg.get("content", "").startswith("[Old tool result content cleared due to memory compaction]")
+                )
+            ])
+
+            imsg(
+                f"\n [✓] Force compacted {actual_compacted} oldest message{'s' if actual_compacted != 1 else ''}"
+            )
+            wmsg(f" [i] Remaining chat messages: {remaining_messages}")
+
+            # Show what was compacted (brief summary)
+            if actual_compacted > 0:
+                message_types = {}
+                for msg in compacted_messages:
+                    role = msg.get("role", "unknown")
+                    message_types[role] = message_types.get(role, 0) + 1
+                
+                type_summary = ", ".join([f"{count} {role}" for role, count in message_types.items()])
+                wmsg(f" [i] Compacted: {type_summary}")
+
+        except NoMessagesToCompactError as e:
+            wmsg(f"\n [i] Nothing to compact: {str(e)}")
+        except Exception as e:
+            emsg(f"\n [X] Force message compaction failed: {str(e)}")
             wmsg(" *** Your conversation history has been preserved.")
             self.app.message_history._compaction_performed = False
 
@@ -297,6 +355,13 @@ class CompactCommand(BaseCommand):
         wmsg("    - Example: /compact force 3 (compacts 3 oldest rounds)")
         wmsg('    - A "round" = user message + complete assistant response\n')
 
+        wmsg(
+            "  - /compact force-messages N    Force compact N oldest individual messages"
+        )
+        wmsg("    - More granular than round-based compaction")
+        wmsg("    - Example: /compact force-messages 15")
+        wmsg("    - Preserves tool call/response pairs together\n")
+
         wmsg("  - /compact stats              Show conversation statistics")
         wmsg("    - Current round count and token usage")
         wmsg("    - Auto-compaction status\n")
@@ -313,5 +378,6 @@ class CompactCommand(BaseCommand):
         )
         wmsg("    - Auto-compaction preserves recent rounds by default")
         wmsg("    - Force compaction only removes oldest rounds")
+        wmsg("    - Force-messages gives more granular control over individual messages")
 
         return False, False

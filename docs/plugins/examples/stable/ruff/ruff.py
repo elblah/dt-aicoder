@@ -25,7 +25,6 @@ Plugin Constants:
 import os
 import shutil
 import subprocess
-import sys
 
 
 # Plugin configuration

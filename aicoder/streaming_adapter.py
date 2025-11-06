@@ -24,7 +24,7 @@ from .retry_utils import (
 )
 from .streaming_colorizer import MarkdownColorizer
 from .terminal_manager import is_esc_pressed
-from .utils import estimate_messages_tokens, wmsg, emsg, imsg, dmsg
+from .utils import wmsg, emsg, imsg, dmsg
 
 
 class StreamingAdapter(APIClient):
@@ -145,7 +145,9 @@ class StreamingAdapter(APIClient):
             try:
                 # Validate tool definitions using shared functionality
                 self._validate_tool_definitions(api_data)
-                request_body = json.dumps(api_data).encode("utf-8")
+                
+                # Use centralized request preparation with caching
+                request_body = self._prepare_and_cache_request(api_data)
             except TypeError as e:
                 self.animator.stop_animation()
                 emsg(f"\nError serializing data for API request: {e}")
@@ -224,18 +226,6 @@ class StreamingAdapter(APIClient):
                     processed_response = result_dict["response"]
                     self._update_stats_on_success(api_start_time, processed_response)
 
-                    # Extract token usage information from the response if not handled by _update_stats_on_success
-                    if processed_response and "usage" in processed_response:
-                        usage = processed_response["usage"]
-                        dmsg(f"Non-streaming usage data: {usage}")
-                        # Extract prompt tokens (input) and completion tokens (output)
-                        if "prompt_tokens" in usage and self.stats:
-                            self.stats.current_prompt_size = usage["prompt_tokens"]
-                            self.stats.current_prompt_size_estimated = False
-                            self.stats.prompt_tokens += usage["prompt_tokens"]
-                        if "completion_tokens" in usage and self.stats:
-                            self.stats.completion_tokens += usage["completion_tokens"]
-
                     return processed_response
 
                 # Record time spent even on failed API calls
@@ -297,7 +287,9 @@ class StreamingAdapter(APIClient):
             try:
                 # Validate tool definitions using shared functionality
                 self._validate_tool_definitions(api_data)
-                request_body = json.dumps(api_data).encode("utf-8")
+                
+                # Use centralized request preparation with caching
+                request_body = self._prepare_and_cache_request(api_data)
             except TypeError as e:
                 self.animator.stop_animation()
                 emsg(f"\nError serializing data for API request: {e}")
@@ -457,54 +449,6 @@ class StreamingAdapter(APIClient):
                     self._update_stats_on_success(
                         api_start_time, processed_response or {}
                     )
-
-                    # Extract token usage information from the response
-                    if processed_response and "usage" in processed_response:
-                        usage = processed_response["usage"]
-                        dmsg(f"Streaming usage data: {usage}")
-                        # Extract prompt tokens (input) and completion tokens (output)
-                        if "prompt_tokens" in usage and self.stats:
-                            self.stats.current_prompt_size = usage["prompt_tokens"]
-                            self.stats.current_prompt_size_estimated = False
-                            self.stats.prompt_tokens += usage["prompt_tokens"]
-                        if "completion_tokens" in usage and self.stats:
-                            self.stats.completion_tokens += usage["completion_tokens"]
-                    else:
-                        # Fallback: estimate tokens if usage information is not available
-                        # This can happen with some API providers that don't include token usage
-                        estimated_input_tokens = 0
-                        estimated_output_tokens = 0
-
-                        # For input tokens, we need to access the message history
-                        if (
-                            hasattr(self.api_handler, "message_history")
-                            and self.api_handler.message_history
-                        ):
-                            estimated_input_tokens = estimate_messages_tokens(
-                                self.api_handler.message_history.messages
-                            )
-
-                        # Estimate output tokens from the response content
-                        if (
-                            processed_response
-                            and "choices" in processed_response
-                            and len(processed_response["choices"]) > 0
-                        ):
-                            choice = processed_response["choices"][0]
-                            if "message" in choice and "content" in choice["message"]:
-                                content = choice["message"]["content"]
-                                if content:
-                                    from .utils import estimate_tokens
-
-                                    estimated_output_tokens = estimate_tokens(content)
-
-                        # Update stats with estimated values
-                        self.stats.prompt_tokens += estimated_input_tokens
-                        self.stats.completion_tokens += estimated_output_tokens
-                        # Update current prompt size for auto-compaction (use estimated input tokens if available)
-                        if estimated_input_tokens > 0:
-                            self.stats.current_prompt_size = estimated_input_tokens
-                            self.stats.current_prompt_size_estimated = True
 
                     return processed_response
 

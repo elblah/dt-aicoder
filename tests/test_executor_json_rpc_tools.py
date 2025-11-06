@@ -14,13 +14,12 @@ import sys
 import urllib.request
 import urllib.parse
 import urllib.error
-from unittest.mock import Mock, patch, MagicMock
-from io import StringIO
+from unittest.mock import Mock, patch
 
 # Add parent directory to the path to import aicoder modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from aicoder.tool_manager.executor import ToolExecutor, DENIED_MESSAGE
+from aicoder.tool_manager.executor import ToolExecutor
 from aicoder.tool_manager.registry import ToolRegistry
 from aicoder.stats import Stats
 from aicoder.animator import Animator

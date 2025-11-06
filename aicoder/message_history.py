@@ -184,6 +184,9 @@ class MessageHistory:
 
     def __init__(self):
         self.messages = self._create_initial_messages()
+        
+
+        
         self.initial_system_prompt = self.messages[0] if self.messages else None
         self.stats = Stats()
         # Reference to the API handler will be set externally
@@ -192,6 +195,53 @@ class MessageHistory:
         self._compaction_performed = False
         # Track autosave file if enabled (loaded from "autosave" in filename)
         self.autosave_filename = None
+        
+        # Initial estimation will happen after api_handler is set
+    
+    def estimate_context(self):
+        """
+        Centralized function to estimate current message history and update stats.
+        Use this everywhere instead of duplicating token estimation logic.
+        """
+        # Early return if no messages
+        if not self.messages:
+            return
+            
+        # Early return if no api_handler
+        if self.api_handler is None:
+            return
+        
+        try:
+            # Get API request data using the same builder as real requests
+            # Include tools by passing the actual tool manager
+            tool_manager = getattr(self.api_handler, 'tool_manager', None)
+            api_data = self.api_handler._prepare_api_request_data(
+                self.messages, stream=False, tool_manager=tool_manager
+            )
+            
+            # Simple token estimation
+            import json
+            request_string = json.dumps(api_data, separators=(',', ':'))
+
+            # Simple token estimation without caching to avoid duplicate JSON files
+            from .utils import estimate_tokens
+            estimated_size = estimate_tokens(request_string)
+            
+            # Early return if estimation failed
+            if not estimated_size:
+                return
+
+            # Update stats with the estimated context size
+            self.stats.current_prompt_size = estimated_size
+            self.stats.current_prompt_size_estimated = True
+            
+            if config.DEBUG:
+                from .utils import imsg
+                imsg(f" *** Context estimated: {estimated_size} tokens")
+                
+        except Exception:
+            # Don't fail operations if estimation fails
+            pass
 
     def _create_initial_messages(self) -> List[Dict[str, Any]]:
         """Create the initial system message."""
@@ -329,8 +379,8 @@ class MessageHistory:
         pruned_messages, actual_pruning_occurred = self._prune_old_tool_results()
 
         # Check if pruning was sufficient by estimating tokens after pruning
+        # Just estimate the tokens in the pruned messages directly
         from .utils import estimate_messages_tokens
-
         tokens_after_pruning = estimate_messages_tokens(pruned_messages)
 
         # If pruning brought us below the auto-compaction threshold, keep the pruned messages
@@ -349,18 +399,8 @@ class MessageHistory:
             # Set the flag to True to indicate compaction has been attempted
             self._compaction_performed = True
 
-            # Recalculate token count after compaction
-            from .utils import estimate_messages_tokens
-
-            if self.api_handler and hasattr(self.api_handler, "stats"):
-                self.api_handler.stats.current_prompt_size = estimate_messages_tokens(
-                    self.messages
-                )
-                self.api_handler.stats.current_prompt_size_estimated = True
-                if config.DEBUG:
-                    imsg(
-                        f" *** Token count recalculated after compaction: {self.api_handler.stats.current_prompt_size} tokens"
-                    )
+            # Update context estimation after compaction
+            self.estimate_context()
 
             return self.messages
 
@@ -454,18 +494,8 @@ class MessageHistory:
         # Set the flag to True to indicate compaction has been attempted
         self._compaction_performed = True
 
-        # Recalculate token count after compaction
-        from .utils import estimate_messages_tokens
-
-        if self.api_handler and hasattr(self.api_handler, "stats"):
-            self.api_handler.stats.current_prompt_size = estimate_messages_tokens(
-                self.messages
-            )
-            self.api_handler.stats.current_prompt_size_estimated = True
-            if config.DEBUG:
-                imsg(
-                    f" *** Token count recalculated after compaction: {self.api_handler.stats.current_prompt_size} tokens"
-                )
+        # Update context estimation after compaction
+        self.estimate_context()
 
         return self.messages
 
@@ -862,18 +892,8 @@ Provide a detailed but concise summary of our conversation above. Focus on infor
                 self.autosave_filename = None
                 imsg(f"\n *** Session loaded: {filename}")
 
-            # Recalculate token count after loading session
-            from .utils import estimate_messages_tokens
-
-            if self.api_handler and hasattr(self.api_handler, "stats"):
-                self.api_handler.stats.current_prompt_size = estimate_messages_tokens(
-                    self.messages
-                )
-                self.api_handler.stats.current_prompt_size_estimated = True
-                if config.DEBUG:
-                    imsg(
-                        f" *** Token count recalculated: {self.api_handler.stats.current_prompt_size} tokens"
-                    )
+            # Update context estimation after loading session
+            self.estimate_context()
         except Exception as e:
             emsg(f"\n *** Error loading session from {filename}: {e}")
 
@@ -960,6 +980,159 @@ Provide a detailed but concise summary of our conversation above. Focus on infor
     def get_round_count(self) -> int:
         """Get the number of conversation rounds."""
         return len(self.identify_conversation_rounds())
+
+    def compact_messages(self, num_messages: int) -> List[Dict[str, Any]]:
+        """
+        Compact the specified number of oldest individual messages.
+
+        Args:
+            num_messages: Number of oldest messages to compact
+
+        Returns:
+            List of compacted messages
+
+        Raises:
+            NoMessagesToCompactError: If no messages available to compact
+        """
+        # Get all chat messages (excluding system messages and previous summaries)
+        first_chat_index = self._get_first_chat_message_index()
+        chat_messages = self.messages[first_chat_index:]
+
+        # Filter out messages that shouldn't be compacted
+        eligible_messages = [
+            msg for msg in chat_messages
+            if not (
+                msg.get("role") == "system"
+                and msg.get("content", "").startswith(SUMMARY_MESSAGE_PREFIX)
+            )
+        ]
+
+        if not eligible_messages:
+            raise NoMessagesToCompactError(
+                "No eligible messages to compact"
+            )
+
+        # Build groups of messages that must stay together
+        # Tool calls and their responses must stay together
+        message_groups = []
+        i = 0
+        while i < len(eligible_messages):
+            msg = eligible_messages[i]
+            
+            # Start a new group with this message
+            current_group = [msg]
+            
+            # If this is an assistant message with tool calls, include all following tool responses
+            if (msg.get("role") == "assistant" and 
+                msg.get("tool_calls") and 
+                i + 1 < len(eligible_messages)):
+                
+                # Include all consecutive tool responses
+                j = i + 1
+                while (j < len(eligible_messages) and 
+                       eligible_messages[j].get("role") == "tool"):
+                    current_group.append(eligible_messages[j])
+                    j += 1
+                
+                # Update i to skip the tool responses we just added
+                i = j - 1
+            
+            message_groups.append(current_group)
+            i += 1
+
+        # Select groups to compact until we reach the desired message count
+        messages_to_compact = []
+        messages_counted = 0
+        
+        for group in message_groups:
+            if messages_counted >= num_messages:
+                break
+            messages_to_compact.extend(group)
+            messages_counted += len(group)
+
+        if not messages_to_compact:
+            raise NoMessagesToCompactError(
+                "No messages available to compact"
+            )
+
+        # Create summary of the selected messages
+        summary = self._summarize_old_messages(messages_to_compact)
+
+        summary_content = (
+            SUMMARY_MESSAGE_PREFIX + " " + (summary if summary else "no prior content")
+        )
+        summary_message = {"role": "system", "content": summary_content}
+
+        # Find the index of the first message to compact
+        first_message_to_compact = messages_to_compact[0]
+        first_compact_index = self.messages.index(first_message_to_compact)
+
+        # Find the index of the last message to compact
+        last_message_to_compact = messages_to_compact[-1]
+        last_compact_index = self.messages.index(last_message_to_compact)
+
+        # Reconstruct messages:
+        # 1. Messages before the first compacted message
+        # 2. New summary message
+        # 3. Messages after the last compacted message
+        new_messages = (
+            self.messages[:first_compact_index]  # Before compacted messages
+            + [summary_message]  # New summary
+            + self.messages[last_compact_index + 1 :]  # After compacted messages
+        )
+
+        # Ensure the first message after system is a user message for compatibility
+        # Check if we need to insert a neutral user message
+        # Find the first non-system message index in the new messages
+        first_non_system_idx = 0
+        while (first_non_system_idx < len(new_messages) and
+               new_messages[first_non_system_idx].get("role") == "system"):
+            first_non_system_idx += 1
+        if (first_non_system_idx < len(new_messages) and
+            new_messages[first_non_system_idx].get("role") != "user"):
+            
+            neutral_user_message = {
+                "role": "user", 
+                "content": NEUTRAL_USER_MESSAGE_CONTENT,
+            }
+            # If the first non-system message is our newly added summary, insert user message after it
+            if (first_non_system_idx < len(new_messages) and
+                new_messages[first_non_system_idx].get("role") == "system" and
+                new_messages[first_non_system_idx].get("content", "").startswith(SUMMARY_MESSAGE_PREFIX)):
+                # Insert user message right after the summary
+                new_messages = (
+                    new_messages[:first_non_system_idx + 1]
+                    + [neutral_user_message]
+                    + new_messages[first_non_system_idx + 1:]
+                )
+            else:
+                # Insert user message at the first non-system position
+                new_messages = (
+                    new_messages[:first_non_system_idx]
+                    + [neutral_user_message]
+                    + new_messages[first_non_system_idx:]
+                )
+
+        self.messages = new_messages
+
+        # Update stats
+        self.stats.compactions += 1
+        self._compaction_performed = True
+
+        # Recalculate token count
+        if self.api_handler and hasattr(self.api_handler, "stats"):
+            from .utils import estimate_messages_tokens
+
+            self.api_handler.stats.current_prompt_size = estimate_messages_tokens(
+                self.messages
+            )
+            self.api_handler.stats.current_prompt_size_estimated = True
+            if config.DEBUG:
+                imsg(
+                    f" *** Token count recalculated after message compaction: {self.api_handler.stats.current_prompt_size} tokens"
+                )
+
+        return messages_to_compact
 
     def compact_rounds(self, num_rounds: int = 1) -> List[Dict[str, Any]]:
         """

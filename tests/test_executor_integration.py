@@ -11,13 +11,12 @@ This test triggers tool approval prompts that will hang indefinitely without YOL
 import json
 import os
 import sys
-from unittest.mock import Mock, patch, MagicMock
-from io import StringIO
+from unittest.mock import Mock, patch
 
 # Add the parent directory to the path to import aicoder modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from aicoder.tool_manager.executor import ToolExecutor, DENIED_MESSAGE
+from aicoder.tool_manager.executor import ToolExecutor
 from aicoder.tool_manager.registry import ToolRegistry
 from aicoder.stats import Stats
 from aicoder.animator import Animator
@@ -583,7 +582,7 @@ class TestExecutorIntegration:
             assert cancel_all is False
             # Count the fields in complex_data
             field_count = len(str(complex_data).split(','))  # Rough estimate
-            assert f"Processed complex data" in results[0]["content"]
+            assert "Processed complex data" in results[0]["content"]
 
     def test_execution_time_tracking_integration(self):
         """Test execution time tracking across multiple tools."""

@@ -3,10 +3,12 @@ Input handling for AI Coder.
 """
 
 import os
+import time
 from . import config
 from .utils import make_readline_safe, wmsg, emsg, imsg
 from .readline_history_manager import prompt_history_manager
 from .terminal_manager import enter_prompt_mode, exit_prompt_mode
+from .file_prompt import get_file_prompt_manager
 
 
 class InputHandlerMixin:
@@ -22,7 +24,40 @@ class InputHandlerMixin:
         display_token_info(self.stats, config.AUTO_COMPACT_THRESHOLD)
 
     def _get_multiline_input(self) -> str:
-        """Get user input with simplified handling (no multiline support)."""
+        """Get user input with file-based prompting support."""
+        # Check if file-based prompting is enabled
+        file_manager = get_file_prompt_manager()
+        
+        if file_manager.is_file_mode_enabled():
+            # File-based prompting mode
+            return self._get_file_based_input(file_manager)
+        
+        # Regular interactive input mode
+        return self._get_interactive_input()
+
+    def _get_file_based_input(self, file_manager) -> str:
+        """Handle file-based prompting."""
+        try:
+            # Wait for prompt file to appear
+            while True:
+                prompt_content = file_manager.wait_for_prompt_file()
+                if prompt_content:
+                    imsg(f"📝 Processing file-based prompt: {prompt_content[:50]}...")
+                    return prompt_content
+                    
+                # If no prompt found, wait a bit and check again
+                time.sleep(0.1)
+                
+        except KeyboardInterrupt:
+            # Ctrl+C should exit the application
+            raise
+        except Exception as e:
+            emsg(f"Error in file-based input: {e}")
+            # Fall back to interactive input on error
+            return self._get_interactive_input()
+
+    def _get_interactive_input(self) -> str:
+        """Get regular interactive user input."""
         # Notify plugins before user prompt
         if hasattr(self, "loaded_plugins"):
             from .plugin_system.loader import notify_plugins_before_user_prompt

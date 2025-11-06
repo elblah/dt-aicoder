@@ -9,21 +9,9 @@ import threading
 from . import config
 from .terminal_manager import is_esc_pressed
 
-# Module-level singleton
-_animator_instance = None
-
-
-def get_animator():
-    """Get the singleton animator instance."""
-    global _animator_instance
-    if _animator_instance is None:
-        _animator_instance = Animator()
-    return _animator_instance
-
-
 class Animator:
     """Handles animated status messages with elapsed time and cursor management."""
-
+    
     _instance = None
 
     def __new__(cls):
@@ -32,6 +20,10 @@ class Animator:
         return cls._instance
 
     def __init__(self):
+        # Check if already initialized (singleton pattern)
+        if hasattr(self, '_initialized'):
+            return
+            
         self._stop_event = None
         self._animation_thread = None
         self._cursor_thread = None
@@ -40,6 +32,9 @@ class Animator:
         self._user_cancelled = False
         self._cursor_visible = True
         self._is_streaming = False
+        self._line_width = "\r" + " " * 60 + "\r"
+        
+        self._initialized = True
 
     def start_animation(self, message=""):
         """Start a non-blocking animation thread with elapsed time."""
@@ -49,33 +44,32 @@ class Animator:
         self._start_time = time.time()
         self._user_cancelled = False
         self._cursor_visible = True
-        chars = "|/-\\"
 
         def animate():
-            char_index = 0
-            while not self._stop_event.is_set():
-                char = chars[char_index % len(chars)]
-                elapsed = time.time() - self._start_time
+            try:
+                while not self._stop_event.is_set():
+                    elapsed = time.time() - self._start_time
 
-                # Toggle cursor visibility as part of animation
-                if self._cursor_visible:
-                    cursor_code = "\033[?25h"  # Show cursor
-                else:
-                    cursor_code = "\033[?25l"  # Hide cursor
+                    # Toggle cursor visibility as part of animation
+                    if self._cursor_visible:
+                        cursor_code = "\033[?25h"  # Show cursor
+                    else:
+                        cursor_code = "\033[?25l"  # Hide cursor
 
-                sys.stdout.write(
-                    f"\r{config.RESET}{config.BOLD}{message} {char} {int(elapsed)}s (ESC cancel){config.RESET}{cursor_code}"
-                )
-                sys.stdout.flush()
+                    sys.stdout.write(
+                        f"\r{config.RESET}{config.BOLD}{message} {int(elapsed)}s (ESC cancel){config.RESET}{cursor_code}"
+                    )
+                    sys.stdout.flush()
 
-                self._cursor_visible = not self._cursor_visible
-                char_index += 1
+                    self._cursor_visible = not self._cursor_visible
 
-                # Sleep for 0.5 seconds, but check for stop event every 0.1 seconds
-                for _ in range(5):
-                    if self._stop_event.is_set():
-                        break
-                    time.sleep(0.1)
+                    # Sleep for 0.5 seconds, but check for stop event every 0.1 seconds
+                    for _ in range(5):
+                        if self._stop_event.is_set():
+                            break
+                        time.sleep(0.1)
+            finally:
+                self.ensure_cursor_visible()
 
         self._animation_thread = threading.Thread(target=animate, daemon=True)
         self._animation_thread.start()
@@ -88,10 +82,8 @@ class Animator:
         if self._animation_thread and self._animation_thread.is_alive():
             self._animation_thread.join()
 
-        sys.stdout.write("\r" + " " * 60 + "\r")
-        # Ensure cursor is visible when animation stops
-        sys.stdout.write("\033[?25h")
-        sys.stdout.flush()
+        sys.stdout.write(self._line_width)
+        self.ensure_cursor_visible()
         self._start_time = None
 
     def start_cursor_blinking(self):
@@ -119,6 +111,8 @@ class Animator:
                 # Silently handle errors to avoid thread exceptions bubbling up
                 # This can happen if the terminal is closed or during rapid cleanup
                 pass
+            finally:
+                self.ensure_cursor_visible()
 
         self._cursor_thread = threading.Thread(target=blink_cursor, daemon=True)
         self._cursor_thread.start()
@@ -131,17 +125,19 @@ class Animator:
         if self._cursor_stop_event:
             self._cursor_stop_event.set()
 
+        self.ensure_cursor_visible(stop_blinking=False)
+
         # Wait for the thread to actually stop
         if self._cursor_thread and self._cursor_thread.is_alive():
-            self._cursor_thread.join(timeout=1.0)
-
-        # Ensure cursor is visible
-        sys.stdout.write("\033[?25h")
-        sys.stdout.flush()
+            try:
+                self._cursor_thread.join(timeout=3.0)
+            except Exception:
+                pass
 
         # Clean up only after thread has stopped
         self._cursor_stop_event = None
         self._cursor_thread = None
+        self.ensure_cursor_visible(stop_blinking=False)
 
     def check_user_cancel(self):
         """Check if user has pressed ESC to cancel during animation."""
@@ -154,9 +150,14 @@ class Animator:
         """Check if user has cancelled the operation."""
         return self._user_cancelled
 
-    def ensure_cursor_visible(self):
+    def ensure_cursor_visible(self, stop_blinking=True):
         """Ensure cursor is visible."""
-        # Stop any cursor blinking
-        self.stop_cursor_blinking()
+        if stop_blinking:
+            self.stop_cursor_blinking()
         sys.stdout.write("\033[?25h")
         sys.stdout.flush()
+
+
+def get_animator():
+    """Get the singleton animator instance."""
+    return Animator()

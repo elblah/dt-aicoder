@@ -58,15 +58,38 @@ class SettingsCommand(BaseCommand):
 
         if key in config:
             imsg(f"{key}: {config[key]}")
+            
+            # Show effective value for truncation
+            if key == "truncation":
+                from .. import config as global_config
+                global_config.set_app_instance(self.app)
+                effective_limit = global_config.get_effective_truncation_limit()
+                if config[key] != effective_limit:
+                    imsg(f"  [EFFECTIVE] {effective_limit} (default: {global_config.DEFAULT_TRUNCATION_LIMIT})")
+                else:
+                    imsg(f"  [EFFECTIVE] {effective_limit}")
         else:
-            emsg(f"Setting '{key}' not found.")
+            # For truncation, show default even if not set
+            if key == "truncation":
+                from .. import config as global_config
+                global_config.set_app_instance(self.app)
+                default_limit = global_config.DEFAULT_TRUNCATION_LIMIT
+                effective_limit = global_config.get_effective_truncation_limit()
+                imsg(f"[NOT SET] Using default: {effective_limit}")
+                imsg(f"  [DEFAULT] {default_limit}")
+                imsg(f"  [TIP] Set with: /settings truncation <number>")
+            else:
+                emsg(f"Setting '{key}' not found.")
 
     def _set_setting(self, key, value):
         """Set a setting value."""
         config = self.app.persistent_config
 
         # Convert string to appropriate type
-        parsed_value = self._parse_value(value)
+        parsed_value = self._parse_value(value, key)
+
+        if parsed_value is None:  # Validation failed for truncation
+            return
 
         old_value = config.get(key)
         config[key] = parsed_value
@@ -75,6 +98,20 @@ class SettingsCommand(BaseCommand):
             wmsg(f"Updated {key}: {old_value} → {parsed_value}")
         else:
             imsg(f"Set {key}: {parsed_value}")
+
+        # Show save location if available
+        if hasattr(config, 'config_file'):
+            if old_value is not None:
+                imsg(f"  [SAVED] {config.config_file}")
+            else:
+                imsg(f"  [SAVED] {config.config_file}")
+
+        # Provide context about where settings are stored
+        if not hasattr(self, '_warned_about_local_config') and hasattr(config, 'config_file'):
+            imsg("")
+            imsg(f"[INFO] Settings are saved locally to: {config.config_file}")
+            imsg("       Each project directory has its own settings.")
+            self._warned_about_local_config = True
 
     def _delete_setting(self, key):
         """Delete a setting."""
@@ -87,8 +124,16 @@ class SettingsCommand(BaseCommand):
         else:
             emsg(f"Setting '{key}' not found.")
 
-    def _parse_value(self, value):
+    def _parse_value(self, value, key=None):
         """Parse string value to appropriate Python type."""
+        # Special handling for truncation - always convert to int
+        if key == "truncation":
+            try:
+                return int(float(value))  # Handle both "500" and "500.0"
+            except ValueError:
+                emsg(f"Invalid truncation value: {value}. Must be a number.")
+                return None
+
         # Handle boolean values
         if value.lower() in ["true", "on", "yes", "1"]:
             return True
@@ -126,4 +171,7 @@ class SettingsCommand(BaseCommand):
         imsg("  todo.enabled - Enable/disable todo functionality")
         imsg("  ui.theme - UI theme name")
         imsg("  tools.auto_approve - Auto-approve tool execution")
-        imsg("  truncation - Override truncation limit for tool outputs")
+        imsg("  truncation - Override truncation limit (integer) for tool outputs")
+        imsg("")
+        imsg("[NOTE] Settings are saved per-project in .aicoder/settings-local.json")
+        imsg("       Each directory has its own configuration.")

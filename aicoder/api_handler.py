@@ -77,7 +77,9 @@ class APIHandlerMixin(APIClient):
 
                 # Validate tool definitions using shared functionality
                 self._validate_tool_definitions(api_data)
-                request_body = json.dumps(api_data).encode("utf-8")
+                
+                # Use centralized request preparation with caching
+                request_body = self._prepare_and_cache_request(api_data)
             except TypeError as e:
                 self.animator.stop_animation()
                 emsg(f"\nError serializing data for API request: {e}")
@@ -153,7 +155,6 @@ class APIHandlerMixin(APIClient):
                         api_start_time, result_dict["response"]
                     )
 
-                    # Extract token usage information from the response
                     response = result_dict["response"]
                     if config.DEBUG:
                         print(f"DEBUG: API response keys: {list(response.keys())}")
@@ -163,47 +164,6 @@ class APIHandlerMixin(APIClient):
                             print("DEBUG: No 'usage' key in response")
                             # Print the entire response structure to see what's there
                             print(f"DEBUG: Full response keys: {list(response.keys())}")
-
-                    if "usage" in response:
-                        usage = response["usage"]
-                        # Extract prompt tokens (input) and completion tokens (output)
-                        if "prompt_tokens" in usage:
-                            self.stats.current_prompt_size = usage["prompt_tokens"]
-                            self.stats.current_prompt_size_estimated = False
-                            self.stats.prompt_tokens += usage["prompt_tokens"]
-                        if "completion_tokens" in usage:
-                            self.stats.completion_tokens += usage["completion_tokens"]
-                    else:
-                        # Fallback: estimate tokens if usage information is not available
-                        # This can happen with some API providers that don't include token usage
-                        estimated_input_tokens = 0
-                        estimated_output_tokens = 0
-
-                        # For input tokens, we need to access the message history
-                        if hasattr(self, "message_history") and self.message_history:
-                            from .utils import estimate_messages_tokens
-
-                            estimated_input_tokens = estimate_messages_tokens(
-                                self.message_history.messages
-                            )
-
-                        # Estimate output tokens from the response content
-                        if "choices" in response and len(response["choices"]) > 0:
-                            choice = response["choices"][0]
-                            if "message" in choice and "content" in choice["message"]:
-                                content = choice["message"]["content"]
-                                if content:
-                                    from .utils import estimate_tokens
-
-                                    estimated_output_tokens = estimate_tokens(content)
-
-                        # Update stats with estimated values
-                        self.stats.prompt_tokens += estimated_input_tokens
-                        self.stats.completion_tokens += estimated_output_tokens
-                        # Update current prompt size for auto-compaction (use estimated input tokens if available)
-                        if estimated_input_tokens > 0:
-                            self.stats.current_prompt_size = estimated_input_tokens
-                            self.stats.current_prompt_size_estimated = True
 
                     return response
                 else:

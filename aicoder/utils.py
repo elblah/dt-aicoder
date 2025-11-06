@@ -5,6 +5,7 @@ Utility functions for AI Coder.
 import os
 import sys
 import re
+import time
 import difflib
 import shutil
 import json
@@ -12,6 +13,33 @@ import datetime
 from typing import Dict, Any, List, Union
 
 from . import config
+
+
+# Cache for the last API request token estimation - memory efficient
+_last_api_request_tokens = None
+
+# Pre-defined punctuation set at module level for fast lookup (created once, reused)
+_PUNCTUATION_SET = {
+    '.', '!', '?', ';', ':', '(', ')', '{', '}', '[', ']', '"', "'",
+    '-', '_', '=', '+', '*', '/', '\\', '|', '@', '#', '$', '%', '^', '&', '<', '>', '`', '~', ','
+}
+
+
+def cache_api_request_for_estimation(request_string: str):
+    """
+    Cache only the token estimation result from the actual API request.
+    Memory efficient: stores only the token count, not the full JSON string.
+    """
+    global _last_api_request_tokens
+    _last_api_request_tokens = estimate_tokens(request_string)
+
+
+def estimate_tokens_from_last_api_request():
+    """
+    Get the most accurate token count from the last API request.
+    Returns the cached count if available, None otherwise.
+    """
+    return _last_api_request_tokens
 
 
 def make_readline_safe(text: str) -> str:
@@ -500,39 +528,102 @@ def show_cursor():
 def estimate_tokens(text: str) -> int:
     """
     Estimate the number of tokens in a text string.
-    Uses the standard approach: 4 characters per token.
-    This is fast and good enough for pruning decisions.
+    Uses enhanced character-based estimation that accounts for different content types.
+    More accurate than simple 4 chars per token while remaining fast and dependency-free.
     """
     if not text:
         return 0
-    return max(0, round(len(text) / 4))
+    
+    # Count character types using set lookups (faster than regex)
+    letters = numbers = punctuation = whitespace = other = 0
+    
+    for c in text:
+        if c.isalpha():
+            letters += 1
+        elif c.isdigit():
+            numbers += 1
+        elif c in _PUNCTUATION_SET:
+            punctuation += 1
+        elif c.isspace():
+            whitespace += 1
+        else:
+            other += 1
+    
+    # Different ratios for different character types (more accurate than 4 chars/token)
+    token_estimate = (
+        letters / 4.2 +        # Letters: ~4.2 chars per token (most content)
+        numbers / 3.5 +        # Numbers: ~3.5 chars per token (often grouped)
+        punctuation * 1.0 +    # Punctuation: each contributes ~1.0 tokens (more accurate for code/JSON)
+        whitespace * 0.15 +    # Whitespace: minimal but measurable token cost
+        other / 3.0           # Other chars (symbols, etc.): ~3 chars per token
+    )
+    
+    return round(max(0, token_estimate))
 
 
 def estimate_messages_tokens(messages: List[Dict]) -> int:
     """
     Estimate total tokens for a list of messages.
+    Based on real API testing, this estimates the full API request JSON including:
+    - Message content
+    - JSON structure (field names, quotes, braces)
+    - API overhead (system prompts, control tokens)
+    
+    For accurate fallback when API doesn't return usage data.
     """
-    total = 0
-    for msg in messages:
-        # Estimate content
-        content = msg.get("content", "")
-        total += estimate_tokens(content)
+    # Debug: Print estimation info (only when debug mode is enabled)
+    dmsg(f"Estimating {len(messages)} messages")
+    if messages:
+        dmsg(f"First message type: {messages[0].get('role', 'unknown')}")
+    
+    # Create a realistic API request structure
+    api_request = {
+        "model": "placeholder",  # Will be replaced with actual model
+        "messages": messages,
+        # Other common fields that get added by the API client:
+        "temperature": 0.7,  # Typical default
+    }
+    
+    # Include tools if any messages have tool calls
+    has_tools = any(
+        msg.get("tool_calls") and msg["tool_calls"] 
+        for msg in messages
+    )
+    
+    # Include real tool definitions from global singleton
+    try:
+        from .tool_manager import get_tool_manager
+        tool_manager = get_tool_manager()
+        if tool_manager:
+            definitions = tool_manager.get_tool_definitions()
+            api_request["tools"] = definitions
+            
+            # Include activeTools if planning mode is active (like in actual API request)
+            try:
+                from .planning_mode import get_planning_mode
+                planning_mode = get_planning_mode()
+                if planning_mode.is_plan_mode_active():
+                    active_tools = planning_mode.get_active_tools(definitions)
+                    api_request["activeTools"] = active_tools
+            except ImportError:
+                pass  # Planning mode not available
+            
+            # Debug: Print tool count during initial estimation (only when debug mode is enabled)
+            dmsg(f"Found {len(definitions)} tools for estimation")
+        else:
+            api_request["tools"] = []
+            dmsg("No tool manager found, using empty tools")
+    except Exception as e:
+        # Fallback to empty tools if there's an error
+        api_request["tools"] = []
+        dmsg(f"Error getting tools: {e}")
+    api_request["tool_choice"] = "auto"
+    
+    minified_json = json.dumps(api_request, separators=(',', ':'))
+    
+    token_count = estimate_tokens(minified_json)
 
-        # Estimate tool calls if present
-        if "tool_calls" in msg and msg["tool_calls"]:
-            for tool_call in msg["tool_calls"]:
-                if isinstance(tool_call, dict) and "function" in tool_call:
-                    func_name = tool_call["function"].get("name", "")
-                    func_args = tool_call["function"].get("arguments", "")
-                    total += estimate_tokens(func_name)
-                    total += estimate_tokens(func_args)
-
-        # Estimate tool results
-        if msg.get("role") == "tool":
-            tool_call_id = msg.get("tool_call_id", "")
-            total += estimate_tokens(tool_call_id)
-
-    return total
+    return token_count
 
 
 def display_token_info(stats, auto_compact_threshold=None):
@@ -610,9 +701,17 @@ def display_token_info(stats, auto_compact_threshold=None):
     threshold_formatted = format_token_count(display_threshold)
     current_time = datetime.datetime.now().strftime("%H:%M:%S")
 
+    # Calculate TPS (Tokens Per Second)
+    tps = 0
+    if stats.api_time_spent > 0:
+        tps = stats.completion_tokens / stats.api_time_spent
+
+    # Format TPS as float with 1 decimal place
+    tps_str = f"~{tps:.1f}tps"
+
     # Display token info in the abbreviated format
     print(
-        f"\nContext: {bars} {usage_percentage:.0f}% ({current_size_formatted}/{threshold_formatted} @{config.get_api_model()}) \033[2m- {current_time}\033[22m",
+        f"\nContext: {bars} {usage_percentage:.0f}% ({current_size_formatted}/{threshold_formatted} @{config.get_api_model()} {tps_str}) \033[2m- {current_time}\033[22m",
         end="",
         flush=True,
     )
@@ -628,7 +727,6 @@ def cancellable_sleep(seconds: float, animator=None) -> bool:
     Returns:
         bool: True if sleep completed normally, False if cancelled
     """
-    import time
     from .terminal_manager import is_esc_pressed, setup_for_non_prompt_input
 
     # Setup terminal for ESC detection

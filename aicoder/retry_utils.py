@@ -37,14 +37,9 @@ class _APIRetryHandlerSingleton:
 
     def __new__(cls, *args, **kwargs):
         # Allow bypassing singleton for testing by checking environment
-        import os
-
         test_mode = os.environ.get("AICODER_TEST_MODE") == "1"
         if test_mode:
             # In test mode, create new instances instead of singleton
-            print(
-                f"DEBUG: APIRetryHandler.__new__ - Creating new instance (test_mode={test_mode})"
-            )
             return super().__new__(cls)
 
         if cls._instance is None:
@@ -53,8 +48,6 @@ class _APIRetryHandlerSingleton:
 
     def __init__(self, animator, stats=None):
         # Allow bypassing singleton initialization for testing
-        import os
-
         if os.environ.get("AICODER_TEST_MODE") == "1" or not self._initialized:
             self.animator = animator
             self.stats = stats

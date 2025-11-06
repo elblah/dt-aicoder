@@ -10,11 +10,9 @@ import os
 # Add current directory to path so we can import the plugin
 sys.path.insert(0, os.path.dirname(__file__))
 
-import re
-from typing import List, Dict, Any
 
 # Import the plugin's core functionality
-from highlighter import HighlightRule, set_highlighter_rules, is_highlighter_enabled
+from highlighter import HighlightRule, set_highlighter_rules
 
 def test_basic_highlighting():
     """Test basic highlighting functionality."""

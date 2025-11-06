@@ -331,6 +331,23 @@ RETRY_MAX_ATTEMPTS = int(os.environ.get("RETRY_MAX_ATTEMPTS", "0"))  # 0 means i
 # Token information display configuration
 ENABLE_TOKEN_INFO_DISPLAY = os.environ.get("ENABLE_TOKEN_INFO_DISPLAY", "1") == "1"
 
+# Token estimation configuration
+FORCE_TOKEN_ESTIMATION = os.environ.get("FORCE_TOKEN_ESTIMATION", "0") == "1"
+
 # Token information bar characters (goose bar chars ● ○)
 TOKEN_INFO_FILLED_CHAR = os.environ.get("TOKEN_INFO_FILLED_CHAR", "█")
 TOKEN_INFO_EMPTY_CHAR = os.environ.get("TOKEN_INFO_EMPTY_CHAR", "░")
+
+
+# File-based prompting configuration
+def get_file_prompt_mode():
+    """Get file-based prompting mode setting."""
+    # Auto-enable if AICODER_PROMPT_FILE is set, otherwise check explicit flag
+    if os.getenv("AICODER_PROMPT_FILE"):
+        return True
+    return os.getenv("AICODER_FILE_MODE", "").lower() in ("1", "true", "yes", "on", "file")
+
+
+def get_file_prompt_path():
+    """Get file path for file-based prompting."""
+    return os.getenv("AICODER_PROMPT_FILE", "aicoder_prompt.txt")

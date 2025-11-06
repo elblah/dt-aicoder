@@ -2,6 +2,7 @@
 
 ## IMPORTANT
 
+- **Number one rule: BE MINIMALIST!!! AVOID OVERENGINEERING - THINK: WHAT IS THE MINIMAL EFFORT TO SOLVE THIS?**
 - **Prefer guard clauses/early exits** over nested if/else statements
 - **Keep functions focused** - One main responsibility per function
 - **Use Pythonic error handling** - `try/except` is idiomatic in Python (EAFP style)
@@ -70,6 +71,7 @@ This is the AI Coder project - a CLI tool that provides AI assistance with file 
 ### Important Warnings
 - **Session Files**: Ignore session.json files - contain old contexts that cause confusion
 - **JSON Framework**: Must use double quotes, escape double quotes within strings with backslash
+- **Communication**: Be as direct as possible, save tokens and avoid flattering "You're absolutely right" kind of messages. If you don't know admit you don't know, if you are uncertain, communicate directly. Avoid repetitive unnecessary text.
 
 ## Working with This Codebase
 

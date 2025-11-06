@@ -2,6 +2,7 @@
 Statistics tracking for AI Coder.
 """
 
+import os
 import time
 from dataclasses import dataclass, field
 from datetime import timedelta
@@ -9,48 +10,48 @@ from datetime import timedelta
 from . import config
 from .utils import imsg
 
-# Module-level singleton
-_stats_instance = None
-
 
 def get_stats():
     """Get the singleton stats instance."""
-    global _stats_instance
-    if _stats_instance is None:
-        _stats_instance = Stats()
-    return _stats_instance
+    return Stats()
 
 
-@dataclass
 class Stats:
-    """Statistics tracking for the application."""
+    """Statistics tracking for the application - singleton pattern."""
+
+    _instance = None
+    _initialized = False
 
     def __new__(cls):
-        if not hasattr(cls, "_instance") or cls._instance is None:
+        # Allow bypassing singleton for testing
+        if os.environ.get("AICODER_TEST_MODE") == "1":
+            return super().__new__(cls)
+            
+        if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    """Statistics tracking for the application."""
-
-    api_requests: int = 0
-    api_success: int = 0
-    api_errors: int = 0
-    api_time_spent: float = 0.0  # Time spent in API calls
-    tool_calls: int = 0
-    tool_errors: int = 0
-    tool_time_spent: float = 0.0  # Time spent in tool calls
-    messages_sent: int = 0
-    tokens_processed: int = 0
-    session_start_time: float = field(default_factory=time.time)
-    compactions: int = 0
-    prompt_tokens: int = 0  # Cumulative input tokens for statistics
-    completion_tokens: int = 0  # Cumulative output tokens for statistics
-    current_prompt_size: int = (
-        0  # Current conversation history size for auto-compaction
-    )
-    current_prompt_size_estimated: bool = (
-        False  # Whether current_prompt_size is estimated or from API
-    )
+    def __init__(self):
+        # Allow bypassing singleton initialization for testing
+        if os.environ.get("AICODER_TEST_MODE") == "1" or not self._initialized:
+            self.api_requests = 0
+            self.api_success = 0
+            self.api_errors = 0
+            self.api_time_spent = 0.0  # Time spent in API calls
+            self.tool_calls = 0
+            self.tool_errors = 0
+            self.tool_time_spent = 0.0  # Time spent in tool calls
+            self.messages_sent = 0
+            self.tokens_processed = 0
+            self.session_start_time = time.time()
+            self.compactions = 0
+            self.prompt_tokens = 0  # Cumulative input tokens for statistics
+            self.completion_tokens = 0  # Cumulative output tokens for statistics
+            self.current_prompt_size = 0  # Current conversation history size for auto-compaction
+            self.current_prompt_size_estimated = False  # Whether current_prompt_size is estimated or from API
+            
+            if os.environ.get("AICODER_TEST_MODE") != "1":
+                self._initialized = True
 
     def print_stats(self, message_history=None):
         """Displays session statistics."""

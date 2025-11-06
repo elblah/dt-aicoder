@@ -49,6 +49,3 @@ def on_aicoder_init(app):
     # Register the command handler
     app.command_handlers["/qwen-code refresh"] = handle_qwen_code_refresh
     app.command_handlers["/qwen-code"] = handle_qwen_code_refresh
-
-
-print("Qwen Code plugin loaded!")

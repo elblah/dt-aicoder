@@ -8,17 +8,14 @@ YOLO_MODE=1 python -m pytest tests/test_executor_error_handling.py
 This test triggers tool approval prompts that will hang indefinitely without YOLO_MODE=1.
 """
 
-import json
 import os
 import sys
-import time
-from unittest.mock import Mock, patch, MagicMock
-from io import StringIO
+from unittest.mock import Mock
 
 # Add the parent directory to the path to import aicoder modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from aicoder.tool_manager.executor import ToolExecutor, DENIED_MESSAGE
+from aicoder.tool_manager.executor import ToolExecutor
 from aicoder.tool_manager.registry import ToolRegistry
 from aicoder.stats import Stats
 from aicoder.animator import Animator

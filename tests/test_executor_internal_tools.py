@@ -8,11 +8,9 @@ YOLO_MODE=1 python -m pytest tests/test_executor_internal_tools.py
 This test triggers tool approval prompts that will hang indefinitely without YOLO_MODE=1.
 """
 
-import json
 import os
 import sys
-from unittest.mock import Mock, patch, MagicMock
-from io import StringIO
+from unittest.mock import Mock, patch
 
 # Add the parent directory to the path to import aicoder modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
