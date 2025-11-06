@@ -440,6 +440,9 @@ class AICoder(
                         exit_prompt_mode()
                         continue
 
+                    # Store the user prompt for plugins (spell check, etc.)
+                    self.stats.last_user_prompt = user_input
+
                     # Handle prompt append functionality
                     user_input = self._handle_prompt_append(user_input)
 

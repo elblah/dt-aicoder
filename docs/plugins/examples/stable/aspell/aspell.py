@@ -25,6 +25,7 @@ Personal Dictionary:
 Commands:
 - /aspell list   - Show all misspelled words in current session (sorted by frequency)
 - /aspell clear  - Clear session misspelled word history
+- /aspell edit   - Edit personal dictionary (tmux only)
 - /aspell help   - Show aspell plugin help
 
 Installation:
@@ -37,6 +38,7 @@ import re
 import sys
 import builtins
 import subprocess
+import shutil
 from typing import Optional, List, Dict
 
 # Plugin configuration
@@ -54,8 +56,6 @@ _original_input = builtins.input
 
 # Session history of misspelled words for /aspell list command
 _session_misspelled_words: Dict[str, int] = {}  # word -> count
-
-
 
 # Plugin version
 __version__ = "1.6.0"
@@ -77,19 +77,34 @@ def _is_aspell_available() -> bool:
 
 def _get_personal_dict_file() -> str:
     """Get the path to personal dictionary file.
-    
+
     Returns language-specific file if it exists, otherwise generic file.
     Aspell will ignore the file if it doesn't exist.
     """
     config_dir = os.path.expanduser("~/.config/aicoder")
     lang_specific_file = os.path.join(config_dir, f"aspell.{ASPELL_LANG}.pws")
     generic_file = os.path.join(config_dir, "aspell.pws")
-    
+
     # Return language-specific file if it exists, otherwise generic
     if os.path.exists(lang_specific_file):
         return lang_specific_file
     else:
         return generic_file
+
+
+def _get_editor() -> str:
+    """Get the preferred editor with fallbacks."""
+    # Try $EDITOR first
+    editor = os.getenv("EDITOR")
+    if editor and shutil.which(editor):
+        return editor
+
+    # Try common editors in order of preference
+    for fallback_editor in ["vi", "nano", "emacs", "vim"]:
+        if shutil.which(fallback_editor):
+            return fallback_editor
+
+    return "vi"  # Ultimate fallback
 
 
 def _extract_suggestions(aspell_output: str, word: str) -> List[str]:
@@ -142,7 +157,7 @@ def _check_spelling(text: str) -> Dict[str, List[str]]:
     try:
         # Build aspell command with personal dictionary
         cmd = ["aspell", "list", "-l", ASPELL_LANG, "-p", personal_dict_file]
-        
+
         # Check spelling
         misspelled_result = subprocess.run(
             cmd,
@@ -167,7 +182,7 @@ def _check_spelling(text: str) -> Dict[str, List[str]]:
             try:
                 # Build suggestion command with personal dictionary
                 suggest_cmd = ["aspell", "-a", "-l", ASPELL_LANG, "-p", personal_dict_file]
-                
+
                 # Get suggestions for this specific word
                 suggest_result = subprocess.run(
                     suggest_cmd,
@@ -219,7 +234,7 @@ def _display_spell_errors(errors: Dict[str, List[str]]) -> None:
             print(f"  {RED}{word}{RESET} → {', '.join(suggestions)}")
         else:
             print(f"  {RED}{word}{RESET}")
-        
+
         # Track misspelled words in session history
         if word in _session_misspelled_words:
             _session_misspelled_words[word] += 1
@@ -233,11 +248,11 @@ def _display_spell_errors(errors: Dict[str, List[str]]) -> None:
 def _display_session_misspelled() -> None:
     """Display all misspelled words from current session."""
     global _session_misspelled_words
-    
+
     if not _session_misspelled_words:
         print("No misspelled words in this session.")
         return
-    
+
     # Get color codes for output
     try:
         import aicoder.config as config
@@ -248,26 +263,23 @@ def _display_session_misspelled() -> None:
         GREEN = '\033[32m'
         YELLOW = '\033[33m'
         RESET = '\033[0m'
-    
+
     print(f"{GREEN}Misspelled words in this session:{RESET}")
-    
+
     # Sort by frequency (most common first), then alphabetically
-    sorted_words = sorted(_session_misspelled_words.items(), 
+    sorted_words = sorted(_session_misspelled_words.items(),
                           key=lambda x: (-x[1], x[0].lower()))
-    
+
     for word, count in sorted_words:
         if count == 1:
             print(f"  {word}")
         else:
             print(f"  {word} ({count} times)")
-    
+
     total_words = sum(_session_misspelled_words.values())
     unique_words = len(_session_misspelled_words)
     print(f"\n{YELLOW}Total: {total_words} misspellings, {unique_words} unique words{RESET}")
     print(f"   Tip: Add frequently misspelled words to ~/.config/aicoder/aspell.{ASPELL_LANG}.pws")
-
-
-
 
 
 def _spell_check_input(prompt: str = "") -> str:
@@ -304,12 +316,12 @@ def _setup_aspell_plugin():
     if ASPELL_CHECK_ENABLED and _is_aspell_available():
         # Monkey patch the built-in input function
         builtins.input = _spell_check_input
-        
+
         # Get personal dictionary file path for info message
         personal_dict_file = _get_personal_dict_file()
         personal_dict_basename = os.path.basename(personal_dict_file)
         generic_dict_file = os.path.join(os.path.expanduser("~/.config/aicoder"), "aspell.pws")
-        
+
         print(f"[✓] Aspell spell check plugin loaded (language: {ASPELL_LANG})")
         print(f"    Personal dict: {personal_dict_basename} (or {os.path.basename(generic_dict_file)})")
     elif ASPELL_CHECK_ENABLED and not _is_aspell_available():
@@ -325,11 +337,12 @@ def _handle_aspell_command_direct(args):
         print("Aspell plugin commands:")
         print("  /aspell list   - Show all misspelled words in current session")
         print("  /aspell clear  - Clear session misspelled word history")
+        print("  /aspell edit   - Edit personal dictionary (tmux only)")
         print("  /aspell help   - Show this help message")
         return False, False
-    
+
     subcommand = args[0].lower()
-    
+
     if subcommand == "list":
         _display_session_misspelled()
         return False, False
@@ -338,10 +351,31 @@ def _handle_aspell_command_direct(args):
         _session_misspelled_words.clear()
         print("Session misspelled words cleared.")
         return False, False
+    elif subcommand == "edit":
+        if not os.getenv("TMUX"):
+            print("/aspell edit is only available in tmux sessions.")
+            return False, False
+
+        # Get the personal dictionary file and ensure it exists
+        config_dir = os.path.expanduser("~/.config/aicoder")
+        os.makedirs(config_dir, exist_ok=True)
+
+        dict_file = _get_personal_dict_file()
+        # Create the file with proper header if it doesn't exist
+        if not os.path.exists(dict_file):
+            with open(dict_file, 'w') as f:
+                f.write(f"personal_ws-1.1 {ASPELL_LANG} 0\n")
+
+        # Get editor and run tmux command
+        editor = _get_editor()
+        os.system(f"tmux new-window '{editor} {dict_file}'")
+        print(f"Edited {dict_file}")
+        return False, False
     elif subcommand == "help":
         print("Aspell plugin commands:")
         print("  /aspell list   - Show all misspelled words in current session")
         print("  /aspell clear  - Clear session misspelled word history")
+        print("  /aspell edit   - Edit personal dictionary (tmux only)")
         print("  /aspell help   - Show this help message")
         return False, False
     else:
@@ -349,13 +383,59 @@ def _handle_aspell_command_direct(args):
         return False, False
 
 
+def _apply_edit_wrapper(aicoder_instance):
+    """Apply wrapper to edit command handlers"""
+    try:
+        # Find the edit command handler in the registry
+        if not hasattr(aicoder_instance, 'command_handlers'):
+            return
+
+        # Look for the /e command handler
+        edit_handler = aicoder_instance.command_handlers.get('/e') or aicoder_instance.command_handlers.get('/edit')
+
+        if not edit_handler:
+            return
+
+        # Store the original handler
+        original_handler = edit_handler
+
+        def wrapped_handler(args):
+            # Call original handler
+            result = original_handler(args)
+
+            # Get the app instance from the closure (it should be the same)
+            app = aicoder_instance
+
+            # Get the content and spell check it
+            content = getattr(app.stats, 'last_user_prompt', None)
+
+            # Check spelling
+            if ASPELL_CHECK_ENABLED and _is_aspell_available() and content:
+                errors = _check_spelling(content)
+                if errors:
+                    _display_spell_errors(errors)
+            return result
+
+        # Replace both /e and /edit handlers
+        aicoder_instance.command_handlers['/e'] = wrapped_handler
+        aicoder_instance.command_handlers['/edit'] = wrapped_handler
+
+    except Exception:
+        # Silently fail if we can't apply the wrapper
+        # The plugin will still work for regular input()
+        pass
+
+
 def on_aicoder_init(aicoder_instance):
     """Initialize plugin when AICoder starts."""
-    _setup_aspell_plugin()
-    
-    # Register /aspell command with AI Coder's command system
-    aicoder_instance.command_handlers["/aspell"] = _handle_aspell_command_direct
+    # Apply edit command wrapper for /e command support - this must happen here
+    if aicoder_instance:
+        _apply_edit_wrapper(aicoder_instance)
+        
+        # Register /aspell command with AI Coder's command system
+        if hasattr(aicoder_instance, 'command_handlers'):
+            aicoder_instance.command_handlers["/aspell"] = _handle_aspell_command_direct
 
 
-# Initialize plugin on module load
+# Initialize plugin on module load - but NOT the EditCommand wrapper
 _setup_aspell_plugin()

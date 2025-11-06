@@ -40,6 +40,9 @@ class EditCommand(BaseCommand):
                 wmsg("\n*** Edit cancelled, no content.")
                 return False, False
 
+            # Store the edited content for plugins (spell check, etc.)
+            self.app.stats.last_user_prompt = content
+
             imsg("\n>>> Using edited prompt...")
             print(content)
             self.app.message_history.add_user_message(content)

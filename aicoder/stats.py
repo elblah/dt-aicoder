@@ -21,6 +21,7 @@ class Stats:
 
     _instance = None
     _initialized = False
+    last_user_prompt = ""  # Class attribute - always exists
 
     def __new__(cls):
         # Allow bypassing singleton for testing
@@ -49,6 +50,7 @@ class Stats:
             self.completion_tokens = 0  # Cumulative output tokens for statistics
             self.current_prompt_size = 0  # Current conversation history size for auto-compaction
             self.current_prompt_size_estimated = False  # Whether current_prompt_size is estimated or from API
+            self.last_user_prompt = ""  # Last user prompt content for plugins (spell check, etc.)
             
             if os.environ.get("AICODER_TEST_MODE") != "1":
                 self._initialized = True
