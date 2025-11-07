@@ -37,7 +37,7 @@ class TestExecutorSpecialModes:
     def test_yolo_mode_auto_approval(self):
         """Test YOLO mode provides automatic approval for safe commands."""
         with patch('aicoder.tool_manager.executor.config.YOLO_MODE', True):
-            with patch('aicoder.tool_manager.executor._check_approval_rules', return_value=(False, "")):
+            with patch('aicoder.tool_manager.executor.check_approval_rules', return_value=(False, "")):
                 tool_config = {
                     "type": "internal",
                     "auto_approved": False  # Would normally require approval
@@ -63,7 +63,7 @@ class TestExecutorSpecialModes:
     def test_yolo_mode_respects_user_rules(self):
         """Test that YOLO mode respects user-configured deny rules."""
         with patch('aicoder.tool_manager.executor.config.YOLO_MODE', True):
-            with patch('aicoder.tool_manager.executor._check_approval_rules', return_value=(True, "Auto denied by user rule")):
+            with patch('aicoder.tool_manager.executor.check_approval_rules', return_value=(True, "Auto denied by user rule")):
                 tool_config = {
                     "type": "internal",
                     "auto_approved": False
@@ -89,7 +89,7 @@ class TestExecutorSpecialModes:
     def test_yolo_mode_run_shell_command_special_handling(self):
         """Test YOLO mode special handling for run_shell_command."""
         with patch('aicoder.tool_manager.executor.config.YOLO_MODE', True):
-            with patch('aicoder.tool_manager.executor._check_approval_rules', return_value=(False, "")):
+            with patch('aicoder.tool_manager.executor.check_approval_rules', return_value=(False, "")):
                 from aicoder.tool_manager.internal_tools.run_shell_command import TOOL_DEFINITION
                 
                 tool_config = TOOL_DEFINITION.copy()
@@ -365,7 +365,7 @@ class TestExecutorSpecialModes:
             # Test YOLO mode
             with patch('aicoder.tool_manager.executor.config.YOLO_MODE', True):
                 with patch.object(self.executor, '_print_command_info_once') as mock_print:
-                    with patch('aicoder.tool_manager.executor._check_approval_rules', return_value=(False, "")):
+                    with patch('aicoder.tool_manager.executor.check_approval_rules', return_value=(False, "")):
                         result, _, _, _ = self.executor.execute_tool(
                             'run_shell_command',
                             {"command": "echo yolo mode"},

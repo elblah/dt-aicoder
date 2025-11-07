@@ -2,14 +2,19 @@
 Ruff Plugin for AI Coder - Automatic Python Code Quality Checks
 
 This plugin automatically runs ruff checks on Python files when they are saved/edited
-and prompts the AI to fix any issues found. Optionally auto-formats code with ruff format.
+and prompts the AI to fix any serious issues found. Optionally auto-formats code with ruff format.
 
 Features:
-- Automatic ruff check on .py file modifications
-- User message generation when issues are found
+- Automatic ruff check on .py file modifications (serious-only mode by default)
+- User message generation when serious issues are found
 - Optional auto-formatting with ruff format
 - Graceful fallback when ruff is not installed
 - Configurable via environment variables or plugin constants
+
+Default Behavior:
+- Serious-only mode enabled by default to focus on functional errors only
+- Ignores minor linting issues like unused variables (F841), line length (E501), etc.
+- Use `/ruff check-only-serious off` to enable full linting mode
 
 Environment Variables:
 - RUFF_FORMAT: Enable auto-formatting (default: False)
@@ -82,8 +87,8 @@ def _get_ruff_format_args() -> str:
 def _is_ruff_serious_only_enabled() -> bool:
     """Check if ruff serious-only mode is enabled (persistent config override)."""
     if _aicoder_ref and hasattr(_aicoder_ref, "persistent_config"):
-        return _aicoder_ref.persistent_config.get("ruff.serious_only", False)
-    return False
+        return _aicoder_ref.persistent_config.get("ruff.serious_only", True)
+    return True
 
 
 def _get_effective_check_args() -> str:
@@ -127,7 +132,7 @@ def _handle_ruff_command(args: list[str]) -> tuple[bool, bool]:
             status = f"""Ruff Plugin Status
 
 - **Checking**: {"[✓] Enabled" if enabled else "[X] Disabled"}
-- **Serious-only mode**: {"[✓] Enabled" if serious_only else "[X] Disabled"}
+- **Serious-only mode**: {"[✓] Enabled" if serious_only else "[X] Disabled"} (default: enabled)
 - **Auto-format**: {"[✓] Enabled" if format_enabled else "[X] Disabled"}
 - **Check args**: `{check_args or "default"}`
 - **Format args**: `{format_args or "default"}`
@@ -170,12 +175,10 @@ def _handle_ruff_command(args: list[str]) -> tuple[bool, bool]:
                 serious_cmd = args[1].lower()
                 if serious_cmd in ["on", "off"]:
                     _set_ruff_config("serious_only", serious_cmd == "on")
-                    mode_text = (
-                        "serious-only mode enabled - using predefined serious error filter"
-                        if serious_cmd == "on"
-                        else "serious-only mode disabled"
-                    )
-                    imsg(f"[✓] Ruff {mode_text}")
+                    if serious_cmd == "on":
+                        imsg("[✓] Ruff serious-only mode enabled - using predefined serious error filter")
+                    else:
+                        imsg("[✓] Ruff serious-only mode disabled - all linting issues will be reported")
                     return False, False
                 else:
                     emsg("[X] Usage: `/ruff check-only-serious on|off`")
@@ -219,13 +222,15 @@ def _handle_ruff_command(args: list[str]) -> tuple[bool, bool]:
 
 - `/ruff` - Show current status
 - `/ruff check on|off` - Enable/disable checking
-- `/ruff check-only-serious on|off` - Enable/disable serious-only mode
+- `/ruff check-only-serious on|off` - Enable/disable serious-only mode (default: enabled)
 - `/ruff format on|off` - Enable/disable auto-formatting
 - `/ruff check args <args>` - Set check arguments
 - `/ruff format args <args>` - Set format arguments
 - `/ruff help` - Show this help
 
 **Priority Order:** Commands > Environment Variables > Plugin Constants
+
+**Default Behavior:** Serious-only mode is enabled by default to focus on functional errors only. Use `/ruff check-only-serious off` to enable full linting.
 
 **Environment Variables:**
 - RUFF_FORMAT: true/false/on/off/1/0 - Enable auto-formatting
@@ -288,7 +293,9 @@ def on_aicoder_init(aicoder_instance):
         INTERNAL_TOOL_FUNCTIONS["write_file"] = patched_write_file
         INTERNAL_TOOL_FUNCTIONS["edit_file"] = patched_edit_file
 
-        print(f"[✓] Ruff plugin activated - Auto-format: {ENABLE_RUFF_FORMAT}")
+        serious_mode = _is_ruff_serious_only_enabled()
+        mode_text = "serious-only mode" if serious_mode else "full linting mode"
+        print(f"[✓] Ruff plugin activated - Auto-format: {ENABLE_RUFF_FORMAT}, Mode: {mode_text}")
         return True
 
     except ImportError as e:

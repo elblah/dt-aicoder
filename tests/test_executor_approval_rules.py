@@ -207,16 +207,16 @@ class TestExecutorApprovalRules:
         
         try:
             # Import the rule checking function
-            from aicoder.tool_manager.executor import _check_rule_file
+            from aicoder.tool_manager.approval_utils import check_rule_file
             
             # Test matching command
-            has_match, matched_rule, action = _check_rule_file(rule_file, "safe command here", "approve")
+            has_match, matched_rule, action = check_rule_file(rule_file, "safe command here", "approve")
             assert has_match is True
             assert "safe.*command" in matched_rule
             assert action == "approve"
             
             # Test non-matching command  
-            has_match, matched_rule, action = _check_rule_file(rule_file, "dangerous command", "approve")
+            has_match, matched_rule, action = check_rule_file(rule_file, "dangerous command", "approve")
             assert has_match is False
             
         finally:
@@ -233,16 +233,16 @@ class TestExecutorApprovalRules:
             rule_file = f.name
         
         try:
-            from aicoder.tool_manager.executor import _check_rule_file
+            from aicoder.tool_manager.approval_utils import check_rule_file
             
             # Test safe command (should match)
-            has_match, matched_rule, action = _check_rule_file(rule_file, "safe operation", "approve")
+            has_match, matched_rule, action = check_rule_file(rule_file, "safe operation", "approve")
             assert has_match is True
             assert "dangerous.*" in matched_rule
             assert action == "approve"
             
             # Test dangerous command (should not match due to negation)
-            has_match, matched_rule, action = _check_rule_file(rule_file, "dangerous operation", "approve")
+            has_match, matched_rule, action = check_rule_file(rule_file, "dangerous operation", "approve")
             assert has_match is False
             
         finally:

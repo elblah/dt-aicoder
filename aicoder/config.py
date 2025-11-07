@@ -338,6 +338,13 @@ FORCE_TOKEN_ESTIMATION = os.environ.get("FORCE_TOKEN_ESTIMATION", "0") == "1"
 TOKEN_INFO_FILLED_CHAR = os.environ.get("TOKEN_INFO_FILLED_CHAR", "█")
 TOKEN_INFO_EMPTY_CHAR = os.environ.get("TOKEN_INFO_EMPTY_CHAR", "░")
 
+# Token estimation weights
+TOKEN_LETTER_WEIGHT = float(os.environ.get("AICODER_TOKEN_ESTIMATION_LETTER_WEIGHT", 4.2))
+TOKEN_NUMBER_WEIGHT = float(os.environ.get("AICODER_TOKEN_ESTIMATION_NUMBER_WEIGHT", 3.5))
+TOKEN_PUNCTUATION_WEIGHT = float(os.environ.get("AICODER_TOKEN_ESTIMATION_PUNCTUATION_WEIGHT", 1.0))
+TOKEN_WHITESPACE_WEIGHT = float(os.environ.get("AICODER_TOKEN_ESTIMATION_WHITESPACE_WEIGHT", 0.15))
+TOKEN_OTHER_WEIGHT = float(os.environ.get("AICODER_TOKEN_ESTIMATION_OTHER_WEIGHT", 3.0))
+
 
 # File-based prompting configuration
 def get_file_prompt_mode():

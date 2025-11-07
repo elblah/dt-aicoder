@@ -549,13 +549,13 @@ def estimate_tokens(text: str) -> int:
         else:
             other += 1
     
-    # Different ratios for different character types (more accurate than 4 chars/token)
+    # Use configurable weights
     token_estimate = (
-        letters / 4.2 +        # Letters: ~4.2 chars per token (most content)
-        numbers / 3.5 +        # Numbers: ~3.5 chars per token (often grouped)
-        punctuation * 1.0 +    # Punctuation: each contributes ~1.0 tokens (more accurate for code/JSON)
-        whitespace * 0.15 +    # Whitespace: minimal but measurable token cost
-        other / 3.0           # Other chars (symbols, etc.): ~3 chars per token
+        letters / config.TOKEN_LETTER_WEIGHT +
+        numbers / config.TOKEN_NUMBER_WEIGHT +
+        punctuation * config.TOKEN_PUNCTUATION_WEIGHT +
+        whitespace * config.TOKEN_WHITESPACE_WEIGHT +
+        other / config.TOKEN_OTHER_WEIGHT
     )
     
     return round(max(0, token_estimate))

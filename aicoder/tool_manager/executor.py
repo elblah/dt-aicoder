@@ -3,7 +3,6 @@ Tool Executor for AI Coder - Handles execution of tool calls from the AI.
 """
 
 import os
-import re
 import json
 import time
 import urllib.request
@@ -23,6 +22,10 @@ from .validator import (
     validate_function_signature,
 )
 from .approval_system import ApprovalSystem
+from .approval_utils import (
+    check_approval_rules, 
+    check_rule_file
+)
 
 # Global message queue for tools - simple and easy to access
 pending_tool_messages = []
@@ -30,102 +33,6 @@ pending_tool_messages = []
 # readline functionality is handled by utils.make_readline_safe()
 
 DENIED_MESSAGE = "EXECUTION DENIED BY THE USER"
-
-
-def _check_approval_rules(command: str) -> tuple[bool, str]:
-    """
-    Check user-configurable approval rules with priority:
-    1. auto_deny (highest) - automatically reject
-    2. ask_approval (middle) - require manual approval
-    3. auto_approve (lowest) - automatically approve
-
-    Args:
-        command: The shell command to check
-
-    Returns:
-        tuple: (has_dangerous, reason)
-    """
-
-    config_dir = os.path.expanduser("~/.config/aicoder")
-
-    # Priority 1: Auto deny (highest priority)
-    has_match, matched_rule, action = _check_rule_file(
-        os.path.join(config_dir, "run_shell_command.auto_deny"), command, "deny"
-    )
-    if has_match:
-        return True, f"Auto denied. Regex: {matched_rule}"
-
-    # Priority 2: Ask approval (middle priority)
-    has_match, matched_rule, action = _check_rule_file(
-        os.path.join(config_dir, "run_shell_command.ask_approval"), command, "ask"
-    )
-    if has_match:
-        return True, f"Detected in ask approval file. Regex: {matched_rule}"
-
-    # Priority 3: Auto approve (lowest priority)
-    has_match, matched_rule, action = _check_rule_file(
-        os.path.join(config_dir, "run_shell_command.auto_approve"), command, "approve"
-    )
-    if has_match:
-        return False, ""  # Not dangerous, auto-approved
-
-    return False, ""
-
-
-def _check_rule_file(
-    rule_file: str, command: str, file_type: str
-) -> tuple[bool, str, str]:
-    """
-    Check a single rule file for matches.
-
-    Args:
-        rule_file: Path to the rule file
-        command: The shell command to check
-        file_type: Type of file (deny/ask/approve)
-
-    Returns:
-        tuple: (has_match, matched_rule, file_type)
-    """
-
-    if not os.path.exists(rule_file):
-        return False, "", file_type
-
-    try:
-        with open(rule_file, "r") as f:
-            for line_num, line in enumerate(f, 1):
-                line = line.strip()
-
-                # Skip empty lines (empty regex would match everything!)
-                if not line or line.startswith("#"):
-                    continue  # Skip empty lines and comments
-
-                try:
-                    # Support negation with ! prefix (for auto_approve only)
-                    if line.startswith("!") and file_type == "approve":
-                        pattern = line[1:]  # Remove the ! prefix
-
-                        # Skip if negation pattern is empty (would match everything)
-                        if not pattern:
-                            continue
-
-                        if not re.search(pattern, command):
-                            # Negative pattern matched (command doesn't match pattern)
-                            return (
-                                True,
-                                f"Auto approved (negated regex): {pattern}",
-                                file_type,
-                            )
-                    else:
-                        # Ensure pattern is not empty before searching
-                        if line and re.search(line, command):
-                            return True, line, file_type
-                except re.error:
-                    # Invalid regex, skip it
-                    continue
-    except (IOError, OSError):
-        pass  # File not readable, just skip
-
-    return False, "", file_type
 
 
 class ToolExecutor:
@@ -688,7 +595,7 @@ class ToolExecutor:
                         # YOLO mode - check user rules first
                         if tool_name == "run_shell_command":
                             command = arguments.get("command", "")
-                            has_dangerous, reason = _check_approval_rules(command)
+                            has_dangerous, reason = check_approval_rules(command)
                             if has_dangerous:
                                 print(
                                     f"   - [!] {reason} - YOLO mode respects user rules"
@@ -729,7 +636,7 @@ class ToolExecutor:
                             auto_deny_file = os.path.expanduser(
                                 "~/.config/aicoder/run_shell_command.auto_deny"
                             )
-                            has_deny_match, deny_rule, _ = _check_rule_file(
+                            has_deny_match, deny_rule, _ = check_rule_file(
                                 auto_deny_file, command, "deny"
                             )
                             if has_deny_match:
@@ -742,7 +649,7 @@ class ToolExecutor:
                                 print(f"   - [!] {reason} - requires manual approval")
                             else:
                                 # Check user-configurable approval rules (ask and auto)
-                                has_dangerous, reason = _check_approval_rules(command)
+                                has_dangerous, reason = check_approval_rules(command)
                                 if has_dangerous:
                                     print(
                                         f"   - [!] {reason} - requires manual approval"
