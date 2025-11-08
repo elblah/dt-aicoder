@@ -34,7 +34,7 @@ class TestExecutorErrorHandling:
         self.mock_stats = Stats()
         self.mock_animator = Mock(spec=Animator)
         self.executor = ToolExecutor(self.mock_tool_registry, self.mock_stats, self.mock_animator)
-        
+
         # Track initial stats
         self.initial_tool_calls = self.mock_stats.tool_calls
         self.initial_tool_errors = self.mock_stats.tool_errors
@@ -45,37 +45,33 @@ class TestExecutorErrorHandling:
             "type": "unknown_type",
             "auto_approved": True
         }
-        
+
         self.mock_tool_registry.mcp_tools.get.return_value = tool_config
-        
-        result, returned_config, guidance, guidance_requested = self.executor.execute_tool(
+
+        result, returned_config, show_main_prompt = self.executor.execute_tool(
             'unknown_tool',
             {"param": "test"},
             1, 1
         )
-        
+
         assert "Unknown tool type" in result
         assert "unknown_type" in result
         assert returned_config == tool_config
-        assert guidance is None
-        assert guidance_requested is False
         assert self.mock_stats.tool_errors >= self.initial_tool_errors
 
     def test_tool_config_not_found(self):
         """Test execution when tool configuration is not found."""
         self.mock_tool_registry.mcp_tools.get.return_value = None
         self.mock_tool_registry.mcp_servers = {}  # No MCP servers
-        
-        result, returned_config, guidance, guidance_requested = self.executor.execute_tool(
+
+        result, returned_config, show_main_prompt = self.executor.execute_tool(
             'nonexistent_tool',
             {"param": "test"},
             1, 1
         )
-        
+
         assert "Tool 'nonexistent_tool' not found" in result
         assert isinstance(returned_config, dict)
-        assert guidance is None
-        assert guidance_requested is False
         assert self.mock_stats.tool_errors == self.initial_tool_errors  # Tool not found doesn't increment errors
 
     def test_execution_with_none_tool_name(self):
@@ -84,16 +80,14 @@ class TestExecutorErrorHandling:
             "type": "internal",
             "auto_approved": True
         }
-        
+
         self.mock_tool_registry.mcp_tools.get.return_value = tool_config
-        
-        result, returned_config, guidance, guidance_requested = self.executor.execute_tool(
+
+        result, returned_config, show_main_prompt = self.executor.execute_tool(
             None,  # None tool name
             {"param": "test"},
             1, 1
         )
-        
+
         # Should handle gracefully and still attempt to process
         assert returned_config == tool_config
-
-    

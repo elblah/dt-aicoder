@@ -283,6 +283,16 @@ class ToolRegistry:
             _, tools = self.mcp_servers[server_name]
             return tools
 
+        # Check if we're running in test mode to avoid launching actual server processes
+        import os
+        import sys
+        from .. import config
+        if os.environ.get("AICODER_TEST_MODE") or any('pytest' in arg for arg in sys.argv):
+            # In test mode, return empty tools to avoid launching server processes
+            if config.DEBUG:
+                print(f"DEBUG: Skipping MCP server {server_name} in test mode")
+            return {}
+
         # Get server configuration
         server_config = self.mcp_tools.get(server_name)
         if not server_config or server_config.get("type") != "mcp-stdio":
@@ -325,6 +335,15 @@ class ToolRegistry:
 
             response = send_request(initialize_request)
             if not response or "result" not in response:
+                # Clean up the process if initialization fails
+                try:
+                    process.terminate()
+                    process.wait(timeout=1)
+                except:
+                    try:
+                        process.kill()
+                    except:
+                        pass  # Process might have already terminated
                 raise Exception(f"Failed to initialize MCP server: {response}")
 
             # Send initialized notification
@@ -336,6 +355,15 @@ class ToolRegistry:
             )
 
             if not tools_response or "result" not in tools_response:
+                # Clean up the process if tools list fails
+                try:
+                    process.terminate()
+                    process.wait(timeout=1)
+                except:
+                    try:
+                        process.kill()
+                    except:
+                        pass  # Process might have already terminated
                 raise Exception(f"Failed to get tools list: {tools_response}")
 
             # Store server process and discovered tools
@@ -353,3 +381,23 @@ class ToolRegistry:
         except Exception as e:
             print(f"Error discovering tools from server {server_name}: {e}")
             return {}
+
+    def cleanup_mcp_servers(self):
+        """Clean up all MCP server processes when shutting down."""
+        for server_name, (process, _) in self.mcp_servers.items():
+            try:
+                print(f"Terminating MCP server: {server_name}")
+                # Try graceful termination first
+                process.terminate()
+                try:
+                    # Wait for up to 2 seconds for process to terminate
+                    process.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    # Force kill if it doesn't terminate gracefully
+                    print(f"Force killing MCP server: {server_name}")
+                    process.kill()
+                    process.wait()
+            except Exception as e:
+                print(f"Error terminating MCP server {server_name}: {e}")
+        # Clear the servers dictionary
+        self.mcp_servers.clear()

@@ -14,6 +14,9 @@ from . import config
 from . import retry_utils
 from .terminal_manager import is_esc_pressed
 
+_tools_definitions_token_est_cache = {}
+_messages_token_est_cache = {}
+
 
 class APIClient:
     """Base API client with shared functionality for both streaming and non-streaming requests."""
@@ -145,15 +148,16 @@ class APIClient:
         """Update statistics on successful API call."""
         if not self.stats:
             return
-            
+
         self.stats.api_success += 1
         # Record time spent on API call
         self.stats.api_time_spent += time.time() - api_start_time
 
         # Check if we should force token estimation instead of using API usage data
         import aicoder.config as config
-        if config.FORCE_TOKEN_ESTIMATION:
-            # Always use fallback estimation when forced
+
+        if not config.TRUST_USAGE_INFO_PROMPT_TOKENS:
+            # Always use fallback estimation when not trusting usage data
             self._process_token_fallback(response)
             return
 
@@ -164,6 +168,10 @@ class APIClient:
             return
 
         usage = response["usage"]
+
+        # Track usage information for future cost calculations
+        self.stats.usage_infos.append({"time": time.time(), "usage": usage})
+
         # Check if usage data seems reasonable
         prompt_tokens = usage.get("prompt_tokens", 0)
         if prompt_tokens > 0:
@@ -186,6 +194,7 @@ class APIClient:
 
         # Use the cached accurate value from the actual request
         from .utils import estimate_tokens_from_last_api_request
+
         cached_estimate = estimate_tokens_from_last_api_request()
 
         # Always re-estimate total context size using message history
@@ -224,20 +233,67 @@ class APIClient:
 
         return estimate_tokens(text)
 
+    def _estimate_tools_definitions_tokens(self, api_data):
+        """
+        Estimate the tools definitions tokens and cache it
+        """
+        if "tools" not in api_data:
+            return 0
+
+        from .utils import estimate_tokens, cache_tools_definitions_tokens_estimation
+
+        tools_definitions = api_data["tools"]
+        tools_definitions_json = json.dumps(tools_definitions, separators=(",", ":"))
+
+        hash_tdef = hash(tools_definitions_json)
+        if hash_tdef in _tools_definitions_token_est_cache:
+            tokens_estimation = _tools_definitions_token_est_cache[hash_tdef]
+        else:
+            tokens_estimation = estimate_tokens(tools_definitions_json)
+            _tools_definitions_token_est_cache[hash_tdef] = tokens_estimation
+
+        cache_tools_definitions_tokens_estimation(tokens_estimation)
+
+        return tokens_estimation
+
+    def _estimate_messages_tokens_light(self, api_data):
+        """
+        Estimate messages tokens
+        """
+        if "messages" not in api_data:
+            return 0
+
+        from .utils import estimate_tokens
+
+        stoken = 0
+        for msg in api_data["messages"]:
+            id_msg = id(msg)
+            if id_msg in _messages_token_est_cache:
+                stoken += _messages_token_est_cache[id_msg]
+            else:
+                msg_json = json.dumps(msg, separators=(",", ":"))
+                msg_estimation = estimate_tokens(msg_json)
+                _messages_token_est_cache[id_msg] = msg_estimation
+                stoken += msg_estimation
+        return stoken
+
     def _prepare_and_cache_request(self, api_data: Dict[str, Any]) -> bytes:
         """
         Centralized function to prepare API request for sending.
         - Caches request string for accurate token estimation
         - Returns encoded request body ready for HTTP request
-        
+
         All API request types should use this function for consistency.
         """
-        request_string = json.dumps(api_data, separators=(',', ':'))
         from .utils import cache_api_request_for_estimation
-        
-        # Cache token estimation
-        cache_api_request_for_estimation(request_string)
-        
+
+        tokens_tools_defs = self._estimate_tools_definitions_tokens(api_data)
+        messages_tokens = self._estimate_messages_tokens_light(api_data)
+        estimated_tokens = messages_tokens + tokens_tools_defs
+        cache_api_request_for_estimation(estimated_tokens)
+
+        request_string = json.dumps(api_data, separators=(",", ":"))
+
         return request_string.encode("utf-8")
 
     def _estimate_messages_tokens(self, messages: List[Dict]) -> int:

@@ -31,13 +31,13 @@ class MCPToolManager:
         total_tools: int = 0,
     ) -> str:
         """Execute a single tool."""
-        result, _, _, _ = self.executor.execute_tool(
+        result, _, _ = self.executor.execute_tool(
             tool_name, arguments, tool_index, total_tools
         )
         return result
 
     def execute_tool_calls(
         self, message: Dict[str, Any]
-    ) -> Tuple[List[Dict[str, Any]], bool]:
+    ) -> Tuple[List[Dict[str, Any]], bool, bool]:
         """Execute multiple tool calls from an AI message."""
         return self.executor.execute_tool_calls(message)

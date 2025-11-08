@@ -67,7 +67,7 @@ class TestExecutorDisplayFormatting:
                         ]
                     }
 
-                    results, cancel_all = self.executor.execute_tool_calls(message)
+                    results, cancel_all, show_main_prompt = self.executor.execute_tool_calls(message)
 
                     # Should truncate the result display
                     assert len(results) == 1
@@ -106,7 +106,7 @@ class TestExecutorDisplayFormatting:
                         ]
                     }
 
-                    results, cancel_all = self.executor.execute_tool_calls(message)
+                    results, cancel_all, show_main_prompt = self.executor.execute_tool_calls(message)
 
                     # Should not truncate the result display
                     assert len(results) == 1
@@ -133,7 +133,7 @@ class TestExecutorDisplayFormatting:
                 self.executor.tool_registry.message_history = Mock()
         with patch('aicoder.tool_manager.internal_tools.run_shell_command.has_dangerous_patterns') as mock_check_dangerous:
                     mock_check_dangerous.return_value = (False, "")
-                    result, _, _, _ = self.executor.execute_tool(
+                    result, _, _ = self.executor.execute_tool(
                         'run_shell_command',
                         {"command": "echo test", "timeout": 60},
                         1, 1
@@ -161,9 +161,9 @@ class TestExecutorDisplayFormatting:
             self.executor.tool_registry.message_history = Mock()
         with patch('aicoder.tool_manager.internal_tools.run_shell_command.has_dangerous_patterns') as mock_check_dangerous:
                 mock_check_dangerous.return_value = (True, "rm -rf pattern detected")
-                with patch.object(self.executor, '_print_command_info_once') as mock_print_info:
+                with patch.object(self.executor.internal_handler, '_print_command_info_once') as mock_print_info:
                     with patch('builtins.print') as mock_print:
-                        result, _, _, _ = self.executor.execute_tool(
+                        result, _, _ = self.executor.execute_tool(
                             'run_shell_command',
                             {"command": "rm -rf /tmp/test"},
                             1, 1
@@ -192,10 +192,10 @@ class TestExecutorDisplayFormatting:
                 'aicoder.tool_manager.internal_tools.INTERNAL_TOOL_FUNCTIONS',
                 {'run_shell_command': mock_run_shell_command}
             ):
-                with patch.object(self.executor, '_print_command_info_once') as mock_print_info:
+                with patch.object(self.executor.internal_handler, '_print_command_info_once') as mock_print_info:
                     with patch('aicoder.tool_manager.internal_tools.run_shell_command.has_dangerous_patterns') as mock_check_dangerous:
                         mock_check_dangerous.return_value = (False, "")
-                        result, _, _, _ = self.executor.execute_tool(
+                        result, _, _ = self.executor.execute_tool(
                             'run_shell_command',
                             {"command": "echo yolo mode"},
                             1, 1
@@ -251,7 +251,7 @@ class TestExecutorDisplayFormatting:
                         ]
                     }
 
-                    results, cancel_all = self.executor.execute_tool_calls(message)
+                    results, cancel_all, show_main_prompt = self.executor.execute_tool_calls(message)
 
                     # Should track progress
                     assert len(results) == 3
@@ -266,13 +266,8 @@ class TestExecutorDisplayFormatting:
         self.mock_tool_registry.mcp_tools.get.return_value = tool_config
 
         # Mock approval system
-        mock_approval_result = Mock()
-        mock_approval_result.approved = True
-        mock_approval_result.ai_guidance = None
-        mock_approval_result.guidance_requested = False
-
         with patch('aicoder.tool_manager.executor.config.YOLO_MODE', False):
-                        self.executor.approval_system.request_user_approval = Mock(return_value=mock_approval_result)
+                        self.executor.approval_system.request_user_approval = Mock(return_value=(True, False))
                         self.executor.approval_system.format_tool_prompt = Mock(return_value="Execute test_tool with param=test")
 
         def mock_tool_func(param: str, stats=None):
@@ -284,7 +279,7 @@ class TestExecutorDisplayFormatting:
         ):
             self.executor.tool_registry.message_history = Mock()
         with patch('builtins.input', return_value='y'):
-                result, _, _, _ = self.executor.execute_tool(
+                result, _, _ = self.executor.execute_tool(
                     'test_tool',
                     {"param": "test"},
                     1, 1
@@ -311,7 +306,7 @@ class TestExecutorDisplayFormatting:
         ):
             self.executor.tool_registry.message_history = Mock()
         with patch('builtins.print') as mock_print:
-                result, _, _, _ = self.executor.execute_tool(
+                result, _, _ = self.executor.execute_tool(
                     'error_tool',
                     {"param": "test_error"},
                     1, 1
@@ -342,7 +337,7 @@ class TestExecutorDisplayFormatting:
             'aicoder.tool_manager.internal_tools.INTERNAL_TOOL_FUNCTIONS',
             {'test_tool': mock_tool_func}
         ):
-            result, _, guidance, _ = self.executor.execute_tool(
+            result, returned_config, show_main_prompt = self.executor.execute_tool(
                 'test_tool',
                 {"param": "test"},
                 1, 1
@@ -373,7 +368,7 @@ class TestExecutorDisplayFormatting:
             'aicoder.tool_manager.internal_tools.INTERNAL_TOOL_FUNCTIONS',
             {'test_tool': mock_tool_func}
         ):
-            result, _, _, _ = self.executor.execute_tool(
+            result, _, _ = self.executor.execute_tool(
                 'test_tool',
                 {"param": "stats_test"},
                 1, 1
@@ -422,7 +417,7 @@ class TestExecutorDisplayFormatting:
                     ]
                 }
 
-                results, cancel_all = self.executor.execute_tool_calls(message)
+                results, cancel_all, show_main_prompt = self.executor.execute_tool_calls(message)
 
                 assert True  # Tool executed with error
                 # Should have cancellation display
@@ -447,7 +442,7 @@ class TestExecutorDisplayFormatting:
             'aicoder.tool_manager.internal_tools.INTERNAL_TOOL_FUNCTIONS',
             {'custom_tool': mock_tool_func}
         ):
-            result, _, _, _ = self.executor.execute_tool(
+            result, _, _ = self.executor.execute_tool(
                 'custom_tool',
                 {"param": "display_test"},
                 1, 1
@@ -473,7 +468,7 @@ class TestExecutorDisplayFormatting:
             'aicoder.tool_manager.internal_tools.INTERNAL_TOOL_FUNCTIONS',
             {'animated_tool': mock_animated_tool}
         ):
-            result, _, _, _ = self.executor.execute_tool(
+            result, _, _ = self.executor.execute_tool(
                 'animated_tool',
                 {"param": "animation_test"},
                 1, 1

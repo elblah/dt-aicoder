@@ -331,7 +331,7 @@ class TestExecutorMalformedLogging:
             self.executor.tool_registry.message_history = Mock()
         with patch('aicoder.tool_manager.executor.config.DEBUG', True):
                 with patch.object(self.executor, '_log_malformed_tool_call') as mock_log:
-                    results, cancel_all = self.executor.execute_tool_calls(message)
+                    results, cancel_all, show_main_prompt = self.executor.execute_tool_calls(message)
                     
                     # Should log the two malformed calls
                     assert mock_log.call_count == 2

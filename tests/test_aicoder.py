@@ -92,8 +92,10 @@ def test_tool_execution_with_approval():
     # Mock user approval
     with patch("builtins.input", return_value="a"):
         # Execute the tool call
-        results, _ = tool_manager.execute_tool_calls(message)
+        results, cancel_all, show_main_prompt = tool_manager.execute_tool_calls(message)
 
         # Assert that the tool was executed
         assert len(results) == 1
         assert "hello" in results[0]["content"]
+        assert cancel_all is False
+        assert show_main_prompt is False

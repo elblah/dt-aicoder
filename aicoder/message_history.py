@@ -447,7 +447,7 @@ class MessageHistory:
         summary_content = (
             SUMMARY_MESSAGE_PREFIX + " " + (summary if summary else "no prior content")
         )
-        summary_message = {"role": "system", "content": summary_content}
+        summary_message = {"role": config.COMPACTION_SUMMARY_ROLE, "content": summary_content}
 
         # Find the insertion point - it's the first chat message index
         # All messages before this are system messages (including previous summaries)
@@ -1061,7 +1061,7 @@ Provide a detailed but concise summary of our conversation above. Focus on infor
         summary_content = (
             SUMMARY_MESSAGE_PREFIX + " " + (summary if summary else "no prior content")
         )
-        summary_message = {"role": "system", "content": summary_content}
+        summary_message = {"role": config.COMPACTION_SUMMARY_ROLE, "content": summary_content}
 
         # Find the index of the first message to compact
         first_message_to_compact = messages_to_compact[0]
@@ -1193,7 +1193,7 @@ Please provide a concise summary of the following conversation messages, preserv
         summary_content = (
             SUMMARY_MESSAGE_PREFIX + " " + (summary if summary else "no prior content")
         )
-        summary_message = {"role": "system", "content": summary_content}
+        summary_message = {"role": config.COMPACTION_SUMMARY_ROLE, "content": summary_content}
 
         # Find insertion point (before the oldest round)
         insertion_index = oldest_rounds[0]["start_index"]

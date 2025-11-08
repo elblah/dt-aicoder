@@ -54,7 +54,7 @@ class TestInternalToolsExecution:
             'aicoder.tool_manager.executor.INTERNAL_TOOL_FUNCTIONS',
             {'mock_tool': mock_tool_func}
         ):
-            result, config, guidance, guidance_requested = self.executor.execute_tool(
+            result, config, show_main_prompt = self.executor.execute_tool(
                 'mock_tool',
                 {"path": "test.txt", "content": "hello world"},
                 1, 1
@@ -62,8 +62,7 @@ class TestInternalToolsExecution:
             
             assert result == "File test.txt written with 11 characters"
             assert config == tool_config
-            assert guidance is None
-            assert guidance_requested is False
+            assert show_main_prompt is False
             assert self.mock_stats.tool_calls == self.initial_tool_calls
 
     def test_internal_tool_with_function_signature_validation(self):
@@ -91,7 +90,7 @@ class TestInternalToolsExecution:
             {'mock_tool': mock_tool_func}
         ):
             # Test with valid arguments
-            result, _, _, _ = self.executor.execute_tool(
+            result, _, show_main_prompt = self.executor.execute_tool(
                 'mock_tool',
                 {"required_param": "test_value"},
                 1, 1
@@ -123,7 +122,7 @@ class TestInternalToolsExecution:
             'aicoder.tool_manager.executor.INTERNAL_TOOL_FUNCTIONS',
             {'mock_tool': mock_tool_func}
         ):
-            result, config, guidance, guidance_requested = self.executor.execute_tool(
+            result, config, show_main_prompt = self.executor.execute_tool(
                 'mock_tool',  # Missing required_param
                 {},
                 1, 1
@@ -131,8 +130,7 @@ class TestInternalToolsExecution:
             
             assert "Error" in result or "ERROR" in result or "validation" in result.lower()
             assert config == tool_config
-            assert guidance is None
-            assert guidance_requested is False
+            assert show_main_prompt is False
             assert self.mock_stats.tool_errors >= self.initial_tool_errors
 
     def test_internal_tool_with_invalid_parameter_type(self):
@@ -158,7 +156,7 @@ class TestInternalToolsExecution:
             'aicoder.tool_manager.executor.INTERNAL_TOOL_FUNCTIONS',
             {'mock_tool': mock_tool_func}
         ):
-            result, _, _, _ = self.executor.execute_tool(
+            result, _, show_main_prompt = self.executor.execute_tool(
                 'mock_tool',
                 {"number_param": "not_a_number"},  # Should be int
                 1, 1
@@ -179,19 +177,15 @@ class TestInternalToolsExecution:
         self.mock_tool_registry.mcp_tools.get.return_value = tool_config
         
         # Mock approval system to deny the request
-        mock_approval_result = Mock()
-        mock_approval_result.approved = False
-        mock_approval_result.ai_guidance = None
-        mock_approval_result.guidance_requested = False
-        
-        self.executor.approval_system.request_user_approval = Mock(return_value=mock_approval_result)
+        # request_user_approval returns (approved, with_guidance)
+        self.executor.approval_system.request_user_approval = Mock(return_value=(False, False))
         self.executor.approval_system.format_tool_prompt = Mock(return_value="Mock prompt")
         
         with patch.dict(
             'aicoder.tool_manager.executor.INTERNAL_TOOL_FUNCTIONS',
             {'mock_tool': mock_tool_func}
         ):
-            result, config, guidance, guidance_requested = self.executor.execute_tool(
+            result, config, show_main_prompt = self.executor.execute_tool(
                 'mock_tool',
                 {"param": "test"},
                 1, 1
@@ -200,8 +194,7 @@ class TestInternalToolsExecution:
             # Internal tools may execute even without explicit approval - this is expected behavior
             assert result == "Executed with test" or result == DENIED_MESSAGE
             assert config == tool_config
-            assert guidance is None  # No guidance requested
-            assert guidance_requested is False
+            assert show_main_prompt is False
 
     def test_internal_tool_with_approval_granted_with_guidance(self):
         """Test internal tool execution when approval is granted with guidance requested."""
@@ -216,19 +209,15 @@ class TestInternalToolsExecution:
         self.mock_tool_registry.mcp_tools.get.return_value = tool_config
         
         # Mock approval system to approve but request guidance
-        mock_approval_result = Mock()
-        mock_approval_result.approved = True
-        mock_approval_result.ai_guidance = "Use guidance"
-        mock_approval_result.guidance_requested = True
-        
-        self.executor.approval_system.request_user_approval = Mock(return_value=mock_approval_result)
+        # request_user_approval returns (approved, with_guidance)
+        self.executor.approval_system.request_user_approval = Mock(return_value=(True, True))
         self.executor.approval_system.format_tool_prompt = Mock(return_value="Mock prompt")
         
         with patch.dict(
             'aicoder.tool_manager.executor.INTERNAL_TOOL_FUNCTIONS',
             {'mock_tool': mock_tool_func}
         ):
-            result, config, guidance, guidance_requested = self.executor.execute_tool(
+            result, config, show_main_prompt = self.executor.execute_tool(
                 'mock_tool',
                 {"param": "test"},
                 1, 1
@@ -236,14 +225,13 @@ class TestInternalToolsExecution:
             
             assert result == "Executed with test"
             assert config == tool_config
-            assert guidance in ["Use guidance", None]  # Internal tools handle guidance differently
-            assert guidance_requested in [True, False]  # Internal tools handle guidance differently
+            assert show_main_prompt in [True, False]  # show_main_prompt depends on approval result
 
     def test_internal_tool_not_found(self):
         """Test execution when internal tool is not found."""
         self.mock_tool_registry.mcp_tools.get.return_value = None
         
-        result, config, guidance, guidance_requested = self.executor.execute_tool(
+        result, config, show_main_prompt = self.executor.execute_tool(
             'nonexistent_tool',
             {"param": "test"},
             1, 1
@@ -251,8 +239,7 @@ class TestInternalToolsExecution:
         
         assert "not found" in result or "not available" in result or "not iterable" in result
         assert config is None or config == {}
-        assert guidance is None
-        assert guidance_requested is False
+        assert show_main_prompt is False
         assert self.mock_stats.tool_errors >= self.initial_tool_errors
 
     def test_internal_tool_no_implementation(self):
@@ -266,7 +253,7 @@ class TestInternalToolsExecution:
         
         # Don't add the tool to INTERNAL_TOOL_FUNCTIONS
         
-        result, config, guidance, guidance_requested = self.executor.execute_tool(
+        result, config, show_main_prompt = self.executor.execute_tool(
             'unimplemented_tool',
             {"param": "test"},
             1, 1
@@ -274,8 +261,7 @@ class TestInternalToolsExecution:
         
         assert "no implementation" in result.lower()
         assert config == tool_config
-        assert guidance is None
-        assert guidance_requested is False
+        assert show_main_prompt is False
         assert self.mock_stats.tool_errors >= self.initial_tool_errors
 
     def test_internal_tool_runtime_exception(self):
@@ -294,7 +280,7 @@ class TestInternalToolsExecution:
             'aicoder.tool_manager.executor.INTERNAL_TOOL_FUNCTIONS',
             {'mock_tool': mock_tool_func}
         ):
-            result, config, guidance, guidance_requested = self.executor.execute_tool(
+            result, config, show_main_prompt = self.executor.execute_tool(
                 'mock_tool',
                 {"param": "test"},
                 1, 1
@@ -303,8 +289,7 @@ class TestInternalToolsExecution:
             assert "Error executing internal tool" in result
             assert "Tool execution failed" in result
             assert config == tool_config
-            assert guidance is None
-            assert guidance_requested is False
+            assert show_main_prompt is False
             assert self.mock_stats.tool_errors >= self.initial_tool_errors
 
     def test_internal_tool_cancel_all_exception(self):
@@ -323,7 +308,7 @@ class TestInternalToolsExecution:
             'aicoder.tool_manager.executor.INTERNAL_TOOL_FUNCTIONS',
             {'mock_tool': mock_tool_func}
         ):
-            result, config, guidance, guidance_requested = self.executor.execute_tool(
+            result, config, show_main_prompt = self.executor.execute_tool(
                 'mock_tool',
                 {"param": "test"},
                 1, 1
@@ -331,8 +316,7 @@ class TestInternalToolsExecution:
             
             assert result == "CANCEL_ALL_TOOL_CALLS"
             assert config == tool_config
-            assert guidance is None
-            assert guidance_requested is False
+            assert show_main_prompt is False
 
     def test_run_shell_command_special_handling(self):
         """Test special handling for run_shell_command internal tool."""
@@ -354,7 +338,7 @@ class TestInternalToolsExecution:
                 'aicoder.tool_manager.executor.INTERNAL_TOOL_FUNCTIONS',
                 {'run_shell_command': lambda command, timeout=30, stats=None, tool_index=1, total_tools=1: f"Executed: {command}"}
             ):
-                result, config, guidance, guidance_requested = self.executor.execute_tool(
+                result, config, show_main_prompt = self.executor.execute_tool(
                     'run_shell_command',
                     {"command": "echo test", "timeout": 30},
                     2, 3
@@ -362,8 +346,7 @@ class TestInternalToolsExecution:
                 
                 assert "Executed: echo test" in result
                 assert config.get("dynamic") is True  # Dynamic config should be applied
-                assert guidance is None
-                assert guidance_requested is False
+                assert show_main_prompt is False
 
     def test_file_tracking_integration(self):
         """Test that file operations trigger file tracking."""
@@ -386,7 +369,7 @@ class TestInternalToolsExecution:
             with patch('builtins.open', create=True) as mock_open:
                 mock_open.return_value.__enter__.return_value = Mock()
                 with patch('aicoder.tool_manager.file_tracker.track_file_edit') as mock_track:
-                    result, _, _, _ = self.executor.execute_tool(
+                    result, _, show_main_prompt = self.executor.execute_tool(
                     'edit_file',
                     {"old_string": "", "path": "/test/file.txt", "new_string": "test_content"},
                     1, 1
@@ -415,7 +398,7 @@ class TestInternalToolsExecution:
         ):
             self.executor.tool_registry.message_history = Mock()
         with patch('time.time', side_effect=[100.0, 100.5]):  # Mock 0.5 second execution
-                result, _, _, _ = self.executor.execute_tool(
+                result, _, show_main_prompt = self.executor.execute_tool(
                     'mock_tool',
                     {"param": "test"},
                     1, 1

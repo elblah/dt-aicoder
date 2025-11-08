@@ -292,6 +292,13 @@ MAX_TOOL_RESULT_SIZE = int(
     os.environ.get("MAX_TOOL_RESULT_SIZE", "300000")
 )  # 300KB default
 
+# Compaction summary message configuration
+# Some models fail with role="system" summaries, others work better with it
+# Set to "user" for models that don't support system messages well, "system" otherwise
+COMPACTION_SUMMARY_ROLE = os.environ.get("COMPACTION_SUMMARY_ROLE", "system").lower()
+if COMPACTION_SUMMARY_ROLE not in ["system", "user"]:
+    COMPACTION_SUMMARY_ROLE = "system"  # Default to system for backward compatibility
+
 # Mode flags
 YOLO_MODE = "YOLO_MODE" in os.environ and os.environ.get("YOLO_MODE") == "1"
 SHELL_COMMANDS_DENY_ALL = "SHELL_COMMANDS_DENY_ALL" in os.environ
@@ -332,7 +339,10 @@ RETRY_MAX_ATTEMPTS = int(os.environ.get("RETRY_MAX_ATTEMPTS", "0"))  # 0 means i
 ENABLE_TOKEN_INFO_DISPLAY = os.environ.get("ENABLE_TOKEN_INFO_DISPLAY", "1") == "1"
 
 # Token estimation configuration
-FORCE_TOKEN_ESTIMATION = os.environ.get("FORCE_TOKEN_ESTIMATION", "0") == "1"
+# Default behavior: estimation is used unless TRUST_USAGE_INFO_PROMPT_TOKENS is set to "1"
+# If TRUST_USAGE_INFO_PROMPT_TOKENS is "1", trust API usage data
+# If TRUST_USAGE_INFO_PROMPT_TOKENS is "0" or not set, force estimation
+TRUST_USAGE_INFO_PROMPT_TOKENS = os.environ.get("TRUST_USAGE_INFO_PROMPT_TOKENS", "0") == "1"
 
 # Token information bar characters (goose bar chars ● ○)
 TOKEN_INFO_FILLED_CHAR = os.environ.get("TOKEN_INFO_FILLED_CHAR", "█")

@@ -177,9 +177,9 @@ def test_update_stats_on_success():
 
     api_start_time = time.time()
     
-    # Temporarily disable FORCE_TOKEN_ESTIMATION to test actual usage data
-    original_force_estimation = config.FORCE_TOKEN_ESTIMATION
-    config.FORCE_TOKEN_ESTIMATION = False
+    # Temporarily enable TRUST_USAGE_INFO_PROMPT_TOKENS to test actual usage data
+    original_trust_usage = config.TRUST_USAGE_INFO_PROMPT_TOKENS
+    config.TRUST_USAGE_INFO_PROMPT_TOKENS = True
     
     try:
         client._update_stats_on_success(api_start_time, mock_response)
@@ -191,7 +191,111 @@ def test_update_stats_on_success():
         assert real_stats.completion_tokens == 20
     finally:
         # Restore original setting
-        config.FORCE_TOKEN_ESTIMATION = original_force_estimation
+        config.TRUST_USAGE_INFO_PROMPT_TOKENS = original_trust_usage
+
+
+def test_update_stats_on_success_usage_tracking():
+    """Test that usage data is properly tracked in usage_infos list."""
+    from aicoder.stats import Stats
+    import aicoder.config as config
+    import time
+
+    # Use real Stats object
+    real_stats = Stats()
+    client = APIClient(stats=real_stats)
+
+    # Mock API response with usage data
+    test_usage = {
+        "prompt_tokens": 150,
+        "completion_tokens": 75,
+        "total_tokens": 225,
+        "cost": 0.003
+    }
+    mock_response = {"usage": test_usage}
+
+    # Enable TRUST_USAGE_INFO_PROMPT_TOKENS to ensure usage data is processed
+    original_trust_usage = config.TRUST_USAGE_INFO_PROMPT_TOKENS
+    config.TRUST_USAGE_INFO_PROMPT_TOKENS = True
+
+    try:
+        # Clear existing usage_infos to start fresh
+        real_stats.usage_infos.clear()
+        
+        # Get initial count
+        initial_count = len(real_stats.usage_infos)
+        
+        # Call the method
+        api_start_time = time.time()
+        client._update_stats_on_success(api_start_time, mock_response)
+        
+        # Verify usage was tracked
+        assert len(real_stats.usage_infos) == initial_count + 1
+        
+        # Verify the structure of the tracked usage
+        latest_entry = real_stats.usage_infos[-1]
+        assert "time" in latest_entry
+        assert "usage" in latest_entry
+        assert isinstance(latest_entry["time"], float)
+        assert latest_entry["usage"] == test_usage
+        
+        # Verify the timestamp is recent and reasonable
+        current_time = time.time()
+        assert latest_entry["time"] <= current_time
+        assert current_time - latest_entry["time"] < 1.0  # Should be very recent
+        
+        # Verify the specific usage values are preserved
+        assert latest_entry["usage"]["prompt_tokens"] == 150
+        assert latest_entry["usage"]["completion_tokens"] == 75
+        assert latest_entry["usage"]["total_tokens"] == 225
+        assert latest_entry["usage"]["cost"] == 0.003
+        
+    finally:
+        config.TRUST_USAGE_INFO_PROMPT_TOKENS = original_trust_usage
+
+
+def test_update_stats_on_success_multiple_usage_entries():
+    """Test that multiple API calls are properly tracked separately."""
+    from aicoder.stats import Stats
+    import aicoder.config as config
+    import time
+
+    # Use real Stats object
+    real_stats = Stats()
+    client = APIClient(stats=real_stats)
+
+    # Enable TRUST_USAGE_INFO_PROMPT_TOKENS
+    original_trust_usage = config.TRUST_USAGE_INFO_PROMPT_TOKENS
+    config.TRUST_USAGE_INFO_PROMPT_TOKENS = True
+
+    try:
+        # Clear existing usage_infos to start fresh
+        real_stats.usage_infos.clear()
+        
+        # Make first API call
+        usage1 = {"prompt_tokens": 100, "completion_tokens": 50}
+        response1 = {"usage": usage1}
+        client._update_stats_on_success(time.time(), response1)
+        
+        # Wait a tiny bit to ensure different timestamps
+        time.sleep(0.01)
+        
+        # Make second API call
+        usage2 = {"prompt_tokens": 200, "completion_tokens": 100}
+        response2 = {"usage": usage2}
+        client._update_stats_on_success(time.time(), response2)
+        
+        # Verify both calls were tracked
+        assert len(real_stats.usage_infos) == 2
+        
+        # Verify the entries are distinct and contain correct data
+        assert real_stats.usage_infos[0]["usage"] == usage1
+        assert real_stats.usage_infos[1]["usage"] == usage2
+        
+        # Verify timestamps are different and in order
+        assert real_stats.usage_infos[0]["time"] < real_stats.usage_infos[1]["time"]
+        
+    finally:
+        config.TRUST_USAGE_INFO_PROMPT_TOKENS = original_trust_usage
 
 
 def test_setup_and_restore_terminal():

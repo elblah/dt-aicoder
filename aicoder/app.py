@@ -389,6 +389,12 @@ class AICoder(
 
     def _print_exit_stats(self):
         """Print statistics on exit."""
+        # Clean up MCP server processes before printing stats
+        if hasattr(self, 'tool_manager') and hasattr(self.tool_manager, 'registry'):
+            try:
+                self.tool_manager.registry.cleanup_mcp_servers()
+            except Exception as e:
+                print(f"Error cleaning up MCP servers: {e}")
         self.stats.print_stats()
 
     def _print_startup_info(self):
@@ -512,7 +518,7 @@ class AICoder(
                                     f"DEBUG: Message has tool calls: {message['tool_calls']}"
                                 )
 
-                            tool_results, cancel_all_active = self._execute_tool_calls(
+                            tool_results, cancel_all_active, show_main_prompt = self._execute_tool_calls(
                                 message
                             )
                             # Ensure we're adding all tool results to messages
@@ -532,6 +538,12 @@ class AICoder(
                                     "\n *** Cancel all activated - returning to user input"
                                 )
                                 break
+                            
+                            # If guidance was requested, break to show main prompt to user
+                            if show_main_prompt:
+                                # Tool results are already added above, now break to main prompt
+                                break
+                            
                             continue
                         else:
                             # Check if this is a streaming response - if so, don't print the content again

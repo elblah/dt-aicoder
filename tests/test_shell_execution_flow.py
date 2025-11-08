@@ -54,32 +54,33 @@ def test_executor_with_mocked_approval():
     # Ensure _diff_edit_result is None to avoid MagicMock issues
     mock_approval_system._diff_edit_result = None
 
-    # Mock the shell command function
-    mock_shell_func = Mock()
-    mock_shell_func.return_value = "Command executed successfully"
+    # Mock the shell command function to accept any parameters
+    mock_shell_func = Mock(return_value="Command executed successfully")
 
-    # Create executor with mocked approval system and mocked function
+    # Create executor with mocked approval system
     with patch("aicoder.tool_manager.executor.config"), patch(
         "aicoder.tool_manager.executor.ApprovalSystem",
         return_value=mock_approval_system,
-    ), patch(
-        "aicoder.tool_manager.executor.INTERNAL_TOOL_FUNCTIONS",
-        {"run_shell_command": mock_shell_func},
     ):
         executor = ToolExecutor(mock_tool_registry, mock_stats, mock_animator)
+        
+        # Patch the internal handler's function after executor is created
+        with patch.dict(
+            "aicoder.tool_manager.internal_tools.INTERNAL_TOOL_FUNCTIONS",
+            {"run_shell_command": mock_shell_func},
+            clear=False  # Don't clear other functions, just update this one
+        ):
+            # Execute a simple command
+            result, tool_config_used, show_main_prompt = executor.execute_tool(
+                "run_shell_command", {"command": "ls", "timeout": 30}, 0, 0
+            )
 
-        # Execute a simple command
-        result, tool_config_used, guidance, guidance_requested = executor.execute_tool(
-            "run_shell_command", {"command": "ls", "timeout": 30}, mock_tool_config
-        )
+            # Check that the command was executed
+            assert result == "Command executed successfully"
+            assert tool_config_used["type"] == mock_tool_config["type"]  # Check key fields
 
-        # Check that the command was executed
-        assert result == "Command executed successfully"
-        assert tool_config_used["type"] == mock_tool_config["type"]  # Check key fields
-        assert guidance is None
-
-        # Verify the mock was called
-        mock_shell_func.assert_called_once()
+            # Verify the mock was called
+            mock_shell_func.assert_called_once()
 
 
 def test_executor_command_info_printing():

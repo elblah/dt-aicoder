@@ -9,6 +9,16 @@ from ..utils import format_tool_prompt, make_readline_safe, wmsg, imsg, emsg
 from ..readline_history_manager import prompt_history_manager
 
 
+# Constants for approval system responses
+DENIED_MESSAGE = "EXECUTION DENIED BY THE USER"
+
+
+class CancelAllToolCalls(Exception):
+    """Exception raised when user selects 'Cancel All' in approval system."""
+    def __init__(self, message="CANCEL_ALL_TOOL_CALLS"):
+        super().__init__(message)
+
+
 class ApprovalSystem:
     """Handles user approval for tool execution."""
 
@@ -152,7 +162,7 @@ class ApprovalSystem:
                         return (False, with_guidance)
                     elif answer in ["c", "cancel"]:
                         # This is not an error - it's a valid cancellation request
-                        raise Exception("CANCEL_ALL_TOOL_CALLS")
+                        raise CancelAllToolCalls()
                     elif answer in ["diff"]:
                         if has_diff_option:
                             # Ensure terminal is in prompt mode for external editor
@@ -196,7 +206,7 @@ class ApprovalSystem:
                     return (False, False)
                 except Exception as e:
                     # Check if this is a cancellation request
-                    if str(e) == "CANCEL_ALL_TOOL_CALLS":
+                    if isinstance(e, CancelAllToolCalls):
                         raise  # Re-raise cancellation
                     emsg(f"Error reading input: {e}")
 
@@ -205,7 +215,7 @@ class ApprovalSystem:
 
         except Exception as e:
             # Check if this is a cancellation request
-            if str(e) == "CANCEL_ALL_TOOL_CALLS":
+            if isinstance(e, CancelAllToolCalls):
                 raise  # Re-raise cancellation
             emsg(f"Error in approval system: {e}")
             # For security, deny by default on errors
@@ -531,27 +541,27 @@ class ApprovalSystem:
         wmsg("Type directly - Or type the option letter directly")
         imsg("\nGuidance Feature:")
         print(
-            "You can add a '+' after any option (except help) to provide guidance to the AI."
+            "You can add a '+' after any option (except help) to provide guidance after the tool executes."
         )
         print(
-            "Example: 'a+' allows the tool call once but also gives the AI feedback about your decision."
+            "Example: 'a+' allows the tool call once, executes it, then shows the main prompt for your input."
         )
         print(
-            "When you use '+', you'll be prompted to enter guidance text after making your choice."
+            "When you use '+', you'll see the tool results first, then get the main prompt to provide feedback."
         )
         print(
-            "This guidance will be added to the conversation as a user message, helping the AI"
+            "Your input after the tool execution will be added to the conversation as a user message."
         )
-        print("understand your preferences and make better decisions in future steps.")
+        print("This helps the AI understand your preferences and make better decisions in future steps.")
         imsg("\nDiff Tool:")
         wmsg("Configure - Set AICODER_DIFF_TOOL_BIN environment variable")
         wmsg("Auto-detect - vimdiff, nvim -d, meld, kdiff3, diffuse, or code")
         wmsg("Install - sudo apt install vim (for vimdiff) or meld")
         print(
-            "Example: If you type 'a+' and then enter 'Please use more concise responses',"
+            "Example: If you type 'a+' and the tool executes, you'll then be prompted for input that"
         )
         print(
-            "that feedback will be added to the AI's context for future interactions."
+            "will be added to the AI's context for future interactions."
         )
 
     def _run_tool_validation(

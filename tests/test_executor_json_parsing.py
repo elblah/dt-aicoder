@@ -45,7 +45,7 @@ class TestExecutorJsonParsing:
             ('{}', {}),
             ('[]', []),  # Arrays are valid JSON but not typical for tool arguments
         ]
-        
+
         for json_string, expected in valid_json_cases:
             result = self.executor._improved_json_parse(json_string)
             assert result == expected, f"Failed to parse: {json_string}"
@@ -59,7 +59,7 @@ class TestExecutorJsonParsing:
             True,
             None,
         ]
-        
+
         for input_value in non_string_cases:
             result = self.executor._improved_json_parse(input_value)
             assert result == input_value, f"Should return unchanged for: {input_value}"
@@ -76,7 +76,7 @@ class TestExecutorJsonParsing:
             '',  # Empty string
             '   ',  # Whitespace only
         ]
-        
+
         for invalid_json in invalid_json_cases:
             try:
                 self.executor._improved_json_parse(invalid_json)
@@ -95,7 +95,7 @@ class TestExecutorJsonParsing:
             ('{"quote": "He said \\"hello\\""}', {"quote": 'He said "hello"'}),
             ('{"backslash": "path\\\\to\\\\file"}', {"backslash": "path\\to\\file"}),
         ]
-        
+
         for json_string, expected in escape_cases:
             result = self.executor._improved_json_parse(json_string)
             assert result == expected, f"Failed to parse escape sequence: {json_string}"
@@ -107,7 +107,7 @@ class TestExecutorJsonParsing:
             ('{"chinese": "测试"}', {"chinese": "测试"}),
             ('{"special": "©®™"}', {"special": "©®™"}),
         ]
-        
+
         for json_string, expected in unicode_cases:
             result = self.executor._improved_json_parse(json_string)
             assert result == expected, f"Failed to parse Unicode: {json_string}"
@@ -115,7 +115,7 @@ class TestExecutorJsonParsing:
     def test_improved_json_parse_error_position(self):
         """Test that JSON error position is preserved."""
         invalid_json = '{"valid": "value", "invalid":}'  # Error at position 23
-        
+
         try:
             self.executor._improved_json_parse(invalid_json)
             assert False, "Should have raised JSONDecodeError"
@@ -126,7 +126,7 @@ class TestExecutorJsonParsing:
     def test_improved_json_parse_error_message_enhancement(self):
         """Test that JSON error messages are enhanced with helpful information."""
         invalid_json = '{key: "value"}'  # Unquoted key
-        
+
         try:
             self.executor._improved_json_parse(invalid_json)
             assert False, "Should have raised JSONDecodeError"
@@ -140,14 +140,14 @@ class TestExecutorJsonParsing:
         """Test execute_tool_calls with malformed JSON in arguments."""
         def mock_tool_func(param: str, stats=None):
             return f"Result: {param}"
-        
+
         tool_config = {
             "type": "internal",
             "auto_approved": True
         }
-        
+
         self.mock_tool_registry.mcp_tools.get.return_value = tool_config
-        
+
         with patch.dict(
             'aicoder.tool_manager.executor.INTERNAL_TOOL_FUNCTIONS',
             {'mock_tool': mock_tool_func}
@@ -163,17 +163,17 @@ class TestExecutorJsonParsing:
                     }
                 ]
             }
-            
+
             with patch.object(self.executor, '_log_malformed_tool_call') as mock_log:
-                results, cancel_all = self.executor.execute_tool_calls(message)
-                
+                results, cancel_all, show_main_prompt = self.executor.execute_tool_calls(message)
+
                 # Should create educational message instead of tool result
                 assert len(results) == 1
                 assert results[0]["role"] == "user"
                 assert "SYSTEM ERROR" in results[0]["content"]
                 assert "invalid JSON format" in results[0]["content"]
                 assert "mock_tool" in results[0]["content"]
-                
+
                 # Should log the malformed call
                 mock_log.assert_called_once_with("mock_tool", '{"invalid": json}')
 
@@ -181,14 +181,14 @@ class TestExecutorJsonParsing:
         """Test execute_tool_calls with double-encoded JSON."""
         def mock_tool_func(param: str, stats=None):
             return f"Result: {param}"
-        
+
         tool_config = {
             "type": "internal",
             "auto_approved": True
         }
-        
+
         self.mock_tool_registry.mcp_tools.get.return_value = tool_config
-        
+
         with patch.dict(
             'aicoder.tool_manager.executor.INTERNAL_TOOL_FUNCTIONS',
             {'mock_tool': mock_tool_func}
@@ -196,7 +196,7 @@ class TestExecutorJsonParsing:
             # Create double-encoded JSON
             inner_dict = {"param": "test_value"}
             double_encoded = json.dumps(json.dumps(inner_dict))
-            
+
             message = {
                 "tool_calls": [
                     {
@@ -208,9 +208,9 @@ class TestExecutorJsonParsing:
                     }
                 ]
             }
-            
-            results, cancel_all = self.executor.execute_tool_calls(message)
-            
+
+            results, cancel_all, show_main_prompt = self.executor.execute_tool_calls(message)
+
             # Should successfully execute after normalization
             assert len(results) == 1
             assert results[0]["role"] == "tool"
@@ -222,14 +222,14 @@ class TestExecutorJsonParsing:
         pytest.skip("Temporarily disabled - JSON parsing complexity")
         def mock_tool_func(param: str, stats=None):
             return f"Result: {param}"
-        
+
         tool_config = {
             "type": "internal",
             "auto_approved": True
         }
-        
+
         self.mock_tool_registry.mcp_tools.get.return_value = tool_config
-        
+
         with patch.dict(
             'aicoder.tool_manager.executor.INTERNAL_TOOL_FUNCTIONS',
             {'mock_tool': mock_tool_func}
@@ -244,7 +244,7 @@ class TestExecutorJsonParsing:
                         },
                     },
                     {
-                        "id": "call_2", 
+                        "id": "call_2",
                         "function": {
                             "name": "mock_tool",
                             "arguments": '{"valid": "json"}',  # Valid
@@ -259,23 +259,23 @@ class TestExecutorJsonParsing:
                     }
                 ]
             }
-            
+
             with patch.object(self.executor, '_log_malformed_tool_call') as mock_log:
-                results, cancel_all = self.executor.execute_tool_calls(message)
-                
+                results, cancel_all, show_main_prompt = self.executor.execute_tool_calls(message)
+
                 # Should have: 2 educational messages + 1 tool result
                 assert len(results) >= 2
-                
+
                 # Check educational messages for malformed calls
                 educational_messages = [r for r in results if r["role"] == "user"]
                 assert len(educational_messages) >= 1
                 assert all("SYSTEM ERROR" in msg["content"] for msg in educational_messages)
-                
+
                 # Check successful tool execution
                 tool_results = [r for r in results if r["role"] == "tool"]
                 assert len(tool_results) == 1
                 assert tool_results[0]["tool_call_id"] == "call_2"
-                
+
                 # Should log both malformed calls
                 assert mock_log.call_count == 2
 
@@ -287,7 +287,7 @@ class TestExecutorJsonParsing:
             ('{"key": "value"   }', {"key": "value"}),  # Trailing spaces
             ('{   "key": "value"}', {"key": "value"}),  # Leading spaces
         ]
-        
+
         for json_string, expected in whitespace_cases:
             result = self.executor._improved_json_parse(json_string)
             assert result == expected, f"Failed to parse with whitespace: {repr(json_string)}"
@@ -299,7 +299,7 @@ class TestExecutorJsonParsing:
             ('{"big_float": 1.7976931348623157e+308}', {"big_float": 1.7976931348623157e+308}),  # Max float64
             ('{"small_float": 1e-10}', {"small_float": 1e-10}),  # Small float
         ]
-        
+
         for json_string, expected in large_number_cases:
             result = self.executor._improved_json_parse(json_string)
             assert result == expected, f"Failed to parse large number: {json_string}"
@@ -311,7 +311,7 @@ class TestExecutorJsonParsing:
             ('{"nested": {"inner": null}}', {"nested": {"inner": None}}),
             ('{"array": [null, "value"]}', {"array": [None, "value"]}),
         ]
-        
+
         for json_string, expected in null_cases:
             result = self.executor._improved_json_parse(json_string)
             assert result == expected, f"Failed to parse null: {json_string}"
@@ -323,7 +323,7 @@ class TestExecutorJsonParsing:
             ('{"empty_string": ""}', {"empty_string": ""}),  # Empty string
             ('{"empty_array": []}', {"empty_array": []}),  # Empty array
         ]
-        
+
         for json_string, expected in empty_cases:
             result = self.executor._improved_json_parse(json_string)
             assert result == expected, f"Failed to parse empty structure: {json_string}"
@@ -332,10 +332,10 @@ class TestExecutorJsonParsing:
         """Test argument normalization after successful JSON parsing."""
         # Test that valid JSON becomes properly normalized
         json_args = '{"path": "test.txt", "content": "hello"}'
-        
+
         parsed = self.executor._improved_json_parse(json_args)
         normalized = self.executor._normalize_arguments(parsed)
-        
+
         assert isinstance(normalized, dict)
         assert normalized["path"] == "test.txt"
         assert normalized["content"] == "hello"
@@ -349,7 +349,7 @@ class TestExecutorJsonParsing:
             '{"key": undefined}',  # JavaScript undefined (invalid JSON)
             '{"key": function(){}}',  # JavaScript function (invalid JSON)
         ]
-        
+
         for invalid_json in edge_cases:
             try:
                 self.executor._improved_json_parse(invalid_json)

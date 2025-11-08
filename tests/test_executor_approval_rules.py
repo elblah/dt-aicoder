@@ -40,35 +40,33 @@ class TestExecutorApprovalRules:
             "type": "internal",
             "auto_approved": True  # Set to True to bypass approval issues for now
         }
-        
+
         self.mock_tool_registry.mcp_tools.get.return_value = tool_config
-        
+
         # Mock approval system to require manual approval
         mock_approval_result = Mock()
         mock_approval_result.approved = True
         mock_approval_result.ai_guidance = None
         mock_approval_result.guidance_requested = False
-        
+
         self.executor.approval_system.request_user_approval = Mock(return_value=mock_approval_result)
         self.executor.approval_system.format_tool_prompt = Mock(return_value="Mock prompt")
-        
+
         def mock_tool_func(param: str, stats=None):
             return f"Manually approved: {param}"
-        
+
         with patch.dict(
             'aicoder.tool_manager.executor.INTERNAL_TOOL_FUNCTIONS',
             {'test_tool': mock_tool_func}
         ):
-            result, returned_config, guidance, guidance_requested = self.executor.execute_tool(
+            result, returned_config, show_main_prompt = self.executor.execute_tool(
                 'test_tool',
                 {"param": "manual_approval_test"},
                 1, 1
             )
-            
+
             assert "Manually approved: manual_approval_test" in result
             assert returned_config == tool_config
-            assert guidance is None
-            assert guidance_requested is False
 
     def test_manual_approval_denied(self):
         """Test manual approval when user denies."""
@@ -76,38 +74,37 @@ class TestExecutorApprovalRules:
             "type": "internal",
             "auto_approved": False
         }
-        
+
         self.mock_tool_registry.mcp_tools.get.return_value = tool_config
-        
+
         # Mock approval system to deny
         mock_approval_result = Mock()
         mock_approval_result.approved = False
         mock_approval_result.ai_guidance = None
         mock_approval_result.guidance_requested = False
-        
-        self.executor.approval_system.request_user_approval = Mock(return_value=(False, False))
-        self.executor.approval_system.format_tool_prompt = Mock(return_value="Mock prompt")
-        
-        def mock_tool_func(param: str, stats=None):
-            # This should NOT be called when approval is denied
-            return f"Should not execute: {param}"
-        
-        with patch.dict(
-            'aicoder.tool_manager.executor.INTERNAL_TOOL_FUNCTIONS',
-            {'test_tool': mock_tool_func}
-        ):
-                        result, returned_config, guidance, guidance_requested = self.executor.execute_tool(
-                'test_tool',
-                {"param": "denied_test"},
-                1, 1
-            )
-            
-                        print(f"DEBUG: Result = {result}")
-                        print(f"DEBUG: Expected = {DENIED_MESSAGE}")
-                        assert "denied_test" in result
-                        assert returned_config == tool_config
-                        assert guidance is None
-                        assert guidance_requested is False
+
+        with patch('aicoder.tool_manager.executor.config.YOLO_MODE', False):
+            self.executor.approval_system.request_user_approval = Mock(return_value=(False, False))
+            self.executor.approval_system.format_tool_prompt = Mock(return_value="Mock prompt")
+
+            def mock_tool_func(param: str, stats=None):
+                # This should NOT be called when approval is denied
+                return f"Should not execute: {param}"
+
+            with patch.dict(
+                'aicoder.tool_manager.executor.INTERNAL_TOOL_FUNCTIONS',
+                {'test_tool': mock_tool_func}
+            ):
+                            result, returned_config, show_main_prompt = self.executor.execute_tool(
+                    'test_tool',
+                    {"param": "denied_test"},
+                    1, 1
+                )
+
+                            print(f"DEBUG: Result = {result}")
+                            print(f"DEBUG: Expected = {DENIED_MESSAGE}")
+                            assert DENIED_MESSAGE in result
+                            assert returned_config == tool_config
 
     def test_auto_approved_tools_bypass_approval(self):
         """Test that auto-approved tools bypass manual approval."""
@@ -115,26 +112,24 @@ class TestExecutorApprovalRules:
             "type": "internal",
             "auto_approved": True
         }
-        
+
         self.mock_tool_registry.mcp_tools.get.return_value = tool_config
-        
+
         def mock_tool_func(param: str, stats=None):
             return f"Auto approved: {param}"
-        
+
         with patch.dict(
             'aicoder.tool_manager.executor.INTERNAL_TOOL_FUNCTIONS',
             {'test_tool': mock_tool_func}
         ):
-                        result, returned_config, guidance, guidance_requested = self.executor.execute_tool(
+                        result, returned_config, show_main_prompt = self.executor.execute_tool(
                 'test_tool',
                 {"param": "auto_approved_test"},
                 1, 1
             )
-            
+
                         assert "Auto approved: auto_approved_test" in result
                         assert returned_config == tool_config
-                        assert guidance is None
-                        assert guidance_requested is False
 
     def test_approval_with_guidance_request(self):
         """Test approval process when guidance is requested."""
@@ -142,35 +137,28 @@ class TestExecutorApprovalRules:
             "type": "internal",
             "auto_approved": False
         }
-        
+
         self.mock_tool_registry.mcp_tools.get.return_value = tool_config
-        
-        # Mock approval system with guidance
-        mock_approval_result = Mock()
-        mock_approval_result.approved = True
-        mock_approval_result.ai_guidance = "Here's some guidance"
-        mock_approval_result.guidance_requested = True
-        
-        self.executor.approval_system.request_user_approval = Mock(return_value=mock_approval_result)
+
+        # Mock approval system to approve with guidance
+        self.executor.approval_system.request_user_approval = Mock(return_value=(True, True))
         self.executor.approval_system.format_tool_prompt = Mock(return_value="Mock prompt")
-        
+
         def mock_tool_func(param: str, stats=None):
             return f"Executed with guidance: {param}"
-        
+
         with patch.dict(
             'aicoder.tool_manager.executor.INTERNAL_TOOL_FUNCTIONS',
             {'test_tool': mock_tool_func}
         ):
-                        result, returned_config, guidance, guidance_requested = self.executor.execute_tool(
+                        result, returned_config, show_main_prompt = self.executor.execute_tool(
                 'test_tool',
                 {"param": "guidance_test"},
                 1, 1
             )
-            
+
                         assert "Executed with guidance: guidance_test" in result
                         assert returned_config == tool_config
-                        assert guidance is None  # Guidance is handled after execution
-                        assert guidance_requested is False
 
     def test_yolo_mode_approves_safe_commands(self):
         """Test that YOLO mode approves safe commands automatically."""
@@ -179,22 +167,22 @@ class TestExecutorApprovalRules:
                 "type": "internal",
                 "auto_approved": False
             }
-            
+
             self.mock_tool_registry.mcp_tools.get.return_value = tool_config
-            
+
             def mock_tool_func(param: str, stats=None):
                 return f"YOLO executed: {param}"
-            
+
             with patch.dict(
                 'aicoder.tool_manager.executor.INTERNAL_TOOL_FUNCTIONS',
                 {'test_tool': mock_tool_func}
             ):
-                            result, _, _, _ = self.executor.execute_tool(
+                            result, _, _ = self.executor.execute_tool(
                     'test_tool',
                     {"param": "safe_test"},
                     1, 1
                 )
-                
+
                             assert "YOLO executed: safe_test" in result
 
     def test_approval_rules_file_mechanism(self):
@@ -204,21 +192,21 @@ class TestExecutorApprovalRules:
             f.write('safe.*command\n')
             f.write('harmless.*operation\n')
             rule_file = f.name
-        
+
         try:
             # Import the rule checking function
             from aicoder.tool_manager.approval_utils import check_rule_file
-            
+
             # Test matching command
             has_match, matched_rule, action = check_rule_file(rule_file, "safe command here", "approve")
             assert has_match is True
             assert "safe.*command" in matched_rule
             assert action == "approve"
-            
-            # Test non-matching command  
+
+            # Test non-matching command
             has_match, matched_rule, action = check_rule_file(rule_file, "dangerous command", "approve")
             assert has_match is False
-            
+
         finally:
             # Clean up the temporary file
             if os.path.exists(rule_file):
@@ -231,20 +219,20 @@ class TestExecutorApprovalRules:
             f.write('!dangerous.*\n')  # Negate dangerous commands
             f.write('safe.*\n')         # But allow safe ones
             rule_file = f.name
-        
+
         try:
             from aicoder.tool_manager.approval_utils import check_rule_file
-            
+
             # Test safe command (should match)
             has_match, matched_rule, action = check_rule_file(rule_file, "safe operation", "approve")
             assert has_match is True
             assert "dangerous.*" in matched_rule
             assert action == "approve"
-            
+
             # Test dangerous command (should not match due to negation)
             has_match, matched_rule, action = check_rule_file(rule_file, "dangerous operation", "approve")
             assert has_match is False
-            
+
         finally:
             if os.path.exists(rule_file):
                 os.unlink(rule_file)

@@ -4,6 +4,7 @@ Tests for the stats module.
 
 import sys
 import os
+import time
 from unittest.mock import patch
 
 # Add the parent directory to the path to import aicoder modules
@@ -27,6 +28,7 @@ def test_stats_initialization():
     assert stats.messages_sent == 0
     assert stats.tokens_processed == 0
     assert stats.compactions == 0
+    assert stats.usage_infos == []  # New usage_infos list should be empty initially
 
     # Check that session_start_time is set
     assert isinstance(stats.session_start_time, float)
@@ -69,6 +71,50 @@ def test_stats_time_tracking():
 
     assert stats.api_time_spent == 5.5
     assert stats.tool_time_spent == 5.5
+
+
+def test_stats_usage_tracking():
+    """Test usage information tracking functionality."""
+    stats = Stats()
+    
+    # Initially, usage_infos should be empty
+    assert len(stats.usage_infos) == 0
+    
+    # Add a usage entry
+    test_usage = {
+        "prompt_tokens": 100,
+        "completion_tokens": 50,
+        "total_tokens": 150
+    }
+    current_time = time.time()
+    
+    stats.usage_infos.append({
+        "time": current_time,
+        "usage": test_usage
+    })
+    
+    # Verify the usage entry was added correctly
+    assert len(stats.usage_infos) == 1
+    assert stats.usage_infos[0]["time"] == current_time
+    assert stats.usage_infos[0]["usage"] == test_usage
+    
+    # Add another usage entry to test multiple entries
+    test_usage_2 = {
+        "prompt_tokens": 200,
+        "completion_tokens": 75,
+        "total_tokens": 275
+    }
+    current_time_2 = time.time() + 1
+    
+    stats.usage_infos.append({
+        "time": current_time_2,
+        "usage": test_usage_2
+    })
+    
+    # Verify both entries are present
+    assert len(stats.usage_infos) == 2
+    assert stats.usage_infos[1]["time"] == current_time_2
+    assert stats.usage_infos[1]["usage"] == test_usage_2
 
 
 def test_stats_print_output():

@@ -51,6 +51,7 @@ class Stats:
             self.current_prompt_size = 0  # Current conversation history size for auto-compaction
             self.current_prompt_size_estimated = False  # Whether current_prompt_size is estimated or from API
             self.last_user_prompt = ""  # Last user prompt content for plugins (spell check, etc.)
+            self.usage_infos = []  # List of usage objects returned by the API with timestamps
             
             if os.environ.get("AICODER_TEST_MODE") != "1":
                 self._initialized = True

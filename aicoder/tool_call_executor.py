@@ -10,6 +10,6 @@ class ToolCallExecutorMixin:
 
     def _execute_tool_calls(
         self, message: Dict[str, Any]
-    ) -> Tuple[List[Dict[str, Any]], bool]:
+    ) -> Tuple[List[Dict[str, Any]], bool, bool]:
         """Executes tool calls from an AI message and returns the results."""
         return self.tool_manager.execute_tool_calls(message)

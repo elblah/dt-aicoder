@@ -38,74 +38,74 @@ class TestExecutorEdgeCases:
         """Test tool call with None arguments."""
         def mock_tool_func(value=None, stats=None):
             return "Executed with None args"
-        
+
         tool_config = {
             "type": "internal",
             "auto_approved": True
         }
-        
+
         self.mock_tool_registry.mcp_tools.get.return_value = tool_config
-        
+
         with patch.dict(
             'aicoder.tool_manager.internal_tools.INTERNAL_TOOL_FUNCTIONS',
             {'test_tool': mock_tool_func}
         ):
-            result, _, _, _ = self.executor.execute_tool(
+            result, _, _ = self.executor.execute_tool(
                 'test_tool',
                 None,  # None arguments
                 1, 1
             )
-            
+
             assert result == "Executed with None args"
 
     def test_tool_call_with_empty_string_arguments(self):
         """Test tool call with empty string arguments."""
         def mock_tool_func(content="", stats=None):
             return "Executed with empty string"
-        
+
         tool_config = {
             "type": "internal",
             "auto_approved": True
         }
-        
+
         self.mock_tool_registry.mcp_tools.get.return_value = tool_config
-        
+
         with patch.dict(
             'aicoder.tool_manager.internal_tools.INTERNAL_TOOL_FUNCTIONS',
             {'test_tool': mock_tool_func}
         ):
-            result, _, _, _ = self.executor.execute_tool(
+            result, _, _ = self.executor.execute_tool(
                 'test_tool',
                 "",  # Empty string arguments
                 1, 1
             )
-            
+
             assert True  # Tool executed with error
 
     def test_tool_call_with_very_large_arguments(self):
         """Test tool call with very large arguments."""
         large_string = "x" * 10000  # 10KB string
-        
+
         def mock_tool_func(large_param: str, stats=None):
             return f"Received {len(large_param)} characters"
-        
+
         tool_config = {
             "type": "internal",
             "auto_approved": True
         }
-        
+
         self.mock_tool_registry.mcp_tools.get.return_value = tool_config
-        
+
         with patch.dict(
             'aicoder.tool_manager.internal_tools.INTERNAL_TOOL_FUNCTIONS',
             {'test_tool': mock_tool_func}
         ):
-            result, _, _, _ = self.executor.execute_tool(
+            result, _, _ = self.executor.execute_tool(
                 'test_tool',
                 {"large_param": large_string},
                 1, 1
             )
-            
+
             assert "10000" in result
 
     def test_tool_call_with_nested_complex_arguments(self):
@@ -123,27 +123,27 @@ class TestExecutorEdgeCases:
             },
             "large_array": list(range(1000))
         }
-        
+
         def mock_tool_func(level1, large_array, stats=None):
             return f"Found deep value: {level1['level2']['level3']['level4']['deep_value']}"
-        
+
         tool_config = {
             "type": "internal",
             "auto_approved": True
         }
-        
+
         self.mock_tool_registry.mcp_tools.get.return_value = tool_config
-        
+
         with patch.dict(
             'aicoder.tool_manager.internal_tools.INTERNAL_TOOL_FUNCTIONS',
             {'test_tool': mock_tool_func}
         ):
-            result, _, _, _ = self.executor.execute_tool(
+            result, _, _ = self.executor.execute_tool(
                 'test_tool',
                 complex_args,
                 1, 1
             )
-            
+
             assert "found it" in result
 
     def test_tool_call_with_special_characters(self):
@@ -157,27 +157,27 @@ class TestExecutorEdgeCases:
             "json_chars": "{}[],:\"'",
             "control_chars": "\x00\x01\x02"
         }
-        
+
         def mock_tool_func(unicode, quotes, newlines, tabs, backslashes, json_chars, control_chars, stats=None):
             return f"Processed {7} special fields"
-        
+
         tool_config = {
             "type": "internal",
             "auto_approved": True
         }
-        
+
         self.mock_tool_registry.mcp_tools.get.return_value = tool_config
-        
+
         with patch.dict(
             'aicoder.tool_manager.internal_tools.INTERNAL_TOOL_FUNCTIONS',
             {'test_tool': mock_tool_func}
         ):
-            result, _, _, _ = self.executor.execute_tool(
+            result, _, _ = self.executor.execute_tool(
                 'test_tool',
                 special_chars,
                 1, 1
             )
-            
+
             assert "7 special fields" in result
 
     def test_tool_call_with_numeric_arguments(self):
@@ -193,27 +193,27 @@ class TestExecutorEdgeCases:
             "infinity": float('inf'),
             "nan": float('nan')
         }
-        
+
         def mock_tool_func(int_val, float_val, neg_int, neg_float, zero, large_int, scientific, infinity, nan, stats=None):
             return f"Processed numbers: int={int_val}, float={float_val}"
-        
+
         tool_config = {
             "type": "internal",
             "auto_approved": True
         }
-        
+
         self.mock_tool_registry.mcp_tools.get.return_value = tool_config
-        
+
         with patch.dict(
             'aicoder.tool_manager.internal_tools.INTERNAL_TOOL_FUNCTIONS',
             {'test_tool': mock_tool_func}
         ):
-            result, _, _, _ = self.executor.execute_tool(
+            result, _, _ = self.executor.execute_tool(
                 'test_tool',
                 numeric_args,
                 1, 1
             )
-            
+
             assert "int=42" in result
             assert "float=3.14159" in result
 
@@ -227,27 +227,27 @@ class TestExecutorEdgeCases:
             "empty_list": [],
             "empty_dict": {}
         }
-        
+
         def mock_tool_func(true_val, false_val, null_val, empty_string, empty_list, empty_dict, stats=None):
             return f"True: {true_val}, False: {false_val}, Null: {null_val}"
-        
+
         tool_config = {
             "type": "internal",
             "auto_approved": True
         }
-        
+
         self.mock_tool_registry.mcp_tools.get.return_value = tool_config
-        
+
         with patch.dict(
             'aicoder.tool_manager.internal_tools.INTERNAL_TOOL_FUNCTIONS',
             {'test_tool': mock_tool_func}
         ):
-            result, _, _, _ = self.executor.execute_tool(
+            result, _, _ = self.executor.execute_tool(
                 'test_tool',
                 bool_null_args,
                 1, 1
             )
-            
+
             assert "True: True" in result
             assert "False: False" in result
             assert "Null: None" in result
@@ -256,17 +256,17 @@ class TestExecutorEdgeCases:
         """Test multiple tool calls with some succeeding and some failing."""
         def mock_tool_func_success(param: str, stats=None):
             return f"Success: {param}"
-        
+
         def mock_tool_func_error(param: str, stats=None):
             raise RuntimeError(f"Error with: {param}")
-        
+
         tool_config = {
             "type": "internal",
             "auto_approved": True
         }
-        
+
         self.mock_tool_registry.mcp_tools.get.return_value = tool_config
-        
+
         with patch.dict(
             'aicoder.tool_manager.internal_tools.INTERNAL_TOOL_FUNCTIONS',
             {
@@ -299,9 +299,9 @@ class TestExecutorEdgeCases:
                     }
                 ]
             }
-            
-            results, cancel_all = self.executor.execute_tool_calls(message)
-            
+
+            results, cancel_all, show_main_prompt = self.executor.execute_tool_calls(message)
+
             assert len(results) == 3
             assert results[0]["content"] == "Success: test1"
             assert "Error executing internal tool" in results[1]["content"]
@@ -311,33 +311,33 @@ class TestExecutorEdgeCases:
     def test_tool_call_with_very_long_tool_name(self):
         """Test tool call with extremely long tool name."""
         long_name = "tool_" + "a" * 1000  # 1004 character name
-        
+
         tool_config = {
             "type": "internal",
             "auto_approved": True
         }
-        
+
         # Mock to return config for long name
         def mock_get_side_effect(name):
             if name == long_name:
                 return tool_config
             return None
-        
+
         self.mock_tool_registry.mcp_tools.get.side_effect = mock_get_side_effect
-        
+
         def mock_long_name_tool(param: str, stats=None):
             return f"Executed long name tool: {param}"
-        
+
         with patch.dict(
             'aicoder.tool_manager.internal_tools.INTERNAL_TOOL_FUNCTIONS',
             {long_name: mock_long_name_tool}
         ):
-            result, _, _, _ = self.executor.execute_tool(
+            result, _, _ = self.executor.execute_tool(
                 long_name,
                 {"param": "test"},
                 1, 1
             )
-            
+
             assert "Executed long name tool: test" in result
 
     def test_tool_call_with_missing_function_fields(self):
@@ -360,11 +360,11 @@ class TestExecutorEdgeCases:
                 }
             ]
         }
-        
+
         self.executor.tool_registry.message_history = Mock()
         with patch('aicoder.tool_manager.executor.emsg') as mock_emsg:
             try:
-                results, cancel_all = self.executor.execute_tool_calls(message)
+                results, cancel_all, show_main_prompt = self.executor.execute_tool_calls(message)
                 # Should handle gracefully
                 assert len(results) == 0  # No successful executions
                 mock_emsg.assert_called()
@@ -377,12 +377,12 @@ class TestExecutorEdgeCases:
             "type": "internal",
             "auto_approved": False
         }
-        
+
         self.mock_tool_registry.mcp_tools.get.return_value = tool_config
-        
+
         def mock_tool_func(param: str, stats=None):
             return f"Result: {param}"
-        
+
         with patch.dict(
             'aicoder.tool_manager.internal_tools.INTERNAL_TOOL_FUNCTIONS',
             {'test_tool': mock_tool_func}
@@ -391,9 +391,9 @@ class TestExecutorEdgeCases:
             with patch('aicoder.tool_manager.executor.config.YOLO_MODE', False):
                 self.executor.approval_system.request_user_approval = Mock(side_effect=Exception("Approval system error"))
                 self.executor.approval_system.format_tool_prompt = Mock(return_value="Mock prompt")
-            
+
             try:
-                result, _, _, _ = self.executor.execute_tool(
+                result, _, _ = self.executor.execute_tool(
                     'test_tool',
                     {"param": "test"},
                     1, 1
@@ -408,7 +408,7 @@ class TestExecutorEdgeCases:
         try:
             circular_dict = {}
             circular_dict["self"] = circular_dict
-            
+
             result = self.executor._normalize_arguments(circular_dict)
             # Should handle gracefully
         except Exception:
@@ -421,22 +421,22 @@ class TestExecutorEdgeCases:
             "type": "internal",
             "auto_approved": True
         }
-        
+
         self.mock_tool_registry.mcp_tools.get.return_value = tool_config
-        
+
         def mock_tool_func(param: str, tool_index=0, total_tools=0, stats=None):
             return f"Index: {tool_index}, Total: {total_tools}"
-        
+
         with patch.dict(
             'aicoder.tool_manager.internal_tools.INTERNAL_TOOL_FUNCTIONS',
             {'test_tool': mock_tool_func}
         ):
-            result, _, _, _ = self.executor.execute_tool(
+            result, _, _ = self.executor.execute_tool(
                 'test_tool',
                 {"param": "test"},
                 0, 0  # Zero values
             )
-            
+
             assert "Index: 0" in result
             assert "Total: 0" in result
 
@@ -446,22 +446,22 @@ class TestExecutorEdgeCases:
             "type": "internal",
             "auto_approved": True
         }
-        
+
         self.mock_tool_registry.mcp_tools.get.return_value = tool_config
-        
+
         def mock_tool_func(param: str, tool_index=-1, total_tools=-1, stats=None):
             return f"Negative index: {tool_index}, Negative total: {total_tools}"
-        
+
         with patch.dict(
             'aicoder.tool_manager.internal_tools.INTERNAL_TOOL_FUNCTIONS',
             {'test_tool': mock_tool_func}
         ):
-            result, _, _, _ = self.executor.execute_tool(
+            result, _, _ = self.executor.execute_tool(
                 'test_tool',
                 {"param": "test"},
                 -1, -1  # Negative values
             )
-            
+
             assert "Negative index: -1" in result
             assert "Negative total: -1" in result
 
@@ -471,15 +471,15 @@ class TestExecutorEdgeCases:
             "type": "internal",
             "auto_approved": True
         }
-        
+
         self.mock_tool_registry.mcp_tools.get.return_value = tool_config
-        
+
         execution_order = []
-        
+
         def mock_tool_func(param: str, stats=None):
             execution_order.append(param)
             return f"Result: {param}"
-        
+
         with patch.dict(
             'aicoder.tool_manager.internal_tools.INTERNAL_TOOL_FUNCTIONS',
             {'test_tool': mock_tool_func}
@@ -499,10 +499,10 @@ class TestExecutorEdgeCases:
                 }
                 for i in range(5)
             ]
-            
+
             for message in messages:
-                results, cancel_all = self.executor.execute_tool_calls(message)
-            
+                results, cancel_all, show_main_prompt = self.executor.execute_tool_calls(message)
+
             # All should execute in order
             assert len(execution_order) == 5
             assert execution_order == ["item_0", "item_1", "item_2", "item_3", "item_4"]
@@ -514,23 +514,23 @@ class TestExecutorEdgeCases:
             "command": "echo {message}",
             "auto_approved": True
         }
-        
+
         self.mock_tool_registry.mcp_tools.get.return_value = tool_config
-        
+
         extreme_cases = [
             0,  # Zero timeout
             -1,  # Negative timeout
             999999,  # Very large timeout
             float('inf'),  # Infinite timeout
         ]
-        
+
         for timeout in extreme_cases:
-            result, _, _, _ = self.executor.execute_tool(
+            result, _, _ = self.executor.execute_tool(
                 'test_command',
                 {"message": "test", "timeout": timeout},
                 1, 1
             )
-            
+
             # Should handle gracefully (may vary based on subprocess behavior)
             assert isinstance(result, str)
 
@@ -539,14 +539,14 @@ class TestExecutorEdgeCases:
         # Create many tool calls to simulate pressure
         def mock_tool_func(param: str, stats=None):
             return f"Memory test: {param}"
-        
+
         tool_config = {
             "type": "internal",
             "auto_approved": True
         }
-        
+
         self.mock_tool_registry.mcp_tools.get.return_value = tool_config
-        
+
         with patch.dict(
             'aicoder.tool_manager.internal_tools.INTERNAL_TOOL_FUNCTIONS',
             {'test_tool': mock_tool_func}
@@ -561,10 +561,10 @@ class TestExecutorEdgeCases:
                         "arguments": json.dumps({"param": f"item_{i}"})
                     },
                 })
-            
+
             message = {"tool_calls": tool_calls}
-            
-            results, cancel_all = self.executor.execute_tool_calls(message)
-            
+
+            results, cancel_all, show_main_prompt = self.executor.execute_tool_calls(message)
+
             # Should handle all calls
             assert len(results) == 100
