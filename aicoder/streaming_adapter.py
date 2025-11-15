@@ -550,9 +550,23 @@ class StreamingAdapter(APIClient):
                         # Fallback: read with small timeout
                         line = response.readline()
                         if not line:  # EOF
-                            raise ConnectionDroppedException(
-                                "Connection dropped by server (EOF detected)"
-                            )
+                            # Check if we have received usage data - if so, this is likely a normal completion
+                            # for non-compliant providers like gpt-5-nano that close connection without [DONE]
+                            if usage_info:
+                                dmsg("EOF received but usage info present - treating as normal completion")
+                                self._flush_print_buffers()
+                                # Create a fake JSON line with finish_reason to let normal flow handle it
+                                fake_data = {
+                                    "choices": [{
+                                        "index": 0,
+                                        "finish_reason": "stop"
+                                    }]
+                                }
+                                line = f'data: {json.dumps(fake_data)}'.encode('utf-8')
+                            else:
+                                raise ConnectionDroppedException(
+                                    "Connection dropped by server (EOF detected)"
+                                )
 
                     except Exception as e:
                         handle_request_error(e)

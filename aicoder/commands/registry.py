@@ -23,6 +23,7 @@ from .yolo_command import YoloCommand
 from .plan_command import PlanCommand
 from .reset_command import ResetCommand
 from .settings_command import SettingsCommand
+from .memory_command import MemoryCommand
 
 
 class CommandRegistry:
@@ -57,6 +58,7 @@ class CommandRegistry:
             PlanCommand,
             ResetCommand,
             SettingsCommand,
+            MemoryCommand,
         ]
 
         for cmd_class in command_classes:
