@@ -352,6 +352,104 @@ class TestPromptCommand(unittest.TestCase):
         # Check that the system message was updated
         self.assertEqual(mock_app.message_history.messages[0]["content"], "new prompt")
 
+    def test_handle_prompt_clear(self):
+        """Test the /prompt clear command."""
+
+        class MockApp:
+            def __init__(self):
+                mock_message_history = MagicMock()
+                mock_message_history.messages = [
+                    {"role": "system", "content": "original system prompt"}
+                ]
+                self.message_history = mock_message_history
+
+        mock_app = MockApp()
+        handler = PromptCommand(mock_app)
+        handler.app = mock_app  # Set the app reference
+
+        # Set an initial prompt via environment variable
+        with patch.dict(os.environ, {"AICODER_PROMPT_MAIN": "test prompt content"}):
+            result = handler._handle_prompt_clear(["clear"])
+
+            # Should return (False, False) - don't quit, don't run API call
+            self.assertEqual(result, (False, False))
+
+            # Environment variable should be set to empty string
+            self.assertEqual(os.environ.get("AICODER_PROMPT_MAIN"), "")
+
+            # System message should be cleared
+            self.assertEqual(mock_app.message_history.messages[0]["content"], "")
+
+    def test_handle_prompt_clear_no_system_message(self):
+        """Test the /prompt clear command when no system message exists."""
+
+        class MockApp:
+            def __init__(self):
+                mock_message_history = MagicMock()
+                mock_message_history.messages = [
+                    {"role": "user", "content": "hello"}
+                ]  # No system message
+                self.message_history = mock_message_history
+
+        mock_app = MockApp()
+        handler = PromptCommand(mock_app)
+        handler.app = mock_app  # Set the app reference
+
+        # Clear prompt without a system message
+        with patch.dict(os.environ, {}, clear=False):
+            result = handler._handle_prompt_clear(["clear"])
+
+            # Should return (False, False)
+            self.assertEqual(result, (False, False))
+
+            # Environment variable should still be set to empty string
+            self.assertEqual(os.environ.get("AICODER_PROMPT_MAIN"), "")
+
+    def test_handle_prompt_clear_recalculates_prompt_size(self):
+        """Test that /prompt clear recalculates the prompt size after clearing."""
+
+        class MockApp:
+            def __init__(self):
+                mock_message_history = MagicMock()
+                mock_message_history.messages = [
+                    {"role": "system", "content": "You are a helpful assistant."}
+                ]
+                mock_api_handler = MagicMock()
+                mock_stats = MagicMock()
+                mock_stats.current_prompt_size = 1000  # Initial size
+                mock_stats.current_prompt_size_estimated = False
+                mock_api_handler.stats = mock_stats
+                mock_message_history.api_handler = mock_api_handler
+                self.message_history = mock_message_history
+
+        mock_app = MockApp()
+        handler = PromptCommand(mock_app)
+        handler.app = mock_app  # Set the app reference
+
+        # Mock the estimate_messages_tokens function to return a smaller value after clearing
+        with patch('aicoder.utils.estimate_messages_tokens') as mock_estimate:
+            mock_estimate.return_value = 50  # Much smaller after clearing
+
+            # Clear prompt with a system message
+            with patch.dict(os.environ, {}, clear=False):
+                result = handler._handle_prompt_clear(["clear"])
+
+                # Should return (False, False)
+                self.assertEqual(result, (False, False))
+
+                # Verify estimate_messages_tokens was called with the messages
+                mock_estimate.assert_called_once_with(mock_app.message_history.messages)
+
+                # Verify the prompt size was updated
+                self.assertEqual(mock_app.message_history.api_handler.stats.current_prompt_size, 50)
+                self.assertTrue(mock_app.message_history.api_handler.stats.current_prompt_size_estimated)
+
+                # Verify the system message content was cleared
+                self.assertEqual(mock_app.message_history.messages[0]["content"], "")
+
+                # Environment variable should be set to empty string
+                self.assertEqual(os.environ.get("AICODER_PROMPT_MAIN"), "")
+
 
 if __name__ == "__main__":
     unittest.main()

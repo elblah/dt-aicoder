@@ -5,7 +5,7 @@ Command registry for AI Coder.
 from typing import Dict, Callable
 from .help_command import HelpCommand
 from .edit_command import EditCommand
-from .memory_command import MemoryCommand
+
 from .quit_command import QuitCommand
 from .pprint_messages_command import PprintMessagesCommand
 from .compact_command import CompactCommand
@@ -40,7 +40,6 @@ class CommandRegistry:
         command_classes = [
             HelpCommand,
             EditCommand,
-            MemoryCommand,
             QuitCommand,
             PprintMessagesCommand,
             CompactCommand,

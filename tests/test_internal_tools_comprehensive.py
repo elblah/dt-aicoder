@@ -18,8 +18,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from aicoder.tool_manager.internal_tools import (
     execute_edit_file,
     execute_grep,
-    execute_glob,
-    execute_pwd,
     execute_read_file,
 )
 
@@ -31,82 +29,10 @@ class MockStats:
         self.tool_errors = 0
 
 
-def test_pwd_tool():
-    """Test the pwd tool."""
-    mock_stats = MockStats()
-    # Test getting current working directory
-    result = execute_pwd(stats=mock_stats)
-
-    # Verify the result is a valid path
-    assert isinstance(result, str)
-    assert os.path.exists(result)
-    assert result == os.getcwd()
 
 
-def test_glob_tool():
-    """Test the glob tool."""
-    mock_stats = MockStats()
-    with tempfile.TemporaryDirectory() as temp_dir:
-        # Save current directory and change to temp directory
-        original_dir = os.getcwd()
-        os.chdir(temp_dir)
-
-        try:
-            # Create some test files
-            test_files = ["file1.txt", "file2.txt", "test.py", "script.sh"]
-            for filename in test_files:
-                with open(os.path.join(temp_dir, filename), "w") as f:
-                    f.write("test content")
-
-            # Test finding txt files
-            result = execute_glob(pattern="*.txt", stats=mock_stats)
-
-            # Verify txt files are found
-            assert "file1.txt" in result
-            assert "file2.txt" in result
-            assert "test.py" not in result
-
-            # Test finding py files
-            result = execute_glob(pattern="*.py", stats=mock_stats)
-
-            # Verify py files are found
-            assert "test.py" in result
-            assert "file1.txt" not in result
-
-            # Test finding all files
-            result = execute_glob(pattern="*", stats=mock_stats)
-
-            # Verify all files are found
-            for filename in test_files:
-                assert filename in result
-
-        finally:
-            # Restore original directory
-            os.chdir(original_dir)
 
 
-def test_glob_tool_empty_pattern():
-    """Test the glob tool with empty pattern."""
-    mock_stats = MockStats()
-    result = execute_glob(pattern="", stats=mock_stats)
-    assert "Error" in result
-
-
-def test_glob_tool_no_matches():
-    """Test the glob tool with pattern that matches nothing."""
-    mock_stats = MockStats()
-    with tempfile.TemporaryDirectory() as temp_dir:
-        # Save current directory and change to temp directory
-        original_dir = os.getcwd()
-        os.chdir(temp_dir)
-
-        try:
-            # Test pattern that matches nothing
-            result = execute_glob(pattern="nonexistent*.txt", stats=mock_stats)
-            assert result == "No files found matching pattern"
-        finally:
-            # Restore original directory
-            os.chdir(original_dir)
 
 
 def test_grep_tool():

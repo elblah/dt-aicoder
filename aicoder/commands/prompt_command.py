@@ -50,6 +50,10 @@ class PromptCommand(BaseCommand):
         if "reset" in args:
             return self._handle_prompt_reset(args)
 
+        # Handle clear subcommand
+        if "clear" in args:
+            return self._handle_prompt_clear(args)
+
         # Check if full mode is requested
         full_mode = "full" in args
 
@@ -747,6 +751,69 @@ class PromptCommand(BaseCommand):
         # Return False to continue with current conversation
         return False, False
 
+    def _handle_prompt_clear(self, args: List[str]) -> Tuple[bool, bool]:
+        """Clear the main prompt completely (set to empty string)."""
+        import os
+
+        # Store what we're clearing for the message
+        old_prompt_source = os.environ.get("AICODER_PROMPT_MAIN", "Default")
+
+        # Set the environment variable to an empty string
+        os.environ["AICODER_PROMPT_MAIN"] = ""
+
+        print(f"{config.GREEN} *** Cleared main prompt (set to empty){config.RESET}")
+        print(f"{config.YELLOW} *** Previous source: {old_prompt_source}{config.RESET}")
+
+        print(
+            f"{config.YELLOW} *** New length: 0 characters{config.RESET}"
+        )
+
+        print(f"{config.YELLOW} *** Current source: Environment Variable (empty){config.RESET}")
+
+        # Update the system message in the current conversation to be empty
+        if (
+            self.app.message_history.messages
+            and self.app.message_history.messages[0].get("role") == "system"
+        ):
+            old_prompt = self.app.message_history.messages[0]["content"]
+            self.app.message_history.messages[0]["content"] = ""
+            print(
+                f"\n{config.GREEN} *** System prompt cleared for current conversation{config.RESET}"
+            )
+
+            # Show what was cleared
+            if old_prompt:
+                print(
+                    f"{config.YELLOW} *** Cleared {len(old_prompt)} characters{config.RESET}"
+                )
+
+            # Recalculate token count after clearing the prompt
+            if self.app.message_history.api_handler and hasattr(self.app.message_history.api_handler, "stats"):
+                from ..utils import estimate_messages_tokens
+
+                self.app.message_history.api_handler.stats.current_prompt_size = estimate_messages_tokens(
+                    self.app.message_history.messages
+                )
+                self.app.message_history.api_handler.stats.current_prompt_size_estimated = True
+                if config.DEBUG:
+                    imsg(
+                        f" *** Token count recalculated after clearing prompt: {self.app.message_history.api_handler.stats.current_prompt_size} tokens"
+                    )
+        else:
+            print(
+                f"{config.YELLOW} *** Warning: Could not update current conversation - will apply to next new conversation{config.RESET}"
+            )
+
+        print(
+            f"\n{config.YELLOW} *** Use '/prompt' to see current prompt information{config.RESET}"
+        )
+        print(
+            f"{config.YELLOW} *** Use '/prompt reset' to restore original prompt{config.RESET}"
+        )
+
+        # Return False to continue with current conversation
+        return False, False
+
     def _update_conversation_prompt(self, new_prompt: str) -> None:
         """Update the system prompt in the current conversation."""
         try:
@@ -807,6 +874,9 @@ class PromptCommand(BaseCommand):
             f"  {config.YELLOW}/prompt reset{config.RESET}    Reset to original default prompt"
         )
         print(
+            f"  {config.YELLOW}/prompt clear{config.RESET}    Clear all prompt content (set to empty)"
+        )
+        print(
             f"  {config.YELLOW}/prompt edit{config.RESET}      Edit current main prompt in $EDITOR"
         )
         wmsg("  /prompt help     Show this help message")
@@ -834,6 +904,9 @@ class PromptCommand(BaseCommand):
         print()
         wmsg("  # Reset to original startup prompt")
         print("  /prompt reset")
+        print()
+        wmsg("  # Clear all prompt content")
+        print("  /prompt clear")
         print()
         wmsg("  # Set prompt #2 as active (user prompt)")
         print("  /prompt set 2")

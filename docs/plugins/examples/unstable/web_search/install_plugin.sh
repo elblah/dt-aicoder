@@ -12,7 +12,7 @@ echo "Installing $PLUGIN_NAME plugin..."
 mkdir -p "$INSTALL_DIR"
 
 # Copy plugin files
-cp -r "$PLUGIN_DIR/$PLUGIN_NAME" "$INSTALL_DIR/"
+cp -r "$PLUGIN_DIR/web_search.py" "$INSTALL_DIR/$PLUGIN_NAME"
 
 if [ $? -eq 0 ]; then
     echo "[✓] $PLUGIN_NAME plugin installed successfully!"

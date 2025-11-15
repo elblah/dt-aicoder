@@ -121,10 +121,7 @@ class AICoder(
         set_tool_manager(self.tool_manager)
         self._initialize_mcp_servers()
 
-        # Initialize project memory
-        from .memory import get_project_memory
-
-        self.project_memory = get_project_memory(self.current_directory)
+        
 
         # Load prompt history after readline is initialized
         self._load_prompt_history()

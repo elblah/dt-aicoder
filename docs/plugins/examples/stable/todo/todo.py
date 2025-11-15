@@ -214,12 +214,11 @@ def on_aicoder_init(aicoder_instance):
                             aicoder_instance.last_todo_explanation = explanation
 
                         # Return the tool configuration as the second element, not True
-                        return result, UPDATE_TODO_TOOL_DEFINITION, None, False
+                        return result, UPDATE_TODO_TOOL_DEFINITION, False
                     except Exception as e:
                         return (
                             f"Error executing update_todo: {e}",
                             UPDATE_TODO_TOOL_DEFINITION,
-                            None,
                             False,
                         )
                 else:

@@ -37,7 +37,6 @@ class ReadlineHistoryManager:
                 "diff) Show external diff",
                 "diff-edit) Interactive diff edit",
                 "yolo) YOLO mode",
-                "yolo+) YOLO mode with guidance",
                 "help) Show help",
             ],
         }

@@ -309,9 +309,10 @@ def _apply_prompt_variables(base_prompt: str) -> str:
         base_prompt = base_prompt.replace("{current_directory}", os.getcwd())
 
     if "{current_datetime}" in base_prompt:
-        current_datetime = datetime.now()
+        from datetime import timezone
+        current_datetime = datetime.now(timezone.utc)
         base_prompt = base_prompt.replace(
-            "{current_datetime}", current_datetime.strftime("%Y-%m-%d %H:%M:%S")
+            "{current_datetime}", current_datetime.strftime("%Y-%m-%d %H:%M:%S UTC")
         )
 
     if "{available_tools}" in base_prompt:

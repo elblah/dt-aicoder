@@ -73,7 +73,7 @@ Prompt files can include template variables that are automatically replaced:
 | Variable | Description |
 |----------|-------------|
 | `{current_directory}` | Current working directory |
-| `{current_datetime}` | Current date and time (YYYY-MM-DD HH:MM:SS) |
+| `{current_datetime}` | Current date and time (YYYY-MM-DD HH:MM:SS UTC) |
 | `{current_user}` | Current username |
 | `{system_info}` | System information (OS, architecture) |
 | `{platform_info}` | Detailed platform information |

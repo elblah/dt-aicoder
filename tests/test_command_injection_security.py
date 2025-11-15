@@ -6,7 +6,6 @@ These tests should be run regularly to prevent security regressions.
 import tempfile
 import os
 from aicoder.tool_manager.internal_tools.grep import execute_grep
-from aicoder.tool_manager.internal_tools.glob import execute_glob
 from aicoder.tool_manager.internal_tools.list_directory import execute_list_directory
 
 
@@ -43,27 +42,11 @@ def test_grep_tool_injection_security():
 
 
 def test_glob_tool_injection_security():
-    """Test that glob tool is secure against command injection."""
-    stats = MockStats()
-    injection_marker = "INJECTION_SUCCESS_TEST"
-
-    injection_attempts = [
-        "*.py; echo " + injection_marker,
-        "*.py && echo " + injection_marker,
-        "*.py | echo " + injection_marker,
-        "*.py'; echo " + injection_marker,
-        '*.py"; echo ' + injection_marker,
-        "**/*.py; echo " + injection_marker,
-    ]
-
-    for injection_attempt in injection_attempts:
-        result = execute_glob(injection_attempt, stats)
-
-        # Should not contain the injection marker
-        if injection_marker in result:
-            raise AssertionError(
-                f"GLOB TOOL VULNERABLE: Injection detected in output: {result}"
-            )
+    """Test that glob tool is secure against command injection (now a plugin)."""
+    # Note: glob functionality is now provided by a plugin
+    # This test is kept for historical purposes but no longer tests internal tools
+    print("Glob tool is now a plugin - security tests should be moved to plugin tests")
+    pass
 
 
 def test_list_directory_tool_injection_security():
@@ -110,8 +93,6 @@ def test_actual_command_execution_prevention():
             # Try to inject touch command
             if "echo" in injection_attempt:
                 execute_grep(injection_attempt, stats)
-            elif "py" in injection_attempt:
-                execute_glob(injection_attempt, stats)
             else:
                 execute_list_directory(injection_attempt, stats)
 
@@ -133,10 +114,6 @@ def test_normal_operation_still_works():
     stats = MockStats()
     # Test normal grep
     result = execute_grep("def", stats)
-    assert isinstance(result, str)
-
-    # Test normal glob
-    result = execute_glob("*.py", stats)
     assert isinstance(result, str)
 
     # Test normal list_directory (assuming current directory exists)

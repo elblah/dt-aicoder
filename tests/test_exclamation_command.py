@@ -31,8 +31,7 @@ class TestExclamationCommand(unittest.TestCase):
         ), patch("aicoder.tool_call_executor.ToolCallExecutorMixin.__init__"), patch(
             "aicoder.input_handler.InputHandlerMixin.__init__"
         ), patch("aicoder.command_handlers.CommandHandlerMixin.__init__"), patch(
-            "aicoder.memory.get_project_memory"
-        ), patch("aicoder.readline_history_manager"):
+            "aicoder.readline_history_manager"):
             self.app = AICoder()
             # Mock the message history to avoid complex initialization
             self.app.message_history = MagicMock()

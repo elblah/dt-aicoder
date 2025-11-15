@@ -51,60 +51,73 @@ def _parse_bool_env(var_name: str, default: bool = True) -> bool:
 ASPELL_CHECK_ENABLED = _parse_bool_env("ASPELL_CHECK", True)
 ASPELL_LANG = os.getenv("ASPELL_LANG", "en")
 
+# Cache expensive operations during startup
+_aspell_available = None  # Cache aspell availability
+_personal_dict_file = None  # Cache personal dictionary path
+_config_dir = os.path.expanduser("~/.config/aicoder")  # Cache config directory
+
 # Store original input function
 _original_input = builtins.input
 
 # Session history of misspelled words for /aspell list command
-_session_misspelled_words: Dict[str, int] = {}  # word -> count
+_session_misspelled_words: Dict[str, int] = {}
+
+# Global flag to enable/disable aspell checking (can be toggled via commands)
+_aspell_enabled = True  # Global flag to enable/disable aspell checking
 
 # Plugin version
 __version__ = "1.6.0"
 
 
 def _is_aspell_available() -> bool:
-    """Check if aspell command is available."""
-    try:
-        subprocess.run(
-            ["which", "aspell"],
-            capture_output=True,
-            check=True,
-            timeout=5
-        )
-        return True
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
-        return False
+    """Check if aspell command is available (cached)."""
+    global _aspell_available
+    if _aspell_available is None:
+        _aspell_available = shutil.which("aspell") is not None
+    return _aspell_available
 
 
 def _get_personal_dict_file() -> str:
-    """Get the path to personal dictionary file.
+    """Get the path to personal dictionary file (cached).
 
     Returns language-specific file if it exists, otherwise generic file.
     Aspell will ignore the file if it doesn't exist.
     """
-    config_dir = os.path.expanduser("~/.config/aicoder")
-    lang_specific_file = os.path.join(config_dir, f"aspell.{ASPELL_LANG}.pws")
-    generic_file = os.path.join(config_dir, "aspell.pws")
+    global _personal_dict_file
+    if _personal_dict_file is None:
+        lang_specific_file = os.path.join(_config_dir, f"aspell.{ASPELL_LANG}.pws")
+        generic_file = os.path.join(_config_dir, "aspell.pws")
 
-    # Return language-specific file if it exists, otherwise generic
-    if os.path.exists(lang_specific_file):
-        return lang_specific_file
-    else:
-        return generic_file
+        # Return language-specific file if it exists, otherwise generic
+        if os.path.exists(lang_specific_file):
+            _personal_dict_file = lang_specific_file
+        else:
+            _personal_dict_file = generic_file
+    
+    return _personal_dict_file
 
+
+_editor_cache = None
 
 def _get_editor() -> str:
-    """Get the preferred editor with fallbacks."""
-    # Try $EDITOR first
-    editor = os.getenv("EDITOR")
-    if editor and shutil.which(editor):
-        return editor
+    """Get the preferred editor with fallbacks (cached)."""
+    global _editor_cache
+    if _editor_cache is None:
+        # Try $EDITOR first
+        editor = os.getenv("EDITOR")
+        if editor and shutil.which(editor):
+            _editor_cache = editor
+            return _editor_cache
 
-    # Try common editors in order of preference
-    for fallback_editor in ["vi", "nano", "emacs", "vim"]:
-        if shutil.which(fallback_editor):
-            return fallback_editor
+        # Try common editors in order of preference
+        for fallback_editor in ["vi", "nano", "emacs", "vim"]:
+            if shutil.which(fallback_editor):
+                _editor_cache = fallback_editor
+                return _editor_cache
 
-    return "vi"  # Ultimate fallback
+        _editor_cache = "vi"  # Ultimate fallback
+    
+    return _editor_cache
 
 
 def _extract_suggestions(aspell_output: str, word: str) -> List[str]:
@@ -141,7 +154,7 @@ def _check_spelling(text: str) -> Dict[str, List[str]]:
     Returns:
         Dictionary mapping misspelled words to lists of suggestions
     """
-    if not ASPELL_CHECK_ENABLED or not _is_aspell_available():
+    if not ASPELL_CHECK_ENABLED or not _is_aspell_available() or not _aspell_enabled:
         return {}
 
     # Clean and prepare text for spell checking
@@ -300,7 +313,7 @@ def _spell_check_input(prompt: str = "") -> str:
         return user_text
 
     # Check spelling if enabled and aspell is available
-    if ASPELL_CHECK_ENABLED and _is_aspell_available():
+    if ASPELL_CHECK_ENABLED and _is_aspell_available() and _aspell_enabled:
         errors = _check_spelling(user_text)
         if errors:
             _display_spell_errors(errors)
@@ -313,14 +326,14 @@ def _setup_aspell_plugin():
     global _original_input
 
     # Only set up if spell checking is enabled and aspell is available
-    if ASPELL_CHECK_ENABLED and _is_aspell_available():
+    if ASPELL_CHECK_ENABLED and _is_aspell_available() and _aspell_enabled:
         # Monkey patch the built-in input function
         builtins.input = _spell_check_input
 
         # Get personal dictionary file path for info message
         personal_dict_file = _get_personal_dict_file()
         personal_dict_basename = os.path.basename(personal_dict_file)
-        generic_dict_file = os.path.join(os.path.expanduser("~/.config/aicoder"), "aspell.pws")
+        generic_dict_file = os.path.join(_config_dir, "aspell.pws")
 
         print(f"[✓] Aspell spell check plugin loaded (language: {ASPELL_LANG})")
         print(f"    Personal dict: {personal_dict_basename} (or {os.path.basename(generic_dict_file)})")
@@ -332,9 +345,13 @@ def _setup_aspell_plugin():
 
 def _handle_aspell_command_direct(args):
     """Handle aspell commands from AI Coder command system."""
+    global _aspell_enabled
+    
     if not args:
         # Just /aspell, show help
         print("Aspell plugin commands:")
+        print(f"  /aspell enable  - Enable spell checking (currently: {'enabled' if _aspell_enabled else 'disabled'})")
+        print(f"  /aspell disable - Disable spell checking (currently: {'enabled' if _aspell_enabled else 'disabled'})")
         print("  /aspell list   - Show all misspelled words in current session")
         print("  /aspell clear  - Clear session misspelled word history")
         print("  /aspell edit   - Edit personal dictionary (tmux only)")
@@ -343,7 +360,15 @@ def _handle_aspell_command_direct(args):
 
     subcommand = args[0].lower()
 
-    if subcommand == "list":
+    if subcommand == "enable":
+        _aspell_enabled = True
+        print("Aspell spell checking enabled.")
+        return False, False
+    elif subcommand == "disable":
+        _aspell_enabled = False
+        print("Aspell spell checking disabled.")
+        return False, False
+    elif subcommand == "list":
         _display_session_misspelled()
         return False, False
     elif subcommand == "clear":
@@ -357,8 +382,7 @@ def _handle_aspell_command_direct(args):
             return False, False
 
         # Get the personal dictionary file and ensure it exists
-        config_dir = os.path.expanduser("~/.config/aicoder")
-        os.makedirs(config_dir, exist_ok=True)
+        os.makedirs(_config_dir, exist_ok=True)
 
         dict_file = _get_personal_dict_file()
         # Create the file with proper header if it doesn't exist
@@ -373,6 +397,8 @@ def _handle_aspell_command_direct(args):
         return False, False
     elif subcommand == "help":
         print("Aspell plugin commands:")
+        print(f"  /aspell enable  - Enable spell checking (currently: {'enabled' if _aspell_enabled else 'disabled'})")
+        print(f"  /aspell disable - Disable spell checking (currently: {'enabled' if _aspell_enabled else 'disabled'})")
         print("  /aspell list   - Show all misspelled words in current session")
         print("  /aspell clear  - Clear session misspelled word history")
         print("  /aspell edit   - Edit personal dictionary (tmux only)")
@@ -410,7 +436,7 @@ def _apply_edit_wrapper(aicoder_instance):
             content = getattr(app.stats, 'last_user_prompt', None)
 
             # Check spelling
-            if ASPELL_CHECK_ENABLED and _is_aspell_available() and content:
+            if ASPELL_CHECK_ENABLED and _is_aspell_available() and _aspell_enabled and content:
                 errors = _check_spelling(content)
                 if errors:
                     _display_spell_errors(errors)

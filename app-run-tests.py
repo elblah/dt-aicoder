@@ -115,7 +115,7 @@ print('✓ Core imports successful')
             """
 from aicoder.tool_manager.internal_tools import (
     read_file, write_file, edit_file, list_directory,
-    run_shell_command, pwd, grep, glob
+    run_shell_command, grep
 )
 print('✓ Internal tools imports successful')
 """,
@@ -235,7 +235,7 @@ def full_tests() -> bool:
     internal_tools_test = """
 from aicoder.tool_manager.internal_tools import (
     read_file, write_file, edit_file, list_directory,
-    run_shell_command, pwd, grep, glob
+    run_shell_command, grep
 )
 print('✓ All internal tools imported successfully')
 """
