@@ -42,9 +42,16 @@ def test_offset_and_limit():
         assert "Line 4" in lines[1]
         assert "Line 5" in lines[2]
 
-        # Should indicate more lines available
-        assert "File has more lines" in result
-        assert "offset=5" in result
+        # Should NOT indicate more lines available with default metadata=False
+        assert "File has more lines" not in result
+        assert "offset=5" not in result
+
+        # Test with metadata=True
+        result_with_metadata = execute_read_file(temp_path, stats, offset=2, limit=3, metadata=True)
+        
+        # Should indicate more lines available when metadata=True
+        assert "File has more lines" in result_with_metadata
+        assert "offset=5" in result_with_metadata
 
     finally:
         os.unlink(temp_path)
@@ -176,9 +183,16 @@ def test_memory_efficiency():
         assert "5002" in content_lines[1]
         assert "5003" in content_lines[2]
 
-        # Should indicate more lines available
-        assert "File has more lines" in result
-        assert "offset=5003" in result
+        # Should NOT indicate more lines available with default metadata=False
+        assert "File has more lines" not in result
+        assert "offset=5003" not in result
+
+        # Test with metadata=True
+        result_with_metadata = execute_read_file(temp_path, stats, offset=5000, limit=3, metadata=True)
+        
+        # Should indicate more lines available when metadata=True
+        assert "File has more lines" in result_with_metadata
+        assert "offset=5003" in result_with_metadata
 
     finally:
         os.unlink(temp_path)

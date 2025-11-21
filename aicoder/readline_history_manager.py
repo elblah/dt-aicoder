@@ -41,7 +41,7 @@ class ReadlineHistoryManager:
             ],
         }
         self.current_context = "user_input"
-        self._max_history = 1000  # Maximum history items per context
+        self._max_history = 100  # Maximum history items per context
         self._persistent_loaded = False  # Track if persistent history has been loaded
 
     def switch_context(self, context: str):
@@ -134,7 +134,7 @@ class ReadlineHistoryManager:
             persistent_prompts = history.load_history()
 
             # Add them to the user input history (but limit to avoid overwhelming readline)
-            max_load = min(len(persistent_prompts), 500)  # Limit to 500 most recent
+            max_load = min(len(persistent_prompts), 10)  # Limit to 10 most recent for readline
             if persistent_prompts and max_load > 0:
                 # Add the most recent prompts to user input history
                 for prompt in persistent_prompts[-max_load:]:

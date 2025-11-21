@@ -52,6 +52,10 @@ WARNING: If old_string doesn't match exactly or appears multiple times, the oper
                 "type": "string",
                 "description": "The edited text to replace the old_string",
             },
+            "metadata": {
+                "type": "boolean",
+                "description": "Include optional metadata like search suggestions and context (default: False).",
+            },
         },
         "required": ["path", "old_string", "new_string"],
     },
@@ -199,26 +203,38 @@ def _calculate_relevance_score(word: str, line: str, line_index: int) -> float:
     return score
 
 
-def _generate_not_found_error(content: str, old_string: str, path: str) -> str:
+def _generate_not_found_error(content: str, old_string: str, path: str, metadata: bool = False) -> str:
     """Generate a helpful error message using hybrid search approach."""
+    base_error = f"Error: [X] Match not found"
+    
+    if not metadata:
+        return f"{base_error}. Try read_file('{path}') to see current content"
+    
+    # With metadata=True, provide all available search information
+    
     # Phase 1: Quick word search for common cases
     word_result = _quick_word_search(content, old_string)
-    if word_result:
-        return f"Error: [X] Match not found. {word_result}"
-
-    # Phase 2: Fuzzy search only for substantial searches
+    
+    # Phase 2: Fuzzy search for substantial searches
+    fuzzy_result = None
     if _should_use_fuzzy_search(old_string):
         fuzzy_result = _fuzzy_search(content, old_string)
+    
+    # Build comprehensive error message
+    if word_result or fuzzy_result:
+        search_info = []
+        if word_result:
+            search_info.append(word_result)
         if fuzzy_result:
-            return f"Error: [X] Match not found. {fuzzy_result}"
-
+            search_info.append(fuzzy_result)
+        
+        return f"{base_error}. {' | '.join(search_info)}"
+    
     # Phase 3: Basic suggestion
-    return (
-        f"Error: [X] Match not found. Try read_file('{path}') to see current content"
-    )
+    return f"{base_error}. Try read_file('{path}') to see current content"
 
 
-def _generate_multiple_matches_error(content: str, old_string: str, path: str) -> str:
+def _generate_multiple_matches_error(content: str, old_string: str, path: str, metadata: bool = False) -> str:
     """Generate a helpful error message when old_string appears multiple times."""
     lines = content.splitlines()
     old_lines = old_string.splitlines()
@@ -239,6 +255,7 @@ def _generate_multiple_matches_error(content: str, old_string: str, path: str) -
         occurrences.append(line_num)
         pos += 1
 
+    # Basic error is always shown
     error_msg = f"Error: [X] MULTIPLE MATCHES in '{path}'\n"
     error_msg += (
         f"Found {len(occurrences)}+ occurrences (showing first {len(occurrences)})\n"
@@ -246,8 +263,12 @@ def _generate_multiple_matches_error(content: str, old_string: str, path: str) -
     error_msg += f"Lines: {', '.join(map(str, occurrences[:10]))}"
     if len(occurrences) > 10:
         error_msg += " (and more...)"
+    
+    if not metadata:
+        return error_msg
+    
+    # With metadata=True, provide full context and suggestions
     error_msg += "\n\n"
-
     error_msg += "TO FIX: Add unique context to identify the specific match\n"
     error_msg += "   • Include 2-3 lines before your change\n"
     error_msg += "   • Include 2-3 lines after your change\n"
@@ -288,6 +309,7 @@ def execute_edit_file(
     old_string: str,
     new_string: str,
     stats=None,
+    metadata: bool = False,
 ) -> str:
     """
     Edit a file with safety checks similar to production-ready implementations.
@@ -315,10 +337,10 @@ def execute_edit_file(
 
         # Handle content deletion (when new_string is empty)
         if new_string == "":
-            return _delete_content(path, old_string, stats)
+            return _delete_content(path, old_string, stats, metadata)
 
         # Handle content replacement
-        return _replace_content(path, old_string, new_string, stats)
+        return _replace_content(path, old_string, new_string, stats, metadata)
 
     except Exception as e:
         if stats:
@@ -355,7 +377,7 @@ def _create_new_file(path: str, content: str, stats) -> str:
         return f"Error creating file '{path}': {e}"
 
 
-def _delete_content(path: str, old_string: str, stats) -> str:
+def _delete_content(path: str, old_string: str, stats, metadata: bool = False) -> str:
     """Delete content from a file."""
     try:
         # Check if file exists
@@ -377,13 +399,13 @@ def _delete_content(path: str, old_string: str, stats) -> str:
 
         # Check if old_string exists
         if old_string not in old_content:
-            return _generate_not_found_error(old_content, old_string, path)
+            return _generate_not_found_error(old_content, old_string, path, metadata)
 
         # Check if old_string is unique
         first_index = old_content.find(old_string)
         last_index = old_content.rfind(old_string)
         if first_index != last_index:
-            return _generate_multiple_matches_error(old_content, old_string, path)
+            return _generate_multiple_matches_error(old_content, old_string, path, metadata)
 
         # Create new content
         new_content = (
@@ -405,7 +427,7 @@ def _delete_content(path: str, old_string: str, stats) -> str:
         return f"Error deleting content from file '{path}': {e}"
 
 
-def _replace_content(path: str, old_string: str, new_string: str, stats) -> str:
+def _replace_content(path: str, old_string: str, new_string: str, stats, metadata: bool = False) -> str:
     """Replace content in a file."""
     try:
         # Check if file exists
@@ -427,13 +449,13 @@ def _replace_content(path: str, old_string: str, new_string: str, stats) -> str:
 
         # Check if old_string exists
         if old_string not in old_content:
-            return _generate_not_found_error(old_content, old_string, path)
+            return _generate_not_found_error(old_content, old_string, path, metadata)
 
         # Check if old_string is unique
         first_index = old_content.find(old_string)
         last_index = old_content.rfind(old_string)
         if first_index != last_index:
-            return _generate_multiple_matches_error(old_content, old_string, path)
+            return _generate_multiple_matches_error(old_content, old_string, path, metadata)
 
         # Check if content is actually changing
         if old_string == new_string:
@@ -474,6 +496,7 @@ def validate_edit_file(arguments: Dict[str, Any]) -> str | bool:
         path = arguments.get("path", "")
         old_string = arguments.get("old_string", "")
         new_string = arguments.get("new_string", "")
+        metadata = arguments.get("metadata", False)
 
         # Handle file creation (when old_string is empty)
         if old_string == "":
@@ -500,14 +523,14 @@ def validate_edit_file(arguments: Dict[str, Any]) -> str | bool:
 
         # Check if old_string exists (for deletion or replacement)
         if old_string != "" and old_string not in old_content:
-            return _generate_not_found_error(old_content, old_string, path)
+            return _generate_not_found_error(old_content, old_string, path, metadata)
 
         # Check if old_string is unique (if it exists)
         if old_string != "":
             first_index = old_content.find(old_string)
             last_index = old_content.rfind(old_string)
             if first_index != last_index:
-                return _generate_multiple_matches_error(old_content, old_string, path)
+                return _generate_multiple_matches_error(old_content, old_string, path, metadata)
 
         # Check if content is actually changing (for replacement)
         if old_string != "" and new_string != "" and old_string == new_string:

@@ -151,8 +151,6 @@ class PromptHistoryManager:
             # Append prompt as a single JSON line (efficient append-only operation)
             history_entry = {
                 "prompt": prompt,
-                "timestamp": str(Path().resolve()),  # Current directory as context
-                "ts": __import__("time").time(),  # Unix timestamp for ordering
             }
 
             with open(self.history_file, "a", encoding="utf-8") as f:
@@ -227,8 +225,6 @@ class PromptHistoryManager:
                 for prompt in prompts:
                     history_entry = {
                         "prompt": prompt,
-                        "timestamp": str(Path().resolve()),
-                        "ts": __import__("time").time(),
                     }
                     f.write(json.dumps(history_entry) + "\n")
 
@@ -259,8 +255,6 @@ class PromptHistoryManager:
                 for prompt in recent_prompts:
                     history_entry = {
                         "prompt": prompt,
-                        "timestamp": str(Path().resolve()),
-                        "ts": __import__("time").time(),
                     }
                     f.write(json.dumps(history_entry) + "\n")
 

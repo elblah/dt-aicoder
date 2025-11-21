@@ -102,8 +102,6 @@ class TestPromptHistoryManager(unittest.TestCase):
         data = json.loads(line)
         self.assertIn("prompt", data)
         self.assertEqual(data["prompt"], prompt)
-        self.assertIn("timestamp", data)
-        self.assertIn("ts", data)
 
     def test_load_from_corrupted_file(self):
         """Test loading from a corrupted history file."""

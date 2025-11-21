@@ -283,9 +283,9 @@ def on_aicoder_init(aicoder_instance):
             return result
 
         def patched_edit_file(
-            path: str, old_string: str, new_string: str, stats=None
+            path: str, old_string: str, new_string: str, stats=None, metadata: bool = False
         ) -> str:
-            result = _original_edit_file(path, old_string, new_string, stats)
+            result = _original_edit_file(path, old_string, new_string, stats, metadata)
             _check_file_with_ruff(path)
             return result
 

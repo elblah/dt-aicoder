@@ -34,6 +34,10 @@ TOOL_DEFINITION = {
                 "description": f"The number of lines to read (defaults to {DEFAULT_READ_LIMIT}).",
                 "minimum": 1,
             },
+            "metadata": {
+                "type": "boolean",
+                "description": "Include optional metadata like pagination info (default: False).",
+            },
         },
         "required": ["path"],
         "additionalProperties": False,
@@ -41,7 +45,7 @@ TOOL_DEFINITION = {
 }
 
 
-def execute_read_file(path: str, stats, offset: int = None, limit: int = None) -> str:
+def execute_read_file(path: str, stats, offset: int = None, limit: int = None, metadata: bool = False) -> str:
     """Reads the content from a specified file path with optional pagination."""
     try:
         # Convert to absolute path for consistent tracking
@@ -84,21 +88,32 @@ def execute_read_file(path: str, stats, offset: int = None, limit: int = None) -
 
             content = "\n".join(lines)
 
-            # Add truncation warnings if needed
-            warnings = []
+            # Split warnings into mandatory and optional metadata
+            mandatory_warnings = []
+            optional_metadata = []
 
+            # Mandatory: line truncation warnings
             if lines_were_truncated:
-                warnings.append(
+                mandatory_warnings.append(
                     f"[!] Some lines were truncated to {MAX_LINE_LENGTH} characters"
                 )
 
-            if has_more_lines:
-                warnings.append(
+            # Mandatory: file truncation when no pagination was specified
+            if has_more_lines and offset is None and limit is None:
+                mandatory_warnings.append(
+                    f"[!] File has more lines than the default limit of {DEFAULT_READ_LIMIT}. Use offset and limit to read specific ranges."
+                )
+
+            # Optional: pagination info
+            if has_more_lines and metadata:
+                optional_metadata.append(
                     f"[i] File has more lines. Use offset={start_line + len(lines)} to read further"
                 )
 
-            if warnings:
-                content += "\n\n" + " | ".join(warnings)
+            # Combine warnings
+            all_warnings = mandatory_warnings + optional_metadata
+            if all_warnings:
+                content += "\n\n" + " | ".join(all_warnings)
 
             # Record that we've read this file using absolute path
             record_file_read(abs_path)
