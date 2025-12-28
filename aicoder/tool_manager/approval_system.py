@@ -120,7 +120,7 @@ class ApprovalSystem:
                     # Check if this is a file operation that supports external diff
                     has_diff_option = tool_name in ["edit_file", "write_file"]
 
-                    approval_prompt = f"{config.RED}a) Allow once  s) Allow for session  d) Deny  c) Cancel all  YOLO) YOLO  help) Show help\nChoose (a/s/d/c/YOLO/help): {config.RESET}"
+                    approval_prompt = f"{config.RED}A) Allow once  s) Allow for session  d) Deny  c) Cancel all  YOLO) YOLO  help) Show help\nChoose (A/s/d/c/YOLO/help): {config.RESET}"
                     safe_approval_prompt = make_readline_safe(approval_prompt)
 
                     # Enter prompt mode to ensure echo and canonical mode
@@ -133,10 +133,14 @@ class ApprovalSystem:
                     finally:
                         exit_prompt_mode()
 
-                    # Extract just the letter before ")" (e.g., "a) Allow once" -> "a")
-                    answer = (
-                        raw_answer.split(")")[0] if ")" in raw_answer else raw_answer
-                    )
+                    # Default to 'a' if user just presses Enter
+                    if not raw_answer:
+                        answer = "a"
+                    else:
+                        # Extract just the letter before ")" (e.g., "a) Allow once" -> "a")
+                        answer = (
+                            raw_answer.split(")")[0] if ")" in raw_answer else raw_answer
+                        )
 
                     # Start cursor animation
                     self.animator.start_cursor_blinking()

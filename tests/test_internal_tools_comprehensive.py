@@ -238,10 +238,10 @@ def test_edit_file_old_string_not_found():
         # Should return an error
         assert "Error:" in result
         assert "not found" in result
-        # Should provide helpful guidance (either word match or suggestion)
+        # Should provide helpful guidance
         assert any(
             phrase in result
-            for phrase in ["Found '", "Try read_file", "similar content"]
+            for phrase in ["Did you mean", "read_file", "matches exactly"]
         )
 
 
@@ -269,8 +269,7 @@ def test_edit_file_multiple_instances():
 
         # Should return an error about multiple instances
         assert "Error:" in result
-        assert "MULTIPLE MATCHES" in result
-        assert "Lines:" in result
+        assert "appears" in result and "times in file" in result
 
 
 def test_edit_file_same_content():

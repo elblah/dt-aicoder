@@ -291,7 +291,13 @@ def execute_run_shell_command(
     """
     process = None
     try:
-        shell_cmd = ["bash", "-c", command]
+        # Handle None timeout - use default
+        if timeout is None:
+            timeout = DEFAULT_TIMEOUT_SECS
+            
+        # Use timeout command at the beginning to ensure system-level timeout enforcement
+        # Add --kill-after=5 to send KILL signal if process doesn't terminate after SIGTERM
+        shell_cmd = ["timeout", "--kill-after=5", str(timeout), "bash", "-c", command]
 
         # Use Popen to have more control over the process
         process = subprocess.Popen(
